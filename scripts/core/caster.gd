@@ -34,6 +34,11 @@ func update(delta: float) -> void:
 			_cooldowns.erase(k)
 
 
+# Seconds until `spell` can be cast again (its own cooldown or the global one, whichever is longer).
+func cooldown_left(spell: Dictionary) -> float:
+	return maxf(_cooldowns.get(spell["id"], 0.0), _global)
+
+
 func can_cast(spell: Dictionary) -> bool:
 	return not _cooldowns.has(spell["id"])
 

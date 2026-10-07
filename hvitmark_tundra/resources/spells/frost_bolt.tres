@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spells/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"frost_bolt"
+display_name = "Frost Bolt"
+description = "A small blue bolt of frost."
+keyboard_key = 81
+icon_color = Color(0.3765, 0.6471, 0.9804, 1)
+damage = 14.0
+projectile_speed = 520.0
+cooldown = 0.35
+cast_range = 520.0
+effect_type = 0
+projectile_radius = 6.0
+area_radius = 0.0

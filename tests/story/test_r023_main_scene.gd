@@ -144,3 +144,62 @@ func test_casting_shows_an_effect_that_is_cleaned_up_when_leaving() -> void:
 	assert_true(main._hud.text.contains("Queue:"), "HUD queue")
 	main.continue_after_zone()
 	assert_true(main.effects_view == null, "effect layer removed with the zone")
+
+
+func test_the_zone_view_has_the_spell_bar_and_letter_keys() -> void:
+	_boot()
+	main.new_game()
+	main.enter_zone("tundra")
+	assert_eq(main.hud.orb_count(), 9, "nine orbs")
+	assert_true(main.hud.play == main.play, "bar follows the zone")
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_F
+	ev.pressed = true
+	main._unhandled_key_input(ev)
+	assert_eq(main.play.queue.queue, ["dark"], "F queues dark")
+	ev = InputEventKey.new()
+	ev.keycode = KEY_Q
+	ev.pressed = true
+	main._unhandled_key_input(ev)
+	assert_eq(main.play.queue.queue, ["dark", "fire"], "Q queues fire")
+	main.tick(0.016, Vector2.ZERO)
+	main.continue_after_zone()
+	assert_true(main.hud == null, "bar removed with the zone")
+
+
+func test_dead_thralls_leave_the_screen() -> void:
+	_boot()
+	main.new_game()
+	main.enter_zone("tundra")
+	var thrall = main.play.enemies[0]
+	thrall.take_damage(999)
+	main.tick(0.016, Vector2.ZERO)
+	assert_true(not thrall.visible, "corpse hidden")
+	assert_true(main.play.enemies[1].visible, "the living one stays")
+
+
+func test_the_queue_bar_mirrors_the_games_queue() -> void:
+	_boot()
+	main.new_game()
+	main.enter_zone("tundra")
+	assert_true(main.queue_bar != null, "bar present in a zone")
+	assert_eq(main.queue_bar.max_slots, 2, "the game queues pairs")
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_Q
+	ev.pressed = true
+	main._unhandled_key_input(ev)
+	assert_eq(main.queue_bar.queue, PackedStringArray(["Fire"]), "fire appears")
+	assert_true(main.preview_label.text.contains("Fire Bolt"), "preview names the bolt")
+	ev = InputEventKey.new()
+	ev.keycode = KEY_A
+	ev.pressed = true
+	main._unhandled_key_input(ev)
+	assert_eq(main.queue_bar.queue, PackedStringArray(["Fire", "Ice"]), "ice appears")
+	assert_true(main.preview_label.text.contains("Thermal Shock"), "preview names the pair's spell")
+	ev = InputEventKey.new()
+	ev.keycode = KEY_SPACE
+	ev.pressed = true
+	main._unhandled_key_input(ev)
+	assert_eq(main.queue_bar.queue.size(), 0, "casting empties the bar")
+	main.continue_after_zone()
+	assert_true(main.queue_bar == null, "bar removed with the zone")

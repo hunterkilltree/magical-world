@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spells/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"lightning"
+display_name = "Lightning"
+description = "A crackling bolt that strikes at range."
+keyboard_key = 83
+icon_color = Color(0.9804, 0.8000, 0.0824, 1)
+damage = 28.0
+projectile_speed = 0.0
+cooldown = 1.5
+cast_range = 380.0
+effect_type = 2
+projectile_radius = 0.0
+area_radius = 0.0

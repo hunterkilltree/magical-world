@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spells/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"frost_nova"
+display_name = "Frost Nova"
+description = "A ring of frost that bursts around you."
+keyboard_key = 69
+icon_color = Color(0.4039, 0.9098, 0.9765, 1)
+damage = 18.0
+projectile_speed = 0.0
+cooldown = 3.0
+cast_range = 0.0
+effect_type = 1
+projectile_radius = 0.0
+area_radius = 150.0

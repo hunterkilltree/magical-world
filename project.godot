@@ -10,7 +10,7 @@ config/features=PackedStringArray("4.3")
 [display]
 
 window/size/viewport_width=832
-window/size/viewport_height=576
+window/size/viewport_height=700
 
 [rendering]
 

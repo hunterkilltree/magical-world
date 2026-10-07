@@ -209,3 +209,43 @@ Flow. A scripted bot plays the six zones in order through `GameSession` and
 finishes with the ending, and the finished save can be continued with the
 shade unlocked. If this fails, the game has a balance or logic hole.
 
+## Magicka-style presentation
+
+Reference: a Magicka screenshot (element orbs at the bottom-left with letter keys,
+queued orbs on the wizard, floating damage numbers, beams as glowing streaks,
+raised ruined walls). The game stays 2D top-down; these adapt the interface and feel.
+
+### R-027 [done] An element bar and letter keys
+Presentation. The nine elements are bound to letter keys (Q W E R T / A S D F in
+element order) as well as 1-9. The zone HUD shows the nine orbs in two rows with
+their letters, two queue slots, a preview of the spell the queue will cast (its
+name, and whether it is ready or how long until it is), and the wizard's weapon.
+Queued elements also orbit the wizard.
+
+### R-028 [done] Floating damage numbers
+Presentation. A cast shows the damage dealt as a number over each target; damage
+the wizard takes shows in red and health gained from a cast in green. Numbers
+rise and fade within a second.
+
+### R-029 [done] Beams look like beams
+Presentation. Beam spells leave a streak along the wizard's facing for their
+length and width; every other spell leaves its circle.
+
+### R-030 [done] Raised walls and lived-in tiles
+Presentation. Wall and boulder tiles are drawn raised, with a front face where
+nothing solid stands below; floor tiles vary slightly and have slab edges;
+characters have a shadow, thralls and bosses a health bar, and the wizard a hat
+and a staff pointing the way they face.
+
+### R-031 [done] A bottom-centre element queue bar
+Presentation. `ui/element_queue.tscn` is a CanvasLayer holding the exact tree
+`UIBottomCenter` (MarginContainer, bottom-centre anchors, bottom padding) >
+`BackgroundFrame` (TextureRect) > `SlotContainer` (centred HBoxContainer) >
+`Slot1`..`Slot5` (TextureRect, circular frame) > `ElementIcon` (TextureRect,
+ignore texture size, keep aspect centred). Its script keeps up to five queued
+elements in a `PackedStringArray`, `add_element(name)` fills the next empty slot
+with that element's icon and pops the slot (scale 1.0 to 1.2 and back with a
+Tween), and `clear_queue()` empties every slot. Element names map to texture
+paths (Fire, Water, Earth, Nature, Lightning, Ice, Wind, Light, Dark). The game
+mirrors its two-element queue into this bar, hiding the unused slots.
+

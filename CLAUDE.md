@@ -60,9 +60,9 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `controls` (key bindings), `draw_util` (shadows, health bars), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
 - `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
-  1-9 queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
+  Q W E R T / A S D F (or 1-9) queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
   Save file: `user://savegame.json` (autosaved when a zone completes).
 - `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
   after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
@@ -78,3 +78,15 @@ a random or auto-generated name.
   damage in `data/bosses.json` (6000 / 10000 / 18000 hp), the 0.8 s global cooldown in `caster.gd`. Without the
   global cooldown the bot burst 4000 damage in a second. Boss tests use the boss's own max health, so retuning
   needs no test edits; re-run the bot test to check the game is still beatable. Not playtested by a human.
+- Presentation (Magicka-inspired, R-027 to R-030): `scripts/hud.gd` (element bar, queue slots, spell preview), `effects_view.gd`
+  (circles, beams, floating numbers), `level.gd` (raised walls, tile variation). The logic they show (popups, effects,
+  `queue_preview`, `cooldown_left`) lives in ZonePlay/Caster and is unit-tested; check the look with `run.sh shot ... demo`.
+- Element queue bar (R-031): `ui/element_queue.tscn` + `ui/element_queue.gd` (CanvasLayer > UIBottomCenter > BackgroundFrame >
+  SlotContainer > Slot1..5 > ElementIcon). `add_element("Fire")`, `clear_queue()`, `sync_queue([...])`; main mirrors the game's
+  two-element queue into it (`max_slots = 2` hides the rest). Textures are generated placeholders: `python3 tools/make_ui_placeholders.py`
+  (replace the PNGs in `ui/` with real art; keep the paths). The window is 832x700: the 576 px map is pinned to the top and the
+  bottom strip is the spell UI, so nothing covers the spawn tiles.
+- `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
+- `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
+  milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects
+  (any folder containing a `project.godot`). It is deliberately independent of the Grauhold Reach code (different spell model).

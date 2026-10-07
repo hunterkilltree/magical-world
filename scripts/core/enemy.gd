@@ -3,6 +3,7 @@ extends Node2D
 
 const Health = preload("res://scripts/core/health.gd")
 const Mover = preload("res://scripts/core/mover.gd")
+const DrawUtil = preload("res://scripts/core/draw_util.gd")
 
 const SPEED := 80.0
 const SIGHT := 256.0
@@ -51,4 +52,10 @@ func step(delta: float, target) -> void:
 
 
 func _draw() -> void:
+	DrawUtil.shadow(self, 10.0)
 	draw_circle(Vector2.ZERO, 10.0, Color("#ef4444"))
+	draw_arc(Vector2.ZERO, 10.0, 0.0, TAU, 20, Color("#7f1d1d"), 2.0)
+	draw_circle(Vector2(-3.5, -2), 1.8, Color.WHITE)
+	draw_circle(Vector2(3.5, -2), 1.8, Color.WHITE)
+	if health.current < health.max_health:
+		DrawUtil.bar(self, -20.0, 24.0, float(health.current) / float(health.max_health), Color("#ef4444"))

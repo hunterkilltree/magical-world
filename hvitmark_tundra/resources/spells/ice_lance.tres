@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spells/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"ice_lance"
+display_name = "Ice Lance"
+description = "A narrow, fast shard of ice."
+keyboard_key = 87
+icon_color = Color(0.7294, 0.9020, 0.9922, 1)
+damage = 22.0
+projectile_speed = 760.0
+cooldown = 0.8
+cast_range = 700.0
+effect_type = 0
+projectile_radius = 4.0
+area_radius = 0.0

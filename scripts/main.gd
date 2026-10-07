@@ -5,12 +5,15 @@ extends Node2D
 const GameSession = preload("res://scripts/core/game_session.gd")
 const Level = preload("res://scripts/level.gd")
 const EffectsView = preload("res://scripts/effects_view.gd")
-const SpellBook = preload("res://scripts/core/spell_book.gd")
+const Controls = preload("res://scripts/core/controls.gd")
+const HudScript = preload("res://scripts/hud.gd")
+const QueueBarScene = preload("res://ui/element_queue.tscn")
+const ElementQueue = preload("res://scripts/core/element_queue.gd")
 
 const ENDING_TEXT := "The Hollow Warden falls, and the dark drains out of Grauhold Reach.\n\n" \
 	+ "The three fragments knit around the Staff of the Cracked Rune, and for the first\n" \
 	+ "time since the night the Reach fell, the rune burns clean.\n\n" \
-	+ "Far to the south, in Eldermere, a lamp comes back on."
+	+ "Along the shore where the party first landed, the first lamp in the Reach comes back on."
 
 var save_path := "user://savegame.json"
 var session
@@ -24,6 +27,9 @@ var _world: Node2D
 var _level
 var effects_view = null
 var wizard_button: Button = null
+var hud = null  # the element key reference (Control)
+var queue_bar = null  # ui/element_queue.tscn: the queued elements, bottom centre
+var preview_label: Label = null
 var _hud: Label
 var _banner: Label
 
@@ -44,7 +50,7 @@ func start() -> void:
 	_world = Node2D.new()
 	add_child(_world)
 	var cam := Camera2D.new()
-	cam.position = Vector2(832, 576) / 2.0
+	cam.position = Vector2(832, 700) / 2.0  # the 576 px map sits at the top; the bottom 124 px is the spell UI
 	add_child(cam)
 	_ui = CanvasLayer.new()
 	add_child(_ui)
@@ -147,10 +153,32 @@ func enter_zone(id: String) -> bool:
 	_world.add_child(effects_view)
 	_hud = Label.new()
 	_hud.position = Vector2(8, 4)
+	_hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hud.custom_minimum_size = Vector2(816, 0)
+	_hud.add_theme_color_override("font_outline_color", Color.BLACK)
+	_hud.add_theme_constant_override("outline_size", 5)
 	_ui.add_child(_hud)
+	hud = HudScript.new()
+	hud.play = play
+	hud.position = Vector2(8, 594)
+	hud.size = Vector2(214, 100)
+	_ui.add_child(hud)
+	queue_bar = QueueBarScene.instantiate()
+	queue_bar.max_slots = ElementQueue.MAX  # the game queues pairs; the bar hides the other slots
+	add_child(queue_bar)
+	queue_bar.setup()
+	preview_label = Label.new()
+	preview_label.position = Vector2(216, 560)
+	preview_label.size = Vector2(400, 24)
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	preview_label.add_theme_constant_override("outline_size", 5)
+	_ui.add_child(preview_label)
 	_banner = Label.new()
 	_banner.position = Vector2(220, 260)
 	_banner.add_theme_font_size_override("font_size", 28)
+	_banner.add_theme_color_override("font_outline_color", Color.BLACK)
+	_banner.add_theme_constant_override("outline_size", 8)
 	_ui.add_child(_banner)
 	_update_hud()
 	return true
@@ -178,6 +206,15 @@ func tick(delta: float, input: Vector2) -> void:
 	play.tick(delta, input)
 	_level.queue_redraw()
 	effects_view.queue_redraw()
+	hud.queue_redraw()
+	_sync_queue_view()
+	play.wizard.queue_redraw()
+	for e in play.enemies:
+		e.visible = not e.health.is_dead()
+		e.queue_redraw()
+	if play.boss != null:
+		play.boss.visible = not play.boss.health.is_dead()
+		play.boss.queue_redraw()
 	_update_hud()
 	if play.state != "playing":
 		_finish_zone()
@@ -218,13 +255,30 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_ESCAPE:
 			continue_after_zone()
 			return
-		var elements := SpellBook.elements()
-		var idx: int = event.keycode - KEY_1
-		if idx >= 0 and idx < elements.size():
-			play.queue_element(elements[idx])
+		var element := Controls.element_for_keycode(event.keycode)
+		if element != "":
+			play.queue_element(element)
 		elif event.keycode == KEY_SPACE:
 			play.cast()
+		if hud != null:
+			_sync_queue_view()
+			hud.queue_redraw()
 			effects_view.queue_redraw()
+			play.wizard.queue_redraw()
+
+
+# Mirrors the game's queue into the bottom-centre bar and the spell-name preview above it.
+func _sync_queue_view() -> void:
+	if queue_bar == null or play == null:
+		return
+	queue_bar.sync_queue(play.queue.queue)
+	var p: Dictionary = play.queue_preview()
+	if p.is_empty():
+		preview_label.text = ""
+		return
+	var note: String = "" if not p["complete"] else (" - ready" if p["ready"] else " - %.1fs" % p["cooldown"])
+	preview_label.text = "%s%s" % [p["name"], note if p["complete"] else " (add one more)"]
+	preview_label.add_theme_color_override("font_color", Color.WHITE if p["ready"] else Color(1, 0.65, 0.55))
 
 
 func _update_hud() -> void:
@@ -236,7 +290,7 @@ func _update_hud() -> void:
 		(" +%d shield" % h.shield) if h.shield > 0 else "", ", ".join(play.queue.queue)]
 	if play.boss != null:
 		line += "   %s %d/%d" % [play.boss.display_name, play.boss.health.current, play.boss.health.max_health]
-	_hud.text = line + "\n1-9 element, Space cast, Esc leave.  " + play.grid.objective
+	_hud.text = line + "\nQ W E R T / A S D F (or 1-9) queue elements, Space casts, Esc leaves.  " + play.grid.objective
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -260,6 +314,8 @@ func _clear_ui() -> void:
 	_banner = null
 	continue_button = null
 	wizard_button = null
+	hud = null
+	preview_label = null
 
 
 func _leave_world() -> void:
@@ -272,3 +328,6 @@ func _leave_world() -> void:
 	if effects_view != null and is_instance_valid(effects_view):
 		effects_view.free()
 	effects_view = null
+	if queue_bar != null and is_instance_valid(queue_bar):
+		queue_bar.free()
+	queue_bar = null

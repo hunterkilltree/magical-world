@@ -7,11 +7,32 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var what: String = args[0] if args.size() > 0 else "menu"
 	var out: String = args[1] if args.size() > 1 else "/tmp/shot.png"
+	if what == "queue5":
+		# The element-queue bar on its own, all five slots filled (its design size).
+		var bg := ColorRect.new()
+		bg.color = Color("#2b3a2a")
+		bg.size = Vector2(832, 700)
+		root.add_child(bg)
+		var bar = load("res://ui/element_queue.tscn").instantiate()
+		root.add_child(bar)
+		bar.setup()
+		for e in ["Fire", "Lightning", "Ice", "Nature", "Dark"]:
+			bar.add_element(e)
+		for i in 30:
+			await process_frame
+		var shot := root.get_texture().get_image()
+		shot.save_png(out)
+		print("saved ", out, " ", shot.get_size())
+		quit(0)
+		return
 	var main = load("res://scenes/main.tscn").instantiate()
 	main.save_path = "user://screenshot_save.json"
 	root.add_child(main)
 	main.start()
-	if what != "menu":
+	if what == "ending":
+		main.new_game()
+		main.show_ending()
+	elif what != "menu":
 		main.new_game()
 		if args.size() > 2 and args[2] != "":
 			main.session.select_wizard(args[2])
@@ -21,6 +42,21 @@ func _initialize() -> void:
 			main.enter_zone(zone)
 			for i in 20:
 				main.tick(0.016, Vector2.ZERO)
+			if args.size() > 3 and args[3] == "demo":
+				# A mid-fight scene: a beam just fired through two beefy thralls, a fresh pair queued.
+				var p = main.play
+				p.wizard.position = p.grid.cell_center(Vector2i(8, 14))
+				p.wizard.facing = Vector2.RIGHT
+				for i in p.enemies.size():
+					p.enemies[i].health.max_health = 5000
+					p.enemies[i].health.current = 5000
+					p.enemies[i].position = p.wizard.position + Vector2(130 + i * 100, -8 + i * 14)
+				p.queue_element("fire")
+				p.queue_element("lightning")
+				p.cast()
+				p.queue_element("fire")
+				p.queue_element("ice")
+				main.tick(0.1, Vector2.ZERO)
 			if args.size() > 3 and args[3] == "cast":
 				main.play.queue_element("fire")
 				main.play.queue_element("fire")
