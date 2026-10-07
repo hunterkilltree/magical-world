@@ -46,3 +46,4 @@ func step(delta: float, input: Vector2) -> void:
 
 func _draw() -> void:
 	draw_circle(Vector2.ZERO, RADIUS, color)
+	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 24, Color.WHITE, 2.0)  # outline: glows can match the tiles

@@ -11,7 +11,10 @@ func _initialize() -> void:
 	main.save_path = "user://screenshot_save.json"
 	root.add_child(main)
 	main.start()
-	if what != "menu":
+	if what == "ending":
+		main.new_game()
+		main.show_ending()
+	elif what != "menu":
 		main.new_game()
 		if args.size() > 2 and args[2] != "":
 			main.session.select_wizard(args[2])

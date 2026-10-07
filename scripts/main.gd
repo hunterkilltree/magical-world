@@ -10,7 +10,7 @@ const SpellBook = preload("res://scripts/core/spell_book.gd")
 const ENDING_TEXT := "The Hollow Warden falls, and the dark drains out of Grauhold Reach.\n\n" \
 	+ "The three fragments knit around the Staff of the Cracked Rune, and for the first\n" \
 	+ "time since the night the Reach fell, the rune burns clean.\n\n" \
-	+ "Far to the south, in Eldermere, a lamp comes back on."
+	+ "Along the shore where the party first landed, the first lamp in the Reach comes back on."
 
 var save_path := "user://savegame.json"
 var session
