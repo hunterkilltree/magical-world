@@ -66,57 +66,58 @@ test exists but has not yet been confirmed passing in real Godot.
 Chapter 1. Movement input produces a velocity of exactly 200 px/s in that
 direction; diagonals are not faster; no input means no movement.
 
-### R-002 [active] Zone data is valid
+### R-002 [done] Zone data is valid
 Data. `data/zones.json` holds the six zones in order (tundra, pine, keep,
 volcano, bog, cavern), each a 26 x 18 grid of known tile characters with an
 entry and an enemy spawn; boss pads exist only in keep, volcano and cavern.
 
-### R-003 [active] Spell data is valid
+### R-003 [done] Spell data is valid
 Data. `data/spells.json` has unique spell ids, ordered recipes unique across
 spells, every recipe element in the nine-element list, and every spell type in
 {aoe, beam, projectile, vortex, barrier, summon, buff}.
 
-### R-004 [planned] A zone grid becomes a playable level
-Chapter 1. Loading a zone builds collision for blockers, places the party at
-the entry tiles, and places enemy spawns, loot, gates and boss pads on their
-tiles. Void and blocker tiles are never walkable.
+### R-004 [done] A zone grid becomes a playable level
+Chapter 1. Loading a zone gives a grid with collision (blocker, void and cover
+tiles are never walkable; the wizard cannot walk into them), places the party
+at the entry tiles, and exposes enemy spawns, loot, gates and boss pads on
+their tiles.
 
-### R-005 [planned] Elements queue and combine into spells
+### R-005 [done] Elements queue and combine into spells
 Chapter 1. The wizard queues up to two elements; order matters. Casting a full
 queue resolves the recipe in `spells.json` (e.g. fire + ice = Thermal Shock)
 and clears the queue. An unknown pair falls back to a plain bolt of the first
 element.
 
-### R-006 [planned] Spells deal damage with cooldowns
+### R-006 [done] Spells deal damage with cooldowns
 Chapter 1. An aoe spell damages every enemy within its radius once per cast;
 a spell cannot be recast until its cooldown has elapsed.
 
-### R-007 [planned] The wizard has health and can fall
+### R-007 [done] The wizard has health and can fall
 Chapter 1. Health starts at 100, never goes below 0, and a `died` signal fires
 exactly once at 0.
 
-### R-008 [planned] Enemies spawn at E tiles and chase
+### R-008 [done] Enemies spawn at E tiles and chase
 Chapter 1. Each enemy spawn tile spawns a thrall that moves toward the nearest
 living wizard within sight range and damages it on contact with a cooldown.
 
-### R-009 [planned] Terrain hazards act on whoever stands in them
+### R-009 [done] Terrain hazards act on whoever stands in them
 Chapter 1-5. `~` tiles apply the zone's hazard: thin ice breaks under weight,
 lava and void pools damage over time, bramble and mire slow movement. `,` rough
 tiles slow movement by a fixed factor.
 
-### R-010 [planned] Chokepoint gates open on objective
+### R-010 [done] Chokepoint gates open on objective
 Chapter 1. `G` tiles block passage until the zone's gate condition is met
 (zone 1: hold the north bridge for a set time); then they open permanently.
 
-### R-011 [planned] Destructible tiles break
+### R-011 [done] Destructible tiles break
 Chapter 2. A `D` tile takes damage and is removed when destroyed; fire damage
 destroys log piles and dead stands outright and opens their lane.
 
-### R-012 [planned] Loot caches grant a rune fragment or item
+### R-012 [done] Loot caches grant a rune fragment or item
 Chapter 2. A `C` tile can be opened once; it adds its item to the party's
 inventory and is marked looted for the rest of the run.
 
-### R-013 [planned] Zone 1 can be completed end to end
+### R-013 [done] Zone 1 can be completed end to end
 Chapter 1. A scripted run from entry, through both gates and the cache, to the
 north exit marks Hvítmark Tundra complete.
 
@@ -143,3 +144,7 @@ Hollow Warden's shade, unlocked later) boosts damage of its own element.
 ### R-019 [planned] Ending
 Chapter 6. Defeating the Hollow Warden with all three rune fragments mends the
 Cracked Rune and plays the ending; without them he cannot be damaged.
+
+### R-020 [planned] Non-area spell types
+Chapters 1-6. Beam, projectile, vortex, barrier, summon and buff spells each
+behave per their `type` in `data/spells.json` (R-006 covers aoe only).

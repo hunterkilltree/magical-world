@@ -24,16 +24,20 @@ if [ -z "$GODOT_BIN" ]; then
   exit 127
 fi
 
+# Every engine call is time-limited (a hung engine must not stall the harness).
+TIMEOUT_S="${HARNESS_TIMEOUT:-120}"
+godot() { timeout "$TIMEOUT_S" "$GODOT_BIN" "$@"; }
+
 # First run on a fresh checkout needs an import pass to build the class/resource cache.
 if [ ! -d .godot ]; then
-  "$GODOT_BIN" --headless --path . --import >/dev/null 2>&1 || true
+  godot --headless --path . --import >/dev/null 2>&1 || true
 fi
 
-cmd_check() { "$GODOT_BIN" --headless --path . --script res://harness/check_all.gd; }
+cmd_check() { godot --headless --path . --script res://harness/check_all.gd; }
 
 cmd_boot() {
   local out
-  out="$("$GODOT_BIN" --headless --path . --quit-after 60 2>&1)"
+  out="$(godot --headless --path . --quit-after 60 2>&1)"
   local rc=$?
   echo "$out"
   if [ $rc -ne 0 ] || echo "$out" | grep -qE "SCRIPT ERROR|^ERROR:|Parse Error"; then
@@ -43,7 +47,7 @@ cmd_boot() {
   echo "boot: ok"
 }
 
-cmd_test() { "$GODOT_BIN" --headless --path . --script res://harness/run_tests.gd -- "$@"; }
+cmd_test() { godot --headless --path . --script res://harness/run_tests.gd -- "$@"; }
 
 source harness/reqs.sh
 

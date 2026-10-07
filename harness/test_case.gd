@@ -1,6 +1,7 @@
 # Base class for tests. Extend by path (class_name needs an editor import):
 #   extends "res://harness/test_case.gd"
-# Methods named test_* are run; before_each() runs ahead of each one.
+# Methods named test_* are run; before_each() runs ahead of each one and
+# after_test() after it (free any nodes you created).
 extends RefCounted
 
 var tree: SceneTree
@@ -8,6 +9,10 @@ var failures: Array[String] = []
 
 
 func before_each() -> void:
+	pass
+
+
+func after_test() -> void:
 	pass
 
 

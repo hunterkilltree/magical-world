@@ -27,8 +27,8 @@ func test_something() -> void:
 ```
 
 Extend by path, not `class_name` (class cache is not built in headless runs).
-Each `test_*` method gets a fresh instance; `before_each()` runs first; `tree`
-is the running SceneTree.
+Each `test_*` method gets a fresh instance; `before_each()` runs first and
+`after_test()` last (free any nodes you create); `tree` is the running SceneTree.
 
 ## Conventions
 
@@ -56,3 +56,11 @@ finishing while it fails; it is skipped if Godot is not installed.
 Every session uses its own meaningful branch name describing the work
 (e.g. `feature/story-requirements-harness`, `fix/player-diagonal-speed`), never
 a random or auto-generated name.
+
+## Code layout
+
+- `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `mover`, `zone_run`.
+- `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
+- Known data issue: in `keep` the boss court (`B`) is not reachable from the entry even with gates open and
+  destructibles broken. Resolve before R-014/R-015 for that zone.
