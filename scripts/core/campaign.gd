@@ -49,6 +49,10 @@ func all_complete() -> bool:
 # Marks a zone complete and unlocks its neighbours. Returns false if the zone is locked
 # or unknown; completing an already-complete zone is a no-op that returns true.
 func complete(id: String) -> bool:
+	return _complete(id, true)
+
+
+func _complete(id: String, announce: bool) -> bool:
 	if not is_unlocked(id):
 		return false
 	if _completed.has(id):
@@ -57,8 +61,29 @@ func complete(id: String) -> bool:
 	for n in neighbours(id):
 		if not _unlocked.has(n):
 			_unlocked[n] = true
-			zone_unlocked.emit(n)
+			if announce:
+				zone_unlocked.emit(n)
 	return true
+
+
+func completed_ids() -> Array:
+	return _completed.keys()
+
+
+# Rebuilds progress from a saved list by replaying it through the route graph, so zones
+# that could not have been reached are dropped. Resets first; emits no signals.
+func restore(ids: Array) -> void:
+	_completed.clear()
+	_unlocked.clear()
+	_unlocked[_order[0]] = true
+	var pending := ids.filter(func(i): return i in _order)
+	var progressed := true
+	while progressed:
+		progressed = false
+		for id in pending.duplicate():
+			if _complete(id, false):
+				pending.erase(id)
+				progressed = true
 
 
 # Completes `id` when the given ZoneRun completes.

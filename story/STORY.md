@@ -140,7 +140,7 @@ Boss data lives in `data/bosses.json`.
 Overworld. Completing a zone unlocks its connected zones per
 `data/overworld.json`; the cavern stays locked until the bog is complete.
 
-### R-017 [planned] Progress saves and loads
+### R-017 [done] Progress saves and loads
 Overworld. Completed zones, looted caches and rune fragments survive a quit
 and reload.
 

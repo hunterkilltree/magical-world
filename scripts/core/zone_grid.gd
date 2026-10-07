@@ -219,3 +219,16 @@ func stand_on(c: Vector2i, delta: float) -> Dictionary:
 		else:
 			effect.merge(h, true)
 	return effect
+
+
+# ---- persistence (R-017) ---------------------------------------------------
+
+func looted_cells() -> Array:
+	return _looted.keys()
+
+
+# Marks caches as looted; cells that are not caches are ignored.
+func restore_loot(cells: Array) -> void:
+	for c in cells:
+		if tile_at(c) == "C":
+			_looted[c] = true
