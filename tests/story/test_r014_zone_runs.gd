@@ -79,3 +79,59 @@ func test_pine_not_complete_by_looting_nothing() -> void:
 	var run = ZoneRun.new(g, Inventory.new())
 	run.update(g.cells_of("S")[0])
 	assert_true(not run.done, "fresh run is incomplete")
+
+
+# ---- zone 5: Mirefen Bog ---------------------------------------------------
+# Objective: loot the sunken barge (north-east cache) and get back out to the
+# ferry landing (entry) before dark.
+
+func _barge(g) -> Vector2i:
+	return g.cells_of("C")[0]
+
+
+func test_bog_dry_causeway_route_exists() -> void:
+	var g = ZoneGrid.load_zone("bog")
+	var path: Array = g.find_path(g.cells_of("S")[0], _barge(g), ["~"])
+	assert_true(not path.is_empty(), "a route to the barge that avoids the sink pools")
+
+
+func test_bog_run_there_and_back_before_dark() -> void:
+	var g = ZoneGrid.load_zone("bog")
+	var inv = Inventory.new()
+	var run = ZoneRun.new(g, inv)
+	var p = _wizard(g)
+	var thralls := _thralls(g)
+	Walker.walk_to(self, p, g, run, _barge(g), ["~"], thralls)
+	assert_true(not run.done, "reaching the barge is not enough")
+	g.open_loot(_barge(g), inv)
+	run.update(g.world_to_cell(p.position))
+	assert_true(not run.done, "looted but still in the bog")
+	Walker.walk_to(self, p, g, run, g.cells_of("S")[0], ["~"], thralls)
+	assert_true(run.done, "zone complete back at the ferry landing")
+	assert_true(not run.failed, "made it before dark")
+	assert_true(run.elapsed < 90.0, "took %.1fs" % run.elapsed)
+	assert_true(p.health.current > 0, "wizard survived")
+
+
+func test_bog_returning_empty_handed_is_not_enough() -> void:
+	var g = ZoneGrid.load_zone("bog")
+	var run = ZoneRun.new(g, Inventory.new())
+	run.update(g.cells_of("S")[0])
+	assert_true(not run.done, "no barge loot, no completion")
+
+
+func test_bog_dark_falls_and_fails_the_run() -> void:
+	var g = ZoneGrid.load_zone("bog")
+	var inv = Inventory.new()
+	var run = ZoneRun.new(g, inv)
+	var failed_count := [0]
+	run.failed_signal.connect(func(): failed_count[0] += 1)
+	run.tick(89.0)
+	assert_true(not run.failed, "still light")
+	run.tick(2.0)
+	assert_true(run.failed, "dark")
+	run.tick(100.0)
+	assert_eq(failed_count[0], 1, "failure signalled once")
+	g.open_loot(_barge(g), inv)
+	run.update(g.cells_of("S")[0])
+	assert_true(not run.done, "too late to complete")

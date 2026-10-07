@@ -123,8 +123,9 @@ north exit marks Hvítmark Tundra complete.
 
 ### R-014 [active] Zones 2 to 6 can be completed
 Chapters 2-6. Each zone has a scripted run test to its exit or boss, built one
-zone at a time in chapter order. Progress: pine (loot the north-east cache) in
-`tests/story/test_r014_zone_runs.gd`; keep, volcano, bog, cavern remain.
+zone at a time in chapter order. Progress, in `tests/story/test_r014_zone_runs.gd`: pine (loot the north-east
+cache) and bog (loot the barge, return to the landing before dark) done; keep,
+volcano, cavern remain.
 
 ### R-015 [planned] Bosses fight in phases and end their zone
 Chapters 3, 4, 6. A `B` pad spawns the zone's boss with health and at least two

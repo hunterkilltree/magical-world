@@ -17,6 +17,7 @@ static func walk_to(t, p, g, run, target: Vector2i, avoid: Array = [], enemies: 
 			g.update_gate_hold(g.world_to_cell(p.position), DT)
 			for e in enemies:
 				e.step(DT, p)
+			run.tick(DT)
 			run.update(g.world_to_cell(p.position))
 			guard += 1
 	return not path.is_empty()
