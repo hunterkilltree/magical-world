@@ -99,3 +99,14 @@ func test_only_real_caches_are_restored() -> void:
 	SaveGame.apply_grid(data, g)
 	assert_true(not g.is_looted(Vector2i(0, 0)), "void cell ignored")
 	assert_true(not g.is_looted(Vector2i(1, 1)), "non-cache cell ignored")
+
+
+func test_a_restored_pine_save_does_not_regrant_the_fragment() -> void:
+	var g = ZoneGrid.load_zone("pine")
+	var inv = Inventory.new()
+	var cells: Array = g.cells_of("C")
+	assert_eq(g.open_loot(cells[0], inv)["id"], "rune_fragment_1", "first cache holds the fragment")
+	var data: Dictionary = SaveGame.to_dict(Campaign.new(), {"pine": g}, inv)
+	var reloaded = ZoneGrid.load_zone("pine")
+	SaveGame.apply_grid(data, reloaded)
+	assert_true(reloaded.open_loot(cells[1])["id"] != "rune_fragment_1", "fragment is not granted twice")

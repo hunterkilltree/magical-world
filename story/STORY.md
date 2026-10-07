@@ -148,9 +148,12 @@ and reload.
 Selection. Each of the six wizards (Aldric, Brann, Vela, Morrow, Kessa, the
 Hollow Warden's shade, unlocked later) boosts damage of its own element.
 
-### R-019 [planned] Ending
-Chapter 6. Defeating the Hollow Warden with all three rune fragments mends the
-Cracked Rune and plays the ending; without them he cannot be damaged.
+### R-019 [done] Ending
+Chapter 6. The three rune fragments come from the pine cache (1), the Warden of
+the Keep (2) and the Cinder Colossus (3). Defeating the Hollow Warden (the
+cavern boss, `final` in `data/bosses.json`) while holding all three mends the
+Cracked Rune (`cracked_rune_mended` joins the inventory) and plays the ending;
+without all three he cannot be damaged.
 
 ### R-020 [planned] Non-area spell types
 Chapters 1-6. Beam, projectile, vortex, barrier, summon and buff spells each

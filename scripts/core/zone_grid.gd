@@ -20,6 +20,8 @@ const ROUGH_SPEED := 0.7
 const BROKEN_ICE := {"speed": 0.5, "dps": 10.0}
 # Seconds the party must hold the gate area before gates open (zones without an entry stay shut).
 const GATE_HOLD := {"tundra": 10.0}
+# A zone whose first opened cache holds a rune fragment (once per zone).
+const FRAGMENT_CACHE := {"pine": "rune_fragment_1"}
 
 static var _cache: Dictionary = {}
 
@@ -34,6 +36,7 @@ var _destructible_hp: Dictionary = {}
 var _looted: Dictionary = {}
 var _ice_time: Dictionary = {}
 var _gate_hold_time := 0.0
+var _fragment_given := false
 
 
 static func load_zone(zone_id: String):
@@ -190,6 +193,9 @@ func open_loot(c: Vector2i, inventory = null) -> Dictionary:
 		return {}
 	_looted[c] = true
 	var item := {"id": "%s_cache_%d_%d" % [id, c.x, c.y], "kind": "item"}
+	if FRAGMENT_CACHE.has(id) and not _fragment_given:
+		item = {"id": FRAGMENT_CACHE[id], "kind": "rune_fragment"}
+		_fragment_given = true
 	if inventory != null:
 		inventory.add(item)
 	return item
@@ -232,3 +238,5 @@ func restore_loot(cells: Array) -> void:
 	for c in cells:
 		if tile_at(c) == "C":
 			_looted[c] = true
+			if FRAGMENT_CACHE.has(id):
+				_fragment_given = true  # the saved inventory already holds it

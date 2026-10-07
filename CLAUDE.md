@@ -60,7 +60,7 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`.
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`.
 - `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
 - Data patch: the design's `keep` court was sealed (the boss pad was unreachable). `data/zones.json` row 12,
   columns 11-12 were opened (`#` -> `.`) beside the court gate; `story/design/` still shows the original.

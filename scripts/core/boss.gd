@@ -3,6 +3,7 @@
 extends Node2D
 
 signal phase_changed(index: int)
+signal damage_blocked
 
 const Health = preload("res://scripts/core/health.gd")
 const Mover = preload("res://scripts/core/mover.gd")
@@ -19,6 +20,9 @@ var display_name := ""
 var fragment := ""
 var phases: Array = []
 var phase := 0
+var final := false  # defeating it plays the ending
+var requires: Array = []  # item ids the party must hold before it can be hurt
+var inventory = null  # the party inventory, set by ZoneRun.bind_boss
 var health := Health.new()
 var grid = null
 var _hit_cooldown := 0.0
@@ -53,6 +57,8 @@ func _init_from(entry: Dictionary) -> void:
 	display_name = entry["name"]
 	fragment = entry["fragment"]
 	phases = entry["phases"]
+	final = entry.get("final", false)
+	requires = entry.get("requires", [])
 	health.max_health = int(entry["health"])
 	health.current = health.max_health
 
@@ -65,7 +71,18 @@ func contact_damage() -> int:
 	return int(phases[phase]["damage"])
 
 
+# A boss with `requires` is immune unless the bound inventory holds every listed item.
+func vulnerable() -> bool:
+	for id in requires:
+		if inventory == null or not inventory.has_item(id):
+			return false
+	return true
+
+
 func take_damage(amount: int) -> void:
+	if not vulnerable():
+		damage_blocked.emit()
+		return
 	health.take_damage(amount)
 	var lost := 1.0 - float(health.current) / float(health.max_health)
 	var idx := mini(phases.size() - 1, int(lost * phases.size()))

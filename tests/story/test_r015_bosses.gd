@@ -108,15 +108,21 @@ func test_defeating_the_boss_completes_the_zone_and_drops_its_fragment() -> void
 	assert_true(inv.has_item("rune_fragment_2"), "dropped the second fragment")
 
 
+func _give_all_fragments(inv) -> void:
+	for id in ["rune_fragment_1", "rune_fragment_2", "rune_fragment_3"]:
+		inv.add({"id": id, "kind": "rune_fragment"})
+
+
 func test_final_boss_completes_the_zone_without_a_fragment() -> void:
 	var g = ZoneGrid.load_zone("cavern")
 	var inv = Inventory.new()
+	_give_all_fragments(inv)  # R-019: the Hollow Warden is only mortal with all three
 	var run = ZoneRun.new(g, inv)
 	var b = _boss("cavern")
 	run.bind_boss(b)
 	b.take_damage(5000)
 	assert_true(run.done, "zone complete")
-	assert_eq(inv.items.size(), 0, "the Verrglass drops no fragment")
+	assert_true(not inv.has_item("rune_fragment_4") and b.fragment == "", "the Verrglass drops no fragment")
 
 
 func test_dead_boss_does_nothing() -> void:
@@ -130,7 +136,9 @@ func test_dead_boss_does_nothing() -> void:
 
 func test_two_spells_kill_the_verrglass_hollow() -> void:
 	var g = ZoneGrid.load_zone("cavern")
-	var run = ZoneRun.new(g, Inventory.new())
+	var inv = Inventory.new()
+	_give_all_fragments(inv)
+	var run = ZoneRun.new(g, inv)
 	var b = _boss("cavern")
 	run.bind_boss(b)
 	var p = _wizard()
