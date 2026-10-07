@@ -1,6 +1,7 @@
 # Runs every tests/test_*.gd. Exit code 1 if any test fails.
 # Usage: godot --headless --path . --script res://harness/run_tests.gd
 # Optional filter: ... -- test_player   (substring match on file name)
+# Searches tests/ recursively.
 extends SceneTree
 
 const TEST_DIR := "res://tests"
@@ -41,11 +42,17 @@ func _initialize() -> void:
 
 func _test_files(filter: String) -> Array[String]:
 	var out: Array[String] = []
-	var dir := DirAccess.open(TEST_DIR)
-	if dir == null:
-		return out
-	for f in dir.get_files():
-		if f.begins_with("test_") and f.ends_with(".gd") and (filter == "" or filter in f):
-			out.append(f)
+	_walk("", filter, out)
 	out.sort()
 	return out
+
+
+func _walk(rel: String, filter: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(TEST_DIR.path_join(rel))
+	if dir == null:
+		return
+	for sub in dir.get_directories():
+		_walk(rel.path_join(sub), filter, out)
+	for f in dir.get_files():
+		if f.begins_with("test_") and f.ends_with(".gd") and (filter == "" or filter in f):
+			out.append(rel.path_join(f))

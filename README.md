@@ -18,7 +18,9 @@ harness/run.sh check           # parse every .gd file under res://
 harness/run.sh boot            # boot the project headlessly, fail on engine errors
 harness/run.sh test            # run all tests in tests/
 harness/run.sh test player     # run only test files whose name contains "player"
-harness/run.sh all             # check, then boot, then test (default)
+harness/run.sh reqs            # every active/done requirement in story/STORY.md has a test
+harness/run.sh story           # run tests, regenerate story/progress.md
+harness/run.sh all             # check, boot, reqs, story (default)
 ```
 
 `all` stops at the first failing step. Exit code is non-zero on any failure,
@@ -42,6 +44,17 @@ PASS  test_example.gd::test_main_scene_loads
 PASS  test_example.gd::test_arithmetic_sanity
 tests: 2 passed, 0 failed
 ```
+
+## Story and requirements
+
+The game is built from `story/STORY.md`: a premise plus requirements written as
+`### R-NNN [planned|active|done] Title`. To build one: set it `active`, add
+`tests/story/test_rNNN_<name>.gd` (test first), implement, run
+`harness/run.sh all`, then set it `done`. `story/progress.md` is generated from
+the test results; don't edit it.
+
+A Claude Code Stop hook (`.claude/settings.json`) runs `harness/run.sh all` and
+refuses to let an agent finish while it fails (skipped if Godot isn't installed).
 
 ## Writing tests
 
