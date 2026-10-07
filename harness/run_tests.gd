@@ -28,6 +28,7 @@ func _initialize() -> void:
 			t.tree = self
 			t.before_each()
 			t.call(m.name)
+			t.after_test()
 			if t.failures.is_empty():
 				passed += 1
 				print("PASS  %s::%s" % [file, m.name])
