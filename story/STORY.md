@@ -136,7 +136,7 @@ phases; defeating it completes the zone and drops its rune fragment (keep and
 volcano drop fragments 2 and 3; the final boss in the cavern drops none).
 Boss data lives in `data/bosses.json`.
 
-### R-016 [planned] The campaign follows the route graph
+### R-016 [done] The campaign follows the route graph
 Overworld. Completing a zone unlocks its connected zones per
 `data/overworld.json`; the cavern stays locked until the bog is complete.
 
