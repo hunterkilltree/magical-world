@@ -7,6 +7,9 @@ const Inventory = preload("res://scripts/core/inventory.gd")
 const Player = preload("res://scripts/player.gd")
 const Enemy = preload("res://scripts/core/enemy.gd")
 const Walker = preload("res://tests/support/walker.gd")
+const Boss = preload("res://scripts/core/boss.gd")
+const Caster = preload("res://scripts/core/caster.gd")
+const SpellBook = preload("res://scripts/core/spell_book.gd")
 
 var nodes: Array = []
 
@@ -183,3 +186,55 @@ func test_cavern_other_zones_never_report_a_boss() -> void:
 	var run = ZoneRun.new(g, Inventory.new())
 	run.update(g.cells_of("S")[0])
 	assert_true(not run.at_boss, "pine has no boss pad")
+
+
+# ---- zone 4: Eldrhólt Wastes -----------------------------------------------
+# Objective: cross the cinder islands and break the Cinder Colossus on the north shelf.
+# The lava channels are the fast way; the dry way needs the gates open.
+
+func _colossus(g, run):
+	var b = Boss.spawn_for(g)
+	nodes.append(b)
+	run.bind_boss(b)
+	return b
+
+
+func test_volcano_routes_lava_or_open_gates() -> void:
+	var g = ZoneGrid.load_zone("volcano")
+	var start: Vector2i = g.cells_of("S")[0]
+	var pad: Vector2i = g.cells_of("B")[0]
+	assert_true(not g.find_path(start, pad).is_empty(), "route through the lava")
+	assert_true(g.find_path(start, pad, ["~"]).is_empty(), "no dry route while the gates are shut")
+	g.open_gates()
+	assert_true(not g.find_path(start, pad, ["~"]).is_empty(), "dry route once the gates are open")
+
+
+func test_volcano_lava_run_reaches_the_colossus_and_survives() -> void:
+	var g = ZoneGrid.load_zone("volcano")
+	var run = ZoneRun.new(g, Inventory.new())
+	var colossus = _colossus(g, run)
+	var p = _wizard(g)
+	var chasers := _thralls(g)
+	chasers.append(colossus)
+	Walker.walk_to(self, p, g, run, g.cells_of("B")[0], [], chasers)
+	assert_true(run.at_boss, "reached the north shelf")
+	assert_true(not run.done, "the Colossus still stands")
+	assert_true(p.health.current < 100, "lava and thralls cost health")
+	assert_true(p.health.current > 0, "wizard survived the crossing (health %d)" % p.health.current)
+
+
+func test_volcano_colossus_falls_to_two_spells_and_drops_fragment_three() -> void:
+	var g = ZoneGrid.load_zone("volcano")
+	var inv = Inventory.new()
+	var run = ZoneRun.new(g, inv)
+	var colossus = _colossus(g, run)
+	var p = _wizard(g)
+	p.position = colossus.position + Vector2(50, 0)
+	var caster = Caster.new()
+	caster.cast(SpellBook.find(["fire", "fire"]), p.position, [colossus])  # 850 of 900
+	assert_true(not run.done, "50 hp left")
+	assert_eq(colossus.phase, 2, "final phase near death")
+	caster.cast(SpellBook.find(["fire", "ice"]), p.position, [colossus])
+	assert_true(colossus.health.is_dead(), "Colossus broken")
+	assert_true(run.done, "zone complete")
+	assert_true(inv.has_item("rune_fragment_3"), "third fragment")
