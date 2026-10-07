@@ -202,3 +202,9 @@ keeps its hold-the-bridge rule: killing thralls does not open its gates.
 Flow. Each cast leaves an effect at the wizard (the spell's radius, coloured by
 its first element) that fades over 0.4 s; failed casts leave none.
 
+### R-026 [done] The whole game is beatable
+Flow. A scripted bot plays the six zones in order through `GameSession` and
+`ZonePlay` (walking, fighting thralls with spells, killing the three bosses),
+finishes with the ending, and the finished save can be continued with the
+shade unlocked. If this fails, the game has a balance or logic hole.
+
