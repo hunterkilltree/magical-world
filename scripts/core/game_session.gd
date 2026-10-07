@@ -8,12 +8,16 @@ const Inventory = preload("res://scripts/core/inventory.gd")
 const SaveGame = preload("res://scripts/core/save_game.gd")
 const ZoneGrid = preload("res://scripts/core/zone_grid.gd")
 const ZonePlay = preload("res://scripts/core/zone_play.gd")
+const Roster = preload("res://scripts/core/wizard_roster.gd")
+
+const DEFAULT_WIZARD := "arcane_archmage"
 
 const MENDED_RUNE := "cracked_rune_mended"
 
 var save_path: String
 var campaign = Campaign.new()
 var inventory = Inventory.new()
+var wizard_id := DEFAULT_WIZARD
 var _loot: Dictionary = {}  # zone id -> Array of looted Vector2i
 
 
@@ -28,6 +32,7 @@ func has_save() -> bool:
 func new_game() -> void:
 	campaign = Campaign.new()
 	inventory = Inventory.new()
+	wizard_id = DEFAULT_WIZARD
 	_loot.clear()
 
 
@@ -39,6 +44,7 @@ func continue_game() -> bool:
 	new_game()
 	SaveGame.apply(data, campaign, {}, inventory)
 	_loot = SaveGame.looted_map(data)
+	select_wizard(str(data.get("wizard", DEFAULT_WIZARD)))  # ignored if unknown or still locked
 	return true
 
 
@@ -48,6 +54,7 @@ func save() -> bool:
 	for zone_id in _loot:
 		looted[zone_id] = _loot[zone_id].map(func(c): return [c.x, c.y])
 	data["looted"] = looted
+	data["wizard"] = wizard_id
 	return SaveGame.write(save_path, data)
 
 
@@ -69,7 +76,7 @@ func enter_zone(id: String):
 	if grid == null:
 		return null
 	grid.restore_loot(_loot.get(id, []))
-	var play = ZonePlay.create(grid, inventory)
+	var play = ZonePlay.create(grid, inventory, wizard())
 	campaign.bind_run(id, play.run)
 	# Capture the grid, not `play`: play owns the run, so capturing it would form a cycle.
 	play.run.completed.connect(func():
@@ -90,3 +97,31 @@ func _remember_loot(grid) -> void:
 
 func ending_played() -> bool:
 	return inventory.has_item(MENDED_RUNE)
+
+
+# ---- wizards ---------------------------------------------------------------
+
+func wizard() -> Dictionary:
+	return Roster.find(wizard_id)
+
+
+# The shade (void necromancer) joins only after the game is finished.
+func available_wizards() -> Array:
+	return Roster.all().filter(func(w): return not w.get("locked_until_ending", false) or ending_played())
+
+
+func select_wizard(id: String) -> bool:
+	for w in available_wizards():
+		if w["id"] == id:
+			wizard_id = id
+			return true
+	return false
+
+
+func cycle_wizard() -> void:
+	var list := available_wizards()
+	for i in list.size():
+		if list[i]["id"] == wizard_id:
+			wizard_id = list[(i + 1) % list.size()]["id"]
+			return
+	wizard_id = list[0]["id"]

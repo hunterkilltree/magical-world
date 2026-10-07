@@ -18,7 +18,7 @@ without opening the editor.
 Open the project in Godot and run it (F5). Menu -> New Game / Continue -> overworld with the six zones.
 Arrows move, **1-9** queue an element (order of `data/spells.json`: fire, water, earth, nature, lightning,
 ice, wind, light, dark), **Space** casts the queued pair, **Esc** leaves a zone, **Enter** continues after a
-result. Stepping on a gold tile opens a cache. Completing a zone autosaves. Collect three rune fragments
+result. Stepping on a gold tile opens a cache. Pick a wizard on the overworld screen: each deals +30% damage with spells containing its elements (the sixth, the Hollow Warden's shade, unlocks after the ending). Beams fire along the way you last moved; in every zone except the tundra the gates open when all thralls are dead. Completing a zone autosaves. Collect three rune fragments
 (pine cache, the Warden of the Keep, the Cinder Colossus) and the Hollow Warden can finally be hurt.
 
 ## Harness

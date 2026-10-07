@@ -1,0 +1,10 @@
+{
+ "wizards": [
+  {"id": "arcane_archmage", "name": "Aldric the Unwritten", "role": "Arcane Archmage", "weapon": "Staff of the Cracked Rune", "glow": "#9c72ff", "affinity": ["light"], "boost": 1.3},
+  {"id": "ember_pyromancer", "name": "Brann Cinderhand", "role": "Ember Pyromancer", "weapon": "The Ember Lantern", "glow": "#ff7a2f", "affinity": ["fire"], "boost": 1.3},
+  {"id": "rime_cryomancer", "name": "Sister Vela", "role": "Rime Cryomancer", "weapon": "The Rimeglass Scepter", "glow": "#7dd3fc", "affinity": ["ice", "water"], "boost": 1.3},
+  {"id": "stone_druid", "name": "Old Morrow", "role": "Stone Druid", "weapon": "Grovewarden Maul", "glow": "#76c04a", "affinity": ["earth", "nature"], "boost": 1.3},
+  {"id": "storm_conduit", "name": "Kessa Voltmark", "role": "Storm Conduit", "weapon": "Thunderfang", "glow": "#f7e26b", "affinity": ["lightning", "wind"], "boost": 1.3},
+  {"id": "void_necromancer", "name": "The Hollow Warden's Shade", "role": "Void Necromancer", "weapon": "Horned Skull Standard", "glow": "#a855f7", "affinity": ["dark"], "boost": 1.3, "locked_until_ending": true}
+ ]
+}

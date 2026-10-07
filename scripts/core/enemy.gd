@@ -13,6 +13,7 @@ const CONTACT_COOLDOWN := 1.0
 var health := Health.new()
 var grid = null
 var _hit_cooldown := 0.0
+var _rooted := 0.0
 
 
 func _init() -> void:
@@ -24,9 +25,15 @@ func take_damage(amount: int) -> void:
 	health.take_damage(amount)
 
 
+# Held in place (still able to hit what is in reach) for `seconds`.
+func root(seconds: float) -> void:
+	_rooted = maxf(_rooted, seconds)
+
+
 # `target` needs `position` and `health`. Dead enemies and dead targets are ignored.
 func step(delta: float, target) -> void:
 	_hit_cooldown = maxf(0.0, _hit_cooldown - delta)
+	_rooted = maxf(0.0, _rooted - delta)
 	if health.is_dead() or target == null or target.health.is_dead():
 		return
 	var to_target: Vector2 = target.position - position
@@ -37,6 +44,8 @@ func step(delta: float, target) -> void:
 		if _hit_cooldown == 0.0:
 			target.health.take_damage(CONTACT_DAMAGE)
 			_hit_cooldown = CONTACT_COOLDOWN
+		return
+	if _rooted > 0.0:
 		return
 	position = Mover.move(grid, position, to_target.normalized() * SPEED, delta)
 

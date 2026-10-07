@@ -7,6 +7,8 @@ const SPEED := 200.0
 const RADIUS := 10.0
 
 var health := Health.new()
+var facing := Vector2.RIGHT  # last movement direction; beams are aimed along it
+var color := Color("#9c72ff")
 var grid = null  # ZoneGrid; null means unobstructed
 var _dot_carry := 0.0
 
@@ -25,8 +27,11 @@ func _physics_process(delta: float) -> void:
 
 # Moves with grid collision and applies terrain effects for this frame.
 func step(delta: float, input: Vector2) -> void:
+	health.update(delta)
 	if health.is_dead():
 		return
+	if input.length() > 0.1:
+		facing = input.normalized()
 	var v := velocity_for(input)
 	if grid != null:
 		var effect: Dictionary = grid.stand_on(grid.world_to_cell(position), delta)
@@ -40,4 +45,4 @@ func step(delta: float, input: Vector2) -> void:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, RADIUS, Color("#9c72ff"))
+	draw_circle(Vector2.ZERO, RADIUS, color)

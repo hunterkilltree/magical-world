@@ -60,7 +60,7 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells), `game_session` (campaign + save + zone entry).
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
 - `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
   1-9 queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
   Save file: `user://savegame.json` (autosaved when a zone completes).

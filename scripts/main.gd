@@ -4,6 +4,7 @@ extends Node2D
 
 const GameSession = preload("res://scripts/core/game_session.gd")
 const Level = preload("res://scripts/level.gd")
+const EffectsView = preload("res://scripts/effects_view.gd")
 const SpellBook = preload("res://scripts/core/spell_book.gd")
 
 const ENDING_TEXT := "The Hollow Warden falls, and the dark drains out of Grauhold Reach.\n\n" \
@@ -21,6 +22,8 @@ var continue_button: Button = null
 var _ui: CanvasLayer
 var _world: Node2D
 var _level
+var effects_view = null
+var wizard_button: Button = null
 var _hud: Label
 var _banner: Label
 
@@ -100,10 +103,26 @@ func show_overworld() -> void:
 	var info := Label.new()
 	info.text = "Rune fragments: %d / 3" % frags
 	box.add_child(info)
+	wizard_button = Button.new()
+	wizard_button.text = _wizard_label()
+	wizard_button.pressed.connect(cycle_wizard)
+	box.add_child(wizard_button)
 	var back := Button.new()
 	back.text = "Main menu"
 	back.pressed.connect(show_menu)
 	box.add_child(back)
+
+
+func cycle_wizard() -> void:
+	session.cycle_wizard()
+	if wizard_button != null:
+		wizard_button.text = _wizard_label()
+
+
+func _wizard_label() -> String:
+	var w: Dictionary = session.wizard()
+	return "Wizard: %s - %s (%s +%d%%)  [click to change]" % [w["name"], w["role"],
+		", ".join(w["affinity"]), int(round((float(w["boost"]) - 1.0) * 100.0))]
 
 
 # Starts a zone; returns false if it is locked.
@@ -123,6 +142,9 @@ func enter_zone(id: String) -> bool:
 	if play.boss != null:
 		_world.add_child(play.boss)
 	_world.add_child(play.wizard)
+	effects_view = EffectsView.new()
+	effects_view.play = play
+	_world.add_child(effects_view)
 	_hud = Label.new()
 	_hud.position = Vector2(8, 4)
 	_ui.add_child(_hud)
@@ -155,6 +177,7 @@ func tick(delta: float, input: Vector2) -> void:
 		return
 	play.tick(delta, input)
 	_level.queue_redraw()
+	effects_view.queue_redraw()
 	_update_hud()
 	if play.state != "playing":
 		_finish_zone()
@@ -201,13 +224,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			play.queue_element(elements[idx])
 		elif event.keycode == KEY_SPACE:
 			play.cast()
+			effects_view.queue_redraw()
 
 
 func _update_hud() -> void:
 	if _hud == null or play == null:
 		return
-	var line := "%s   HP %d   Queue: %s" % [session.campaign.zone_name(play.grid.id),
-		play.wizard.health.current, ", ".join(play.queue.queue)]
+	var h = play.wizard.health
+	var line := "%s   %s   HP %d%s   Queue: %s" % [session.campaign.zone_name(play.grid.id),
+		play.wizard_data.get("name", "Wizard"), h.current,
+		(" +%d shield" % h.shield) if h.shield > 0 else "", ", ".join(play.queue.queue)]
 	if play.boss != null:
 		line += "   %s %d/%d" % [play.boss.display_name, play.boss.health.current, play.boss.health.max_health]
 	_hud.text = line + "\n1-9 element, Space cast, Esc leave.  " + play.grid.objective
@@ -233,6 +259,7 @@ func _clear_ui() -> void:
 	_hud = null
 	_banner = null
 	continue_button = null
+	wizard_button = null
 
 
 func _leave_world() -> void:
@@ -242,3 +269,6 @@ func _leave_world() -> void:
 	if _level != null and is_instance_valid(_level):
 		_level.free()
 	_level = null
+	if effects_view != null and is_instance_valid(effects_view):
+		effects_view.free()
+	effects_view = null

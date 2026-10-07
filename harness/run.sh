@@ -5,7 +5,7 @@
 #   harness/run.sh test [filter]  run tests/test_*.gd
 #   harness/run.sh reqs           every active/done requirement in story/STORY.md has a test
 #   harness/run.sh story          run tests, regenerate story/progress.md
-#   harness/run.sh shot WHAT OUT render a frame to a PNG (needs xvfb-run); WHAT = menu | overworld | zone:<id>
+#   harness/run.sh shot WHAT OUT render a frame to a PNG (needs xvfb-run); WHAT = menu | overworld | zone:<id>  [WIZARD_ID [cast]]
 #   harness/run.sh all            check + boot + reqs + story
 # Set GODOT=/path/to/godot if it is not on PATH as godot or godot4.
 set -u
@@ -66,7 +66,7 @@ source harness/reqs.sh
 cmd_shot() {
   command -v xvfb-run >/dev/null 2>&1 || { echo "shot: xvfb-run not found" >&2; return 127; }
   xvfb-run -a -s "-screen 0 832x576x24" timeout "$TIMEOUT_S" "$GODOT_BIN" --path . --rendering-driver opengl3 \
-    --script res://harness/screenshot.gd -- "${1:-menu}" "${2:-/tmp/shot.png}" 2>&1 | grep -E "saved|ERROR"
+    --script res://harness/screenshot.gd -- "${1:-menu}" "${2:-/tmp/shot.png}" "${3:-}" "${4:-}" 2>&1 | grep -E "saved|ERROR"
 }
 
 case "${1:-all}" in

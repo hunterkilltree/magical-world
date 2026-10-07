@@ -110,3 +110,37 @@ func test_killing_the_hollow_warden_shows_the_ending() -> void:
 	main.tick(0.016, Vector2.ZERO)
 	assert_eq(main.state, "ending", "ending screen")
 	assert_true(main.session.ending_played(), "recorded")
+
+
+func test_overworld_lets_you_cycle_the_wizard() -> void:
+	_boot()
+	main.new_game()
+	assert_true(main.wizard_button.text.contains("Aldric"), "starts as Aldric")
+	var before: String = main.session.wizard_id
+	main.cycle_wizard()
+	assert_true(main.session.wizard_id != before, "next wizard")
+	assert_true(main.wizard_button.text.contains(main.session.wizard()["name"]), "button shows the new wizard")
+
+
+func test_the_chosen_wizard_is_drawn_and_named_in_the_hud() -> void:
+	_boot()
+	main.new_game()
+	main.session.select_wizard("ember_pyromancer")
+	main.enter_zone("tundra")
+	assert_eq(main.play.wizard.color, Color("#ff7a2f"), "Brann's colour")
+	main.tick(0.016, Vector2.ZERO)
+	assert_true(main._hud.text.contains("Brann Cinderhand"), "HUD names the wizard")
+
+
+func test_casting_shows_an_effect_that_is_cleaned_up_when_leaving() -> void:
+	_boot()
+	main.new_game()
+	main.enter_zone("tundra")
+	main.play.queue_element("fire")
+	main.play.queue_element("fire")
+	main.play.cast()
+	main.tick(0.016, Vector2.ZERO)
+	assert_eq(main.effects_view.play.effects.size(), 1, "effect on screen")
+	assert_true(main._hud.text.contains("Queue:"), "HUD queue")
+	main.continue_after_zone()
+	assert_true(main.effects_view == null, "effect layer removed with the zone")

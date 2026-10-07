@@ -144,9 +144,12 @@ Overworld. Completing a zone unlocks its connected zones per
 Overworld. Completed zones, looted caches and rune fragments survive a quit
 and reload.
 
-### R-018 [planned] Six wizards with different affinities
-Selection. Each of the six wizards (Aldric, Brann, Vela, Morrow, Kessa, the
-Hollow Warden's shade, unlocked later) boosts damage of its own element.
+### R-018 [done] Six wizards with different affinities
+Selection. Each of the six wizards (`data/wizards.json`: Aldric, Brann, Vela,
+Morrow, Kessa, and the Hollow Warden's shade, unlocked by finishing the game)
+deals +30% damage with spells that contain one of its elements; together the
+six affinities cover all nine elements exactly once. The overworld lets you
+cycle wizards, the choice is saved, and the wizard's colour is drawn in play.
 
 ### R-019 [done] Ending
 Chapter 6. The three rune fragments come from the pine cache (1), the Warden of
@@ -155,9 +158,15 @@ cavern boss, `final` in `data/bosses.json`) while holding all three mends the
 Cracked Rune (`cracked_rune_mended` joins the inventory) and plays the ending;
 without all three he cannot be damaged.
 
-### R-020 [planned] Non-area spell types
-Chapters 1-6. Beam, projectile, vortex, barrier, summon and buff spells each
-behave per their `type` in `data/spells.json` (R-006 covers aoe only).
+### R-020 [done] Non-area spell types
+Chapters 1-6. Beyond aoe (R-006), every spell in `data/spells.json` works:
+projectile (nearest target in range, 50% splash), beam (pierces everything along
+the wizard's facing), vortex (pulls targets in, then damages), summon (damages
+and roots for its duration; bosses cannot be rooted; death_forest also steals
+30% of the damage as health), barrier (a shield for the wizard worth its
+`damage`, lasting its `duration`), buff (rainbow_mist regenerates, crystal_garden
+shields, world_tree makes the wizard invulnerable). Wizard affinity (R-018)
+scales the `damage` of every type.
 
 ## Playable flow
 
@@ -181,4 +190,15 @@ destructible tiles in their radius. A zone ends complete, dead or failed.
 Flow. Menu (New Game, Continue), an overworld listing the six zones with their
 locked, open and complete state, the zone view with a HUD, a result banner
 after each zone, and an ending screen after the Hollow Warden falls.
+
+
+
+### R-024 [done] Gates open when the thralls are cleared
+Flow. In every zone without a hold rule (all but the tundra), the gates stay
+shut until every thrall in the zone is dead, then open for good. The tundra
+keeps its hold-the-bridge rule: killing thralls does not open its gates.
+
+### R-025 [done] Casting gives visible feedback
+Flow. Each cast leaves an effect at the wizard (the spell's radius, coloured by
+its first element) that fades over 0.4 s; failed casts leave none.
 

@@ -13,6 +13,11 @@ static func _load() -> void:
 			_data = parsed
 
 
+static func all() -> Array:
+	_load()
+	return _data.get("spells", [])
+
+
 static func elements() -> Array:
 	_load()
 	return _data.get("elements", [])
