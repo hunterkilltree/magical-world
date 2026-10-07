@@ -37,7 +37,8 @@ is the running SceneTree.
 
 ## Story-driven workflow
 
-The game follows `story/STORY.md`. Requirements are `### R-NNN [status] Title`
+The game is Grauhold Reach (2D top-down). It follows `story/STORY.md`; design mockups are in
+`story/design/` (reference only), game data in `data/*.json` (extracted from them). Requirements are `### R-NNN [status] Title`
 entries (`planned` -> `active` -> `done`).
 
 1. Pick the next `planned` requirement (lowest ID) and set it to `active`.
