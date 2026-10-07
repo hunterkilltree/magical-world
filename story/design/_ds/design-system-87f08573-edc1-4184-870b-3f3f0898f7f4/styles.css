@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+:root{
+--bg:#faf8f4;--surface:#ffffff;--surface-2:#f2eee6;
+--ink:#161225;--ink-soft:#5c5670;--ink-faint:#948eab;
+--brand:#6d28ff;--brand-ink:#ffffff;--brand-soft:#efe7ff;
+--line:#eae5da;
+--accent-coding:#ff5a3c;--accent-sysdesign:#0ea5a0;--accent-microservices:#f5a623;
+--accent-k8s:#3b82f6;--accent-aws:#e8620c;--accent-java:#e11d48;
+--accent-spring:#16a34a;--accent-frontend:#8b5cf6;
+--conf-low:#ef4444;--conf-med:#f5a623;--conf-high:#16a34a;
+--font-display:'Space Grotesk',sans-serif;--font-body:'Plus Jakarta Sans',sans-serif;
+--radius-lg:22px;--radius-md:14px;--radius-sm:9px;--radius-pill:999px;
+--shadow-card:0 2px 0 var(--line);--shadow-brand:0 10px 28px rgba(109,40,255,.18);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body)}
+h1,h2,h3,h4{font-family:var(--font-display);margin:0;letter-spacing:-0.01em}
+a{color:var(--brand)}
+a:hover{color:#5620d6}
+button{font-family:var(--font-body)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--radius-pill);font-size:12px;font-weight:700;letter-spacing:.02em}
+.btn{font-family:var(--font-display);font-weight:600;border:none;border-radius:var(--radius-pill);padding:12px 22px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--ink);color:#fff;box-shadow:var(--shadow-brand)}
+.btn-primary:hover{background:var(--brand)}
+.btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--ink)}
+.card{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-card);border:1px solid var(--line)}

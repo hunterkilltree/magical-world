@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staff of the Cracked Rune — Magicka-style weapon</title>
+<link rel="stylesheet" href="_ds/design-system-87f08573-edc1-4184-870b-3f3f0898f7f4/styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+    "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js",
+    "three/addons/exporters/OBJExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js",
+    "three/addons/exporters/GLTFExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT",
+    "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js": "sha384-4rziNxOBZKQ69i+w+f89KJ55TCYquwchVbByQwmaOeIOXdOU2PLDn3kOfXHwIJC9",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js": "sha384-nbwtoZENJD3Vq+ACK0CuGQdPMuDWHkamC2KJD70EV5nfg6jQjfppKOea07YJN+N3",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js": "sha384-VofkvpG6HERhFCYbsUOHeNXBCqID2nfqkQqnVzE1jc/oPcz+qJ13ADdXH08hE+cQ"
+  }
+}
+</script>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg); font-family: var(--font-body); }
+  three-d-stage:not(:defined) { visibility: hidden; }
+  three-d-stage { display: block; width: 100vw; height: 100vh; }
+  .plate { position: fixed; left: 32px; top: 28px; z-index: 5; pointer-events: none; max-width: 34ch; }
+  .plate h1 { margin: 0 0 4px; font-family: var(--font-display); font-size: 22px; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--ink); }
+  .plate p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); text-wrap: pretty; }
+  .swap { position: fixed; right: 32px; top: 28px; z-index: 6; display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: flex-end; }
+  .chip { font-size: 12px; font-weight: 500; line-height: 1; padding: 9px 14px; border-radius: var(--radius-pill);
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); text-decoration: none; }
+  .chip:hover { color: var(--brand); border-color: var(--brand); }
+  .chip.is-on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  a { color: var(--brand); }
+  a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="plate">
+    <h1>Staff of the Cracked Rune</h1>
+    <p>Ash shaft · dark iron cradle · arcane core, crowned with six elemental stones — 2.16 m</p>
+  </div>
+  <nav class="swap">
+      <span class="chip is-on">Cracked Rune</span>
+      <a class="chip" href="ember-staff.html">Ember Lantern</a>
+      <a class="chip" href="frost-staff.html">Rimeglass</a>
+      <a class="chip" href="storm-sword.html">Thunderfang</a>
+      <a class="chip" href="grove-maul.html">Grovewarden</a>
+      <a class="chip" href="wizards.html">Wizards</a>
+  </nav>
+  <three-d-stage name="arcane-staff" background="#faf8f4" autorotate></three-d-stage>
+  <script src="./three-d-stage.js"></script>
+  <script type="module" src="./staff-model.js"></script>
+</body>
+</html>

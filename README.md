@@ -1,5 +1,9 @@
 # Magical World
 
+Grauhold Reach: a 2D top-down spellcasting action game (element combos, six zones,
+three bosses). Story and requirements: `story/STORY.md`. Game data: `data/`.
+Design mockups: `story/design/`.
+
 A Godot 4 project (GDScript) with a headless dev harness for verifying changes
 without opening the editor.
 

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wizard Roster — six casters</title>
+<link rel="stylesheet" href="_ds/design-system-87f08573-edc1-4184-870b-3f3f0898f7f4/styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+    "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js",
+    "three/addons/exporters/OBJExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js",
+    "three/addons/exporters/GLTFExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT",
+    "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js": "sha384-4rziNxOBZKQ69i+w+f89KJ55TCYquwchVbByQwmaOeIOXdOU2PLDn3kOfXHwIJC9",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js": "sha384-nbwtoZENJD3Vq+ACK0CuGQdPMuDWHkamC2KJD70EV5nfg6jQjfppKOea07YJN+N3",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js": "sha384-VofkvpG6HERhFCYbsUOHeNXBCqID2nfqkQqnVzE1jc/oPcz+qJ13ADdXH08hE+cQ"
+  }
+}
+</script>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg); font-family: var(--font-body); }
+  three-d-stage:not(:defined) { visibility: hidden; }
+  three-d-stage { display: block; width: 100vw; height: 100vh; }
+  .plate { position: fixed; left: 32px; top: 28px; z-index: 5; pointer-events: none; max-width: 32ch; }
+  .plate .role { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint); }
+  .plate h1 { margin: 5px 0 6px; font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    letter-spacing: -0.015em; color: var(--ink); }
+  .plate p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); text-wrap: pretty; }
+  .rail { position: fixed; right: 32px; top: 28px; z-index: 6; display: flex; flex-direction: column;
+    align-items: stretch; gap: 18px; width: 218px; max-height: calc(100vh - 130px); overflow-y: auto; }
+  #roster { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+  .seg { display: flex; gap: 6px; }
+  .seg .chip { flex: 1; justify-content: center; padding: 9px 6px; }
+  .rail-label { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 7px; }
+  .chip { display: flex; align-items: center; gap: 9px; font-family: var(--font-body); font-size: 12.5px;
+    font-weight: 500; line-height: 1; padding: 10px 13px; border-radius: var(--radius-pill);
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); cursor: pointer;
+    text-align: left; }
+  .chip:hover { color: var(--brand); border-color: var(--brand); }
+  .chip.is-on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  .swatch { width: 9px; height: 9px; border-radius: 999px; flex: 0 0 auto; }
+  .armoury { display: flex; gap: 7px; flex-wrap: wrap; }
+  .armoury a { font-size: 12px; padding: 8px 13px; border-radius: var(--radius-pill); border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-soft); text-decoration: none; }
+  .armoury a:hover { color: var(--brand); border-color: var(--brand); }
+  a { color: var(--brand); }
+  a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="plate">
+    <div class="role" id="w-role">Arcane Archmage</div>
+    <h1 id="w-name">Aldric the Unwritten</h1>
+    <p id="w-blurb"></p>
+  </div>
+  <div class="rail">
+    <nav id="roster"></nav>
+    <div>
+      <div class="rail-label">Motion</div>
+      <div class="seg">
+        <button class="chip" data-m="idle">Idle</button>
+        <button class="chip" data-m="walk">Walk</button>
+        <button class="chip" data-m="run">Run</button>
+      </div>
+    </div>
+    <div>
+      <div class="rail-label">Armoury</div>
+      <nav class="armoury">
+    <a href="arcane-staff.html">Cracked Rune</a>
+    <a href="ember-staff.html">Ember Lantern</a>
+    <a href="frost-staff.html">Rimeglass</a>
+    <a href="storm-sword.html">Thunderfang</a>
+      <a href="grove-maul.html">Grovewarden</a>
+        <a href="overworld.html">World map</a>
+        <a href="zones.html">Zone maps</a>
+      </nav>
+    </div>
+  </div>
+  <three-d-stage name="wizard" background="#faf8f4" autorotate></three-d-stage>
+  <script src="./three-d-stage.js"></script>
+  <script type="module" src="./wizards-model.js"></script>
+</body>
+</html>

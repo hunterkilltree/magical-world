@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zone maps — Grauhold Reach</title>
+<link rel="stylesheet" href="_ds/design-system-87f08573-edc1-4184-870b-3f3f0898f7f4/styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+    "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js",
+    "three/addons/exporters/OBJExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js",
+    "three/addons/exporters/GLTFExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT",
+    "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js": "sha384-4rziNxOBZKQ69i+w+f89KJ55TCYquwchVbByQwmaOeIOXdOU2PLDn3kOfXHwIJC9",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js": "sha384-nbwtoZENJD3Vq+ACK0CuGQdPMuDWHkamC2KJD70EV5nfg6jQjfppKOea07YJN+N3",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js": "sha384-VofkvpG6HERhFCYbsUOHeNXBCqID2nfqkQqnVzE1jc/oPcz+qJ13ADdXH08hE+cQ"
+  }
+}
+</script>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg); font-family: var(--font-body); }
+  three-d-stage:not(:defined) { visibility: hidden; }
+  three-d-stage { display: block; width: 100vw; height: 100vh; }
+  .plate { position: fixed; left: 32px; top: 28px; z-index: 5; max-width: 33ch; pointer-events: none; }
+  .kicker { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint); }
+  .plate h1 { margin: 5px 0 8px; font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    letter-spacing: -0.015em; color: var(--ink); }
+  .plate .obj { margin: 0 0 16px; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); text-wrap: pretty; }
+  ol#z-beats { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; max-width: 34ch; }
+  ol#z-beats li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; font-size: 12.5px;
+    line-height: 1.5; color: var(--ink-soft); text-wrap: pretty; }
+  ol#z-beats .n { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--brand);
+    border: 1px solid var(--line); border-radius: 999px; width: 20px; height: 20px; display: grid;
+    place-items: center; background: var(--surface); }
+  .haz { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px;
+    border-radius: var(--radius-pill); border: 1px solid var(--line); background: var(--surface);
+    font-size: 12px; color: var(--ink-soft); }
+  .haz .dot { width: 7px; height: 7px; border-radius: 999px; background: #ff7a2f; }
+  .rail { position: fixed; right: 32px; top: 28px; z-index: 6; display: flex; flex-direction: column;
+    align-items: stretch; gap: 18px; width: 226px; max-height: calc(100vh - 130px); overflow-y: auto; }
+  .rail-label { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 7px; }
+  #zones { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+  .seg { display: flex; gap: 6px; }
+  .seg .chip { flex: 1; justify-content: center; padding: 9px 6px; white-space: nowrap; }
+  .chip { display: flex; align-items: center; gap: 9px; font-family: var(--font-body); font-size: 12.5px;
+    font-weight: 500; line-height: 1; padding: 10px 13px; border-radius: var(--radius-pill);
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); cursor: pointer; text-align: left; }
+  .chip:hover { color: var(--brand); border-color: var(--brand); }
+  .chip.is-on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  .swatch { width: 9px; height: 9px; border-radius: 999px; flex: 0 0 auto; }
+  #legend { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-md);
+    border: 1px solid var(--line); background: var(--surface); }
+  .legend-row { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--ink-soft); }
+  .links { display: flex; gap: 7px; flex-wrap: wrap; }
+  .links a { font-size: 12px; padding: 8px 13px; border-radius: var(--radius-pill); border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-soft); text-decoration: none; }
+  .links a:hover { color: var(--brand); border-color: var(--brand); }
+  a { color: var(--brand); }
+  a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="plate">
+    <div class="kicker" id="z-sub">Zone 1</div>
+    <h1 id="z-name">Zone</h1>
+    <p class="obj" id="z-objective"></p>
+    <ol id="z-beats"></ol>
+    <div class="haz"><span class="dot"></span><span id="z-hazard"></span></div>
+  </div>
+
+  <div class="rail">
+    <div>
+      <div class="rail-label">Camera</div>
+      <div class="seg">
+        <button class="chip" data-v="top">Top</button>
+        <button class="chip is-on" data-v="iso">Isometric</button>
+        <button class="chip" data-v="low">Low</button>
+      </div>
+    </div>
+    <div>
+      <div class="rail-label">Zone</div>
+      <div id="zones"></div>
+    </div>
+    <div>
+      <div class="rail-label">Tile key</div>
+      <div id="legend"></div>
+    </div>
+    <div>
+      <div class="rail-label">Project</div>
+      <nav class="links">
+        <a href="overworld.html">World map</a>
+        <a href="wizards.html">Wizards</a>
+        <a href="arcane-staff.html">Armoury</a>
+      </nav>
+    </div>
+  </div>
+
+  <three-d-stage name="zone" background="#f2ece2"></three-d-stage>
+  <script src="./three-d-stage.js"></script>
+  <script type="module" src="./zone-model.js"></script>
+</body>
+</html>

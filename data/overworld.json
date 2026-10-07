@@ -1,0 +1,308 @@
+{
+ "regions": [
+  {
+   "id": "tundra",
+   "name": "Hvítmark Tundra",
+   "biome": "Frozen tundra",
+   "hex": [
+    1,
+    -7
+   ],
+   "blurb": "Wind-scoured ice shelf. Two chokepoints, no cover — the opening gauntlet."
+  },
+  {
+   "id": "pine",
+   "name": "Ashvold Pinewood",
+   "biome": "Norse pine forest",
+   "hex": [
+    -1,
+    -2
+   ],
+   "blurb": "Dense pine cover and a hidden cache. The safest route between north and keep."
+  },
+  {
+   "id": "keep",
+   "name": "Grauhold Keep",
+   "biome": "Ruined stone keep",
+   "hex": [
+    3,
+    -1
+   ],
+   "blurb": "Campaign hub on a raised plateau. Broken curtain wall, boss court at the centre."
+  },
+  {
+   "id": "volcano",
+   "name": "Eldrhólt Wastes",
+   "biome": "Volcanic wasteland",
+   "hex": [
+    7,
+    -2
+   ],
+   "blurb": "Cinder plain under an active cone. Lava channels rework the chokepoints each run."
+  },
+  {
+   "id": "bog",
+   "name": "Mirefen Bog",
+   "biome": "Swamp / bog",
+   "hex": [
+    0,
+    3
+   ],
+   "blurb": "Half-drowned lowland. Slow water, dead stands, and the densest destructible cover."
+  },
+  {
+   "id": "cavern",
+   "name": "Sunken Verrglass",
+   "biome": "Crystal cavern",
+   "hex": [
+    -4,
+    2
+   ],
+   "blurb": "Collapsed cave mouth below sea level. Crystal light, one way in, one boss out."
+  }
+ ],
+ "routes": [
+  [
+   "tundra",
+   "pine"
+  ],
+  [
+   "pine",
+   "keep"
+  ],
+  [
+   "keep",
+   "volcano"
+  ],
+  [
+   "pine",
+   "bog"
+  ],
+  [
+   "bog",
+   "cavern"
+  ],
+  [
+   "bog",
+   "keep"
+  ]
+ ],
+ "nodes": [
+  {
+   "type": "spawn",
+   "zone": "tundra",
+   "offset": [
+    0,
+    -2
+   ],
+   "label": "Landing — party spawn"
+  },
+  {
+   "type": "choke",
+   "zone": "tundra",
+   "offset": [
+    1,
+    0
+   ],
+   "label": "Ice bridge chokepoint"
+  },
+  {
+   "type": "hazard",
+   "zone": "tundra",
+   "offset": [
+    -1,
+    1
+   ],
+   "label": "Thin ice — breaks under weight"
+  },
+  {
+   "type": "loot",
+   "zone": "pine",
+   "offset": [
+    -1,
+    -1
+   ],
+   "label": "Woodcutter cache"
+  },
+  {
+   "type": "cover",
+   "zone": "pine",
+   "offset": [
+    1,
+    0
+   ],
+   "label": "Pine stand — heavy cover"
+  },
+  {
+   "type": "destruct",
+   "zone": "pine",
+   "offset": [
+    0,
+    1
+   ],
+   "label": "Log pile — destructible"
+  },
+  {
+   "type": "spawn",
+   "zone": "pine",
+   "offset": [
+    -2,
+    1
+   ],
+   "label": "Forward respawn"
+  },
+  {
+   "type": "choke",
+   "zone": "keep",
+   "offset": [
+    -2,
+    0
+   ],
+   "label": "Gatehouse chokepoint"
+  },
+  {
+   "type": "boss",
+   "zone": "keep",
+   "offset": [
+    0,
+    0
+   ],
+   "label": "Warden of the Keep"
+  },
+  {
+   "type": "loot",
+   "zone": "keep",
+   "offset": [
+    1,
+    -1
+   ],
+   "label": "Armoury vault"
+  },
+  {
+   "type": "destruct",
+   "zone": "keep",
+   "offset": [
+    1,
+    1
+   ],
+   "label": "Curtain wall — breachable"
+  },
+  {
+   "type": "hazard",
+   "zone": "volcano",
+   "offset": [
+    0,
+    0
+   ],
+   "label": "Lava channel"
+  },
+  {
+   "type": "hazard",
+   "zone": "volcano",
+   "offset": [
+    1,
+    1
+   ],
+   "label": "Ash vent — periodic burst"
+  },
+  {
+   "type": "boss",
+   "zone": "volcano",
+   "offset": [
+    2,
+    -1
+   ],
+   "label": "Cinder Colossus"
+  },
+  {
+   "type": "choke",
+   "zone": "volcano",
+   "offset": [
+    -2,
+    0
+   ],
+   "label": "Basalt pass"
+  },
+  {
+   "type": "cover",
+   "zone": "volcano",
+   "offset": [
+    0,
+    2
+   ],
+   "label": "Basalt spires"
+  },
+  {
+   "type": "hazard",
+   "zone": "bog",
+   "offset": [
+    0,
+    0
+   ],
+   "label": "Sink pool — movement slow"
+  },
+  {
+   "type": "destruct",
+   "zone": "bog",
+   "offset": [
+    -1,
+    1
+   ],
+   "label": "Dead stand — burns"
+  },
+  {
+   "type": "loot",
+   "zone": "bog",
+   "offset": [
+    2,
+    0
+   ],
+   "label": "Sunken barge"
+  },
+  {
+   "type": "spawn",
+   "zone": "bog",
+   "offset": [
+    -2,
+    -1
+   ],
+   "label": "Ferry landing"
+  },
+  {
+   "type": "boss",
+   "zone": "cavern",
+   "offset": [
+    0,
+    1
+   ],
+   "label": "Verrglass Hollow"
+  },
+  {
+   "type": "loot",
+   "zone": "cavern",
+   "offset": [
+    -1,
+    -1
+   ],
+   "label": "Geode vault"
+  },
+  {
+   "type": "choke",
+   "zone": "cavern",
+   "offset": [
+    2,
+    -1
+   ],
+   "label": "Cave mouth"
+  },
+  {
+   "type": "cover",
+   "zone": "cavern",
+   "offset": [
+    0,
+    -2
+   ],
+   "label": "Crystal shelf"
+  }
+ ]
+}

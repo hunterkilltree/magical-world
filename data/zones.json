@@ -1,0 +1,302 @@
+{
+ "width": 26,
+ "height": 18,
+ "tile_key": {
+  ".": "floor",
+  ",": "rough",
+  "#": "blocker",
+  "~": "hazard",
+  "^": "ledge",
+  "o": "cover",
+  "D": "destructible",
+  "G": "gate",
+  "S": "entry",
+  "E": "enemy_spawn",
+  "C": "loot",
+  "B": "boss_pad",
+  "*": "shrine",
+  " ": "void"
+ },
+ "legend": [
+  {
+   "color": "#4ade80",
+   "label": "Party entry"
+  },
+  {
+   "color": "#ef4444",
+   "label": "Enemy spawn"
+  },
+  {
+   "color": "#f7e26b",
+   "label": "Chokepoint gate"
+  },
+  {
+   "color": "#c9a227",
+   "label": "Loot cache"
+  },
+  {
+   "color": "#94a3b8",
+   "label": "Cover"
+  },
+  {
+   "color": "#a855f7",
+   "label": "Destructible"
+  },
+  {
+   "color": "#ff7a2f",
+   "label": "Hazard"
+  },
+  {
+   "color": "#ffffff",
+   "label": "Raised ledge"
+  }
+ ],
+ "zones": [
+  {
+   "id": "tundra",
+   "name": "Hvítmark Tundra",
+   "sub": "Zone 1 · opening gauntlet",
+   "objective": "Cross the shelf and hold the north bridge until the gate opens.",
+   "beats": [
+    "Entry on the south shelf — no cover, wind pushes the party north.",
+    "First gate: thin ice on both flanks forces a single file crossing.",
+    "Mid shelf opens out — two raiding parties, boulders are the only cover.",
+    "Second gate, then the cache before the north exit."
+   ],
+   "hazard": "Thin ice — breaks under weight",
+   "dress": "ice",
+   "colors": {
+    "ground": "#dfe9f0",
+    "rough": "#c4d6e2",
+    "rock": "#8fa3b3",
+    "hazard": "#9fd8ef",
+    "glow": "#7dd3fc"
+   },
+   "rows": [
+    "          ##..##          ",
+    "        ###....###        ",
+    "       ##,,....,,##       ",
+    "      ##,,..oo..,,##      ",
+    "     ##,,...GG...,,##     ",
+    "    ##~~~~..##..~~~~##    ",
+    "   ##~~~~~..##..~~~~~##   ",
+    "  ##,,..~~~.##.~~~..,,##  ",
+    " ##,,..oo.......oo..,,##  ",
+    " ##,....E.......E....,,## ",
+    " ##,,...............,,##  ",
+    "  ##,,..~~~~~~~..,,##     ",
+    "   ##,,.~~~~~~~.,,##      ",
+    "    ##,,...GG...,,##      ",
+    "     ##,,..CC..,,##       ",
+    "      ##,,.....,,##       ",
+    "       ###.SS.###         ",
+    "         ######           "
+   ]
+  },
+  {
+   "id": "pine",
+   "name": "Ashvold Pinewood",
+   "sub": "Zone 2 · cover and ambush",
+   "objective": "Reach the north-east cache without being flanked in the deep wood.",
+   "beats": [
+    "Two entry lanes from the south clearing — pick a side, they diverge fast.",
+    "Pine stands break line of sight; ambushers use the middle corridor.",
+    "A single gate at the west lane is the only way back once you commit.",
+    "Cache sits behind a log pile — burn it or go the long way."
+   ],
+   "hazard": "Bramble — slows movement",
+   "dress": "pine",
+   "colors": {
+    "ground": "#4e6b3c",
+    "rough": "#6b6a3c",
+    "rock": "#6b5a44",
+    "hazard": "#3f5f45",
+    "glow": "#76c04a"
+   },
+   "rows": [
+    "   ####      ####    #### ",
+    "  ##..##    ##..####..CC##",
+    " ##..oo##  ##..oo..##..,##",
+    " ##....####..,,..oo##..,##",
+    "##..oo....,,....##..##..##",
+    "##....GG..oo..,,..##....##",
+    "##,,..##....E...........##",
+    " ##,..##..oo..##..oo..,,##",
+    " ##...####,,..##....##..##",
+    "##..oo..##....E...##..oo##",
+    "##....,,##..oo..##....,,##",
+    "##,,....##....,,##..DD..##",
+    " ##..oo..GG....##..oo..## ",
+    " ##....##..,,..##....,,## ",
+    "  ##,,..##..oo....##..##  ",
+    "  ##..SS....,,..oo..,,##  ",
+    "   ####..####....####     ",
+    "      ####  ######        "
+   ]
+  },
+  {
+   "id": "keep",
+   "name": "Grauhold Keep",
+   "sub": "Zone 3 · campaign hub, boss court",
+   "objective": "Breach the gatehouse, take the inner court, kill the Warden.",
+   "beats": [
+    "Approach from the south road into the outer bailey.",
+    "Gatehouse chokepoint — the only breach in the curtain wall.",
+    "Inner keep is a ring of destructible wall sections around the court.",
+    "Boss court at the centre; the north shrine platform is the reward."
+   ],
+   "hazard": "Collapsed floor",
+   "dress": "ruin",
+   "colors": {
+    "ground": "#9a9187",
+    "rough": "#8a8177",
+    "rock": "#6f6862",
+    "hazard": "#5c5a54",
+    "glow": "#c9a227"
+   },
+   "rows": [
+    "     ##################   ",
+    "    ##..............##    ",
+    "   ##..^^^......^^^..##   ",
+    "  ##..^^**^....^^..^^..## ",
+    "  ##...^^^^....^^^^...##  ",
+    " ##..oo....CC....oo..##   ",
+    " ##......########......## ",
+    " ##..DD..##....##..DD..## ",
+    "##......##..BB..##......##",
+    "##..oo..##......##..oo..##",
+    "##......##......##......##",
+    " ##..DD..##..GG##..DD..## ",
+    " ##......########......## ",
+    " ##..oo....E.E....oo..##  ",
+    "  ##..............,,..##  ",
+    "   ##..,,..GG..,,....##   ",
+    "    ####....SS....####    ",
+    "       ############       "
+   ]
+  },
+  {
+   "id": "volcano",
+   "name": "Eldrhólt Wastes",
+   "sub": "Zone 4 · lava islands",
+   "objective": "Cross three cinder islands and break the Colossus on the north shelf.",
+   "beats": [
+    "South cinder flat — safe staging, ash vents open under you.",
+    "First lava channel: two narrow basalt crossings, both watched.",
+    "Central island holds the cache and the widest fighting space.",
+    "North shelf raises the Colossus above the lava — no retreat."
+   ],
+   "hazard": "Lava channel",
+   "dress": "basalt",
+   "colors": {
+    "ground": "#4a3a34",
+    "rough": "#5c4238",
+    "rock": "#2f2622",
+    "hazard": "#ff7a2f",
+    "glow": "#ff7a2f"
+   },
+   "rows": [
+    "   ####~~~~~~~~####       ",
+    "  ##,,..##~~~~##..BB##    ",
+    " ##..oo..##~~##..^^^^##   ",
+    " ##....,,.GG..,,....##    ",
+    "##..DD..~~~~~~~~..oo##    ",
+    "##....~~~~~~~~~~~~..##    ",
+    " ##..~~~~~..CC..~~~..##   ",
+    " ##,,..~~..oo..~~..,,##   ",
+    "##..oo..~~....~~..oo..##  ",
+    "##....E..~~~~~~..E....##  ",
+    "##,,....~~~~~~~~....,,##  ",
+    " ##..oo..~~~~~~..oo..##   ",
+    " ##....,,..GG..,,....##   ",
+    "  ##..DD..~~~~..oo..##    ",
+    "  ##,,......,,......##    ",
+    "   ##..oo..SS..,,..##     ",
+    "    ####........####      ",
+    "       ##########         "
+   ]
+  },
+  {
+   "id": "bog",
+   "name": "Mirefen Bog",
+   "sub": "Zone 5 · open water, no boss",
+   "objective": "Follow the causeways to the sunken barge and get out before dark.",
+   "beats": [
+    "Ferry landing in the south — everything beyond it is knee-deep.",
+    "Mud causeways are the only fast ground; water halves movement.",
+    "Two gates split the fen into three pockets, each with dead stands.",
+    "Barge cache in the north-east; dead stands burn and open new lanes."
+   ],
+   "hazard": "Sink pool — heavy slow",
+   "dress": "bog",
+   "colors": {
+    "ground": "#50603a",
+    "rough": "#5e5a34",
+    "rock": "#3d4230",
+    "hazard": "#2f4436",
+    "glow": "#8fbf4a"
+   },
+   "rows": [
+    "  ~~~~~~~~~~~~~~~~~~~~~~  ",
+    " ~~..oo~~~~,,..~~~~CC..~~ ",
+    " ~~....~~~,,....~~~....~~ ",
+    "~~..DD..~~,,..oo~~..oo..~~",
+    "~~....,,~~,,....~~....,,~~",
+    "~~,,....~~~,,..~~~,,....~~",
+    "~~..oo..GG..,,..GG..oo..~~",
+    "~~....~~~~..E...~~~~....~~",
+    "~~..DD~~~~,,....~~~~DD..~~",
+    "~~....~~~,,..oo..~~~....~~",
+    "~~,,..~~~,,....,,~~~..,,~~",
+    "~~..oo..~~,,..~~~~..oo..~~",
+    "~~......~~~..E..~~~.....~~",
+    "~~..DD..~~~,,..~~~..oo..~~",
+    " ~~....,,..GG..,,....,,~~ ",
+    " ~~..oo....SS....,,..~~~~ ",
+    "  ~~~~~~~~~~~~~~~~~~~~~~  ",
+    "     ~~~~~~~~~~~~~~~~     "
+   ]
+  },
+  {
+   "id": "cavern",
+   "name": "Sunken Verrglass",
+   "sub": "Zone 6 · one way in",
+   "objective": "Descend the crystal throat to the hollow. The way out is the way in.",
+   "beats": [
+    "Cave mouth in the south — a single tile wide, easily held.",
+    "Throat narrows past the gate; crystal shelves give the only cover.",
+    "Void pools spread across the mid chamber, lit by the crystals.",
+    "The hollow opens onto a raised crystal dais and the boss."
+   ],
+   "hazard": "Void pool",
+   "dress": "crystal",
+   "colors": {
+    "ground": "#3b3358",
+    "rough": "#463b63",
+    "rock": "#2a2440",
+    "hazard": "#6b3fa8",
+    "glow": "#a855f7"
+   },
+   "rows": [
+    "        ##########        ",
+    "      ##..,,..,,..##      ",
+    "    ##..oo..BB..oo..##    ",
+    "   ##..,,..^^^^..,,..##   ",
+    "   ##..~~..^^^^..~~..##   ",
+    "  ##..oo..,,..,,..oo..##  ",
+    "  ##,,......E.......,,##  ",
+    "   ##..oo..~~~~..oo..##   ",
+    "    ##....~~~~~~....##    ",
+    "     ##..oo..~~..oo##     ",
+    "      ##,,......,,##      ",
+    "       ##..GG..,,##       ",
+    "       ##..,,..oo##       ",
+    "      ##..oo..,,..##      ",
+    "      ##..CC....DD##      ",
+    "       ##..,,..,,##       ",
+    "        ##..SS..##        ",
+    "         ########         "
+   ]
+  }
+ ]
+}
