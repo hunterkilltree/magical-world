@@ -121,12 +121,14 @@ inventory and is marked looted for the rest of the run.
 Chapter 1. A scripted run from entry, through both gates and the cache, to the
 north exit marks Hvítmark Tundra complete.
 
-### R-014 [active] Zones 2 to 6 can be completed
+### R-014 [done] Zones 2 to 6 can be completed
 Chapters 2-6. Each zone has a scripted run test to its exit or boss, built one
-zone at a time in chapter order. Progress, in `tests/story/test_r014_zone_runs.gd`: pine (loot the north-east
-cache) and bog (loot the barge, return to the landing before dark) done; cavern
-(reach the boss dais) done; volcano (cross the lava, break the Colossus) done;
-keep remains (blocked on its sealed boss court).
+zone at a time in chapter order, in `tests/story/test_r014_zone_runs.gd`:
+pine (loot the north-east cache), keep (reach the court, kill the Warden),
+volcano (cross the lava, break the Colossus), bog (loot the barge, return to the
+landing before dark), cavern (reach the boss dais; the Hollow Warden itself is
+R-019). The keep grid was patched (see `data/zones.json`, row 12, columns 11-12)
+because the court was sealed in the original design.
 
 ### R-015 [done] Bosses fight in phases and end their zone
 Chapters 3, 4, 6. A `B` pad spawns the zone's boss with health and at least two
