@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spells/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"fire_bolt"
+display_name = "Fire Bolt"
+description = "An orange bolt of flame."
+keyboard_key = 65
+icon_color = Color(0.9765, 0.4510, 0.0863, 1)
+damage = 20.0
+projectile_speed = 480.0
+cooldown = 0.6
+cast_range = 520.0
+effect_type = 0
+projectile_radius = 7.0
+area_radius = 0.0

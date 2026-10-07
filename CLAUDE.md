@@ -87,3 +87,6 @@ a random or auto-generated name.
   (replace the PNGs in `ui/` with real art; keep the paths). The window is 832x700: the 576 px map is pinned to the top and the
   bottom strip is the spell UI, so nothing covers the spawn tiles.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
+- `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
+  milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects
+  (any folder containing a `project.godot`). It is deliberately independent of the Grauhold Reach code (different spell model).
