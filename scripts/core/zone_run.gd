@@ -1,13 +1,15 @@
 # Tracks completion of a zone. The objective depends on the zone:
 #   tundra: gates open + a cache looted + reach the north exit
 #   pine:   loot the north-east cache
-#   cavern: reach the boss dais (`at_boss`); completion needs the boss defeated (R-015)
+#   boss zones (keep, volcano, cavern): reaching the pad sets `at_boss`; completion is
+#   bind_boss(): defeating the boss completes the zone and drops its fragment
 #   bog:    loot the barge and return to the ferry landing before dark (90 s)
 extends RefCounted
 
 signal completed
 signal failed_signal
 signal boss_reached
+signal ending_started
 
 # Seconds until dark; zones listed here fail if not completed in time.
 const DARK_TIME := {"bog": 90.0}
@@ -18,6 +20,7 @@ var done := false
 var failed := false
 var at_boss := false  # the party has stood on a boss pad (defeating the boss is R-015)
 var elapsed := 0.0
+var ending_played := false
 
 
 func _init(g, inv) -> void:
@@ -74,6 +77,24 @@ func tick(delta: float) -> void:
 	if DARK_TIME.has(grid.id) and elapsed >= DARK_TIME[grid.id]:
 		failed = true
 		failed_signal.emit()
+
+
+# Killing the boss completes the zone and drops its rune fragment (if it has one).
+# The final boss also mends the Cracked Rune and starts the ending.
+func bind_boss(boss) -> void:
+	boss.inventory = inventory
+	boss.health.died.connect(func():
+		if done or failed:
+			return
+		if boss.fragment != "":
+			inventory.add({"id": boss.fragment, "kind": "rune_fragment"})
+		if boss.final:
+			inventory.add({"id": "cracked_rune_mended", "kind": "relic"})
+			ending_played = true
+		done = true
+		completed.emit()
+		if boss.final:
+			ending_started.emit())
 
 
 func update(party_cell: Vector2i) -> void:

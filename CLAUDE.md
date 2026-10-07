@@ -60,9 +60,21 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `mover`, `zone_run`.
-- `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
-- Known data issue: in `keep` the boss court (`B`) is not reachable from the entry even with gates open and
-  destructibles broken. Resolve before R-014/R-015 for that zone.
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
+- `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
+  1-9 queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
+  Save file: `user://savegame.json` (autosaved when a zone completes).
+- `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
+  after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
+- Nodes added to the root during a `--script` run get `_ready` late; scenes under test expose `start()` instead.
+- Avoid lambdas that capture an object which owns the signal's emitter (reference cycle -> leak warnings at exit).
+- Data patch: the design's `keep` court was sealed (the boss pad was unreachable). `data/zones.json` row 12,
+  columns 11-12 were opened (`#` -> `.`) beside the court gate; `story/design/` still shows the original.
 - Pine note: the north-east cache is reachable in 30 steps whether or not the log pile (`D`) is burned, so
   "burn it or go the long way" is not reflected in the grid; the pine gates are not needed for the objective.
+- `tests/support/bot.gd` + `test_r026_whole_game.gd`: a bot (playing Brann) beats all six zones and the ending
+  through GameSession/ZonePlay, kiting bosses and using shield/regen/invulnerability spells. It keeps the game
+  provably beatable (about 10 s keep, 20 s volcano, 40 s final boss at last run). Balance knobs: boss health and
+  damage in `data/bosses.json` (6000 / 10000 / 18000 hp), the 0.8 s global cooldown in `caster.gd`. Without the
+  global cooldown the bot burst 4000 damage in a second. Boss tests use the boss's own max health, so retuning
+  needs no test edits; re-run the bot test to check the game is still beatable. Not playtested by a human.

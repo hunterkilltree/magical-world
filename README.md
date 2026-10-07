@@ -13,6 +13,14 @@ without opening the editor.
   (or set `GODOT=/path/to/godot`).
 - bash (Linux/macOS, or Git Bash/WSL on Windows).
 
+## Playing
+
+Open the project in Godot and run it (F5). Menu -> New Game / Continue -> overworld with the six zones.
+Arrows move, **1-9** queue an element (order of `data/spells.json`: fire, water, earth, nature, lightning,
+ice, wind, light, dark), **Space** casts the queued pair, **Esc** leaves a zone, **Enter** continues after a
+result. Stepping on a gold tile opens a cache. Pick a wizard on the overworld screen: each deals +30% damage with spells containing its elements (the sixth, the Hollow Warden's shade, unlocks after the ending). Beams fire along the way you last moved; in every zone except the tundra the gates open when all thralls are dead. Completing a zone autosaves. Collect three rune fragments
+(pine cache, the Warden of the Keep, the Cinder Colossus) and the Hollow Warden can finally be hurt.
+
 ## Harness
 
 All commands run from anywhere; the script switches to the project root.
@@ -24,6 +32,7 @@ harness/run.sh test            # run all tests in tests/
 harness/run.sh test player     # run only test files whose name contains "player"
 harness/run.sh reqs            # every active/done requirement in story/STORY.md has a test
 harness/run.sh story           # run tests, regenerate story/progress.md
+harness/run.sh shot menu /tmp/a.png   # render a real frame (needs xvfb-run); also overworld, zone:<id>
 harness/run.sh all             # check, boot, reqs, story (default)
 ```
 

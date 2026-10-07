@@ -90,7 +90,8 @@ element.
 
 ### R-006 [done] Spells deal damage with cooldowns
 Chapter 1. An aoe spell damages every enemy within its radius once per cast;
-a spell cannot be recast until its cooldown has elapsed.
+a spell cannot be recast until its cooldown has elapsed, and no two casts may
+be closer than 0.8 s (global cooldown).
 
 ### R-007 [done] The wizard has health and can fall
 Chapter 1. Health starts at 100, never goes below 0, and a `died` signal fires
@@ -121,32 +122,90 @@ inventory and is marked looted for the rest of the run.
 Chapter 1. A scripted run from entry, through both gates and the cache, to the
 north exit marks Hvítmark Tundra complete.
 
-### R-014 [active] Zones 2 to 6 can be completed
+### R-014 [done] Zones 2 to 6 can be completed
 Chapters 2-6. Each zone has a scripted run test to its exit or boss, built one
-zone at a time in chapter order. Progress, in `tests/story/test_r014_zone_runs.gd`: pine (loot the north-east
-cache) and bog (loot the barge, return to the landing before dark) done; cavern
-(reach the boss dais; completion waits on R-015) done; keep and volcano remain.
+zone at a time in chapter order, in `tests/story/test_r014_zone_runs.gd`:
+pine (loot the north-east cache), keep (reach the court, kill the Warden),
+volcano (cross the lava, break the Colossus), bog (loot the barge, return to the
+landing before dark), cavern (reach the boss dais; the Hollow Warden itself is
+R-019). The keep grid was patched (see `data/zones.json`, row 12, columns 11-12)
+because the court was sealed in the original design.
 
-### R-015 [planned] Bosses fight in phases and end their zone
+### R-015 [done] Bosses fight in phases and end their zone
 Chapters 3, 4, 6. A `B` pad spawns the zone's boss with health and at least two
-phases; defeating it completes the zone and drops its rune fragment.
+phases; defeating it completes the zone and drops its rune fragment (keep and
+volcano drop fragments 2 and 3; the final boss in the cavern drops none).
+Boss data lives in `data/bosses.json`.
 
-### R-016 [planned] The campaign follows the route graph
+### R-016 [done] The campaign follows the route graph
 Overworld. Completing a zone unlocks its connected zones per
 `data/overworld.json`; the cavern stays locked until the bog is complete.
 
-### R-017 [planned] Progress saves and loads
+### R-017 [done] Progress saves and loads
 Overworld. Completed zones, looted caches and rune fragments survive a quit
 and reload.
 
-### R-018 [planned] Six wizards with different affinities
-Selection. Each of the six wizards (Aldric, Brann, Vela, Morrow, Kessa, the
-Hollow Warden's shade, unlocked later) boosts damage of its own element.
+### R-018 [done] Six wizards with different affinities
+Selection. Each of the six wizards (`data/wizards.json`: Aldric, Brann, Vela,
+Morrow, Kessa, and the Hollow Warden's shade, unlocked by finishing the game)
+deals +30% damage with spells that contain one of its elements; together the
+six affinities cover all nine elements exactly once. The overworld lets you
+cycle wizards, the choice is saved, and the wizard's colour is drawn in play.
 
-### R-019 [planned] Ending
-Chapter 6. Defeating the Hollow Warden with all three rune fragments mends the
-Cracked Rune and plays the ending; without them he cannot be damaged.
+### R-019 [done] Ending
+Chapter 6. The three rune fragments come from the pine cache (1), the Warden of
+the Keep (2) and the Cinder Colossus (3). Defeating the Hollow Warden (the
+cavern boss, `final` in `data/bosses.json`) while holding all three mends the
+Cracked Rune (`cracked_rune_mended` joins the inventory) and plays the ending;
+without all three he cannot be damaged.
 
-### R-020 [planned] Non-area spell types
-Chapters 1-6. Beam, projectile, vortex, barrier, summon and buff spells each
-behave per their `type` in `data/spells.json` (R-006 covers aoe only).
+### R-020 [done] Non-area spell types
+Chapters 1-6. Beyond aoe (R-006), every spell in `data/spells.json` works:
+projectile (nearest target in range, 50% splash), beam (pierces everything along
+the wizard's facing), vortex (pulls targets in, then damages), summon (damages
+and roots for its duration; bosses cannot be rooted; death_forest also steals
+30% of the damage as health), barrier (a shield for the wizard worth its
+`damage`, lasting its `duration`), buff (rainbow_mist regenerates, crystal_garden
+shields, world_tree makes the wizard invulnerable). Wizard affinity (R-018)
+scales the `damage` of every type.
+
+## Playable flow
+
+Wiring the finished systems into the running game. The logic lives in
+`scripts/core/` (testable headlessly); `scripts/main.gd` is a thin view.
+
+### R-021 [done] A game session ties campaign, save and zones together
+Flow. A new game starts at Hvítmark Tundra with nothing. Only unlocked zones can
+be entered. Completing a zone autosaves; continuing restores completed zones,
+looted caches and the inventory, and a looted cache stays looted when the zone
+is re-entered. Finishing the game is remembered (the mended rune is saved).
+
+### R-022 [done] A zone plays out end to end
+Flow. Entering a zone puts the wizard on the entry, thralls on the enemy spawns
+and the boss on its pad. Each tick runs movement, terrain, gates, enemies, the
+boss, the dark timer and the objective. Stepping on a cache opens it. Spells
+cast from the element queue hit enemies and the boss, and fire spells burn
+destructible tiles in their radius. A zone ends complete, dead or failed.
+
+### R-023 [done] The main scene is a playable menu, overworld, zone and ending
+Flow. Menu (New Game, Continue), an overworld listing the six zones with their
+locked, open and complete state, the zone view with a HUD, a result banner
+after each zone, and an ending screen after the Hollow Warden falls.
+
+
+
+### R-024 [done] Gates open when the thralls are cleared
+Flow. In every zone without a hold rule (all but the tundra), the gates stay
+shut until every thrall in the zone is dead, then open for good. The tundra
+keeps its hold-the-bridge rule: killing thralls does not open its gates.
+
+### R-025 [done] Casting gives visible feedback
+Flow. Each cast leaves an effect at the wizard (the spell's radius, coloured by
+its first element) that fades over 0.4 s; failed casts leave none.
+
+### R-026 [done] The whole game is beatable
+Flow. A scripted bot plays the six zones in order through `GameSession` and
+`ZonePlay` (walking, fighting thralls with spells, killing the three bosses),
+finishes with the ending, and the finished save can be continued with the
+shade unlocked. If this fails, the game has a balance or logic hole.
+

@@ -17,6 +17,11 @@ func build(zone_id: String) -> bool:
 	return grid != null
 
 
+func show_grid(g) -> void:
+	grid = g
+	queue_redraw()
+
+
 # World positions of the party entry tiles.
 func entry_positions() -> Array:
 	var out := []
