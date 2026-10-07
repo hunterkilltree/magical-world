@@ -24,6 +24,21 @@ func _initialize() -> void:
 			main.enter_zone(zone)
 			for i in 20:
 				main.tick(0.016, Vector2.ZERO)
+			if args.size() > 3 and args[3] == "demo":
+				# A mid-fight scene: a beam just fired through two beefy thralls, a fresh pair queued.
+				var p = main.play
+				p.wizard.position = p.grid.cell_center(Vector2i(8, 14))
+				p.wizard.facing = Vector2.RIGHT
+				for i in p.enemies.size():
+					p.enemies[i].health.max_health = 5000
+					p.enemies[i].health.current = 5000
+					p.enemies[i].position = p.wizard.position + Vector2(130 + i * 100, -8 + i * 14)
+				p.queue_element("fire")
+				p.queue_element("lightning")
+				p.cast()
+				p.queue_element("fire")
+				p.queue_element("ice")
+				main.tick(0.1, Vector2.ZERO)
 			if args.size() > 3 and args[3] == "cast":
 				main.play.queue_element("fire")
 				main.play.queue_element("fire")

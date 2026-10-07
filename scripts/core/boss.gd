@@ -7,6 +7,7 @@ signal damage_blocked
 
 const Health = preload("res://scripts/core/health.gd")
 const Mover = preload("res://scripts/core/mover.gd")
+const DrawUtil = preload("res://scripts/core/draw_util.gd")
 
 const DATA_PATH := "res://data/bosses.json"
 const SIGHT := 640.0
@@ -109,4 +110,9 @@ func step(delta: float, target) -> void:
 
 
 func _draw() -> void:
+	DrawUtil.shadow(self, 22.0)
 	draw_circle(Vector2.ZERO, 22.0, Color("#6b2020"))
+	draw_arc(Vector2.ZERO, 22.0, 0.0, TAU, 32, Color("#fca5a5"), 3.0)
+	draw_circle(Vector2(-7, -4), 3.0, Color("#fde047"))
+	draw_circle(Vector2(7, -4), 3.0, Color("#fde047"))
+	DrawUtil.bar(self, -36.0, 56.0, float(health.current) / float(health.max_health), Color("#ef4444"))

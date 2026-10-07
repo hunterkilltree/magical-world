@@ -60,9 +60,9 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `controls` (key bindings), `draw_util` (shadows, health bars), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
 - `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
-  1-9 queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
+  Q W E R T / A S D F (or 1-9) queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
   Save file: `user://savegame.json` (autosaved when a zone completes).
 - `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
   after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
@@ -78,3 +78,6 @@ a random or auto-generated name.
   damage in `data/bosses.json` (6000 / 10000 / 18000 hp), the 0.8 s global cooldown in `caster.gd`. Without the
   global cooldown the bot burst 4000 damage in a second. Boss tests use the boss's own max health, so retuning
   needs no test edits; re-run the bot test to check the game is still beatable. Not playtested by a human.
+- Presentation (Magicka-inspired, R-027 to R-030): `scripts/hud.gd` (element bar, queue slots, spell preview), `effects_view.gd`
+  (circles, beams, floating numbers), `level.gd` (raised walls, tile variation). The logic they show (popups, effects,
+  `queue_preview`, `cooldown_left`) lives in ZonePlay/Caster and is unit-tested; check the look with `run.sh shot ... demo`.

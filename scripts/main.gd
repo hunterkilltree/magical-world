@@ -5,7 +5,8 @@ extends Node2D
 const GameSession = preload("res://scripts/core/game_session.gd")
 const Level = preload("res://scripts/level.gd")
 const EffectsView = preload("res://scripts/effects_view.gd")
-const SpellBook = preload("res://scripts/core/spell_book.gd")
+const Controls = preload("res://scripts/core/controls.gd")
+const HudScript = preload("res://scripts/hud.gd")
 
 const ENDING_TEXT := "The Hollow Warden falls, and the dark drains out of Grauhold Reach.\n\n" \
 	+ "The three fragments knit around the Staff of the Cracked Rune, and for the first\n" \
@@ -24,6 +25,7 @@ var _world: Node2D
 var _level
 var effects_view = null
 var wizard_button: Button = null
+var hud = null  # the spell bar (Control)
 var _hud: Label
 var _banner: Label
 
@@ -147,10 +149,21 @@ func enter_zone(id: String) -> bool:
 	_world.add_child(effects_view)
 	_hud = Label.new()
 	_hud.position = Vector2(8, 4)
+	_hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hud.custom_minimum_size = Vector2(816, 0)
+	_hud.add_theme_color_override("font_outline_color", Color.BLACK)
+	_hud.add_theme_constant_override("outline_size", 5)
 	_ui.add_child(_hud)
+	hud = HudScript.new()
+	hud.play = play
+	hud.position = Vector2(8, 468)
+	hud.size = Vector2(340, 100)
+	_ui.add_child(hud)
 	_banner = Label.new()
 	_banner.position = Vector2(220, 260)
 	_banner.add_theme_font_size_override("font_size", 28)
+	_banner.add_theme_color_override("font_outline_color", Color.BLACK)
+	_banner.add_theme_constant_override("outline_size", 8)
 	_ui.add_child(_banner)
 	_update_hud()
 	return true
@@ -178,6 +191,14 @@ func tick(delta: float, input: Vector2) -> void:
 	play.tick(delta, input)
 	_level.queue_redraw()
 	effects_view.queue_redraw()
+	hud.queue_redraw()
+	play.wizard.queue_redraw()
+	for e in play.enemies:
+		e.visible = not e.health.is_dead()
+		e.queue_redraw()
+	if play.boss != null:
+		play.boss.visible = not play.boss.health.is_dead()
+		play.boss.queue_redraw()
 	_update_hud()
 	if play.state != "playing":
 		_finish_zone()
@@ -218,13 +239,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_ESCAPE:
 			continue_after_zone()
 			return
-		var elements := SpellBook.elements()
-		var idx: int = event.keycode - KEY_1
-		if idx >= 0 and idx < elements.size():
-			play.queue_element(elements[idx])
+		var element := Controls.element_for_keycode(event.keycode)
+		if element != "":
+			play.queue_element(element)
 		elif event.keycode == KEY_SPACE:
 			play.cast()
+		if hud != null:
+			hud.queue_redraw()
 			effects_view.queue_redraw()
+			play.wizard.queue_redraw()
 
 
 func _update_hud() -> void:
@@ -236,7 +259,7 @@ func _update_hud() -> void:
 		(" +%d shield" % h.shield) if h.shield > 0 else "", ", ".join(play.queue.queue)]
 	if play.boss != null:
 		line += "   %s %d/%d" % [play.boss.display_name, play.boss.health.current, play.boss.health.max_health]
-	_hud.text = line + "\n1-9 element, Space cast, Esc leave.  " + play.grid.objective
+	_hud.text = line + "\nQ W E R T / A S D F (or 1-9) queue elements, Space casts, Esc leaves.  " + play.grid.objective
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -260,6 +283,7 @@ func _clear_ui() -> void:
 	_banner = null
 	continue_button = null
 	wizard_button = null
+	hud = null
 
 
 func _leave_world() -> void:

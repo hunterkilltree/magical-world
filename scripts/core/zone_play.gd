@@ -9,10 +9,13 @@ const ZoneRun = preload("res://scripts/core/zone_run.gd")
 const ElementQueue = preload("res://scripts/core/element_queue.gd")
 const Caster = preload("res://scripts/core/caster.gd")
 const Roster = preload("res://scripts/core/wizard_roster.gd")
+const SpellBook = preload("res://scripts/core/spell_book.gd")
 
-const ELEMENT_COLORS := {"fire": "#f97316", "water": "#06b6d4", "earth": "#a16207", "nature": "#22c55e",
-	"lightning": "#eab308", "ice": "#38bdf8", "wind": "#14b8a6", "light": "#fbbf24", "dark": "#6b21a8"}
 const EFFECT_TIME := 0.4
+const POPUP_TIME := 1.0
+const DAMAGE_COLOR := Color("#fde047")
+const HURT_COLOR := Color("#ef4444")
+const HEAL_COLOR := Color("#4ade80")
 
 var grid
 var inventory
@@ -23,7 +26,8 @@ var boss = null
 var queue := ElementQueue.new()
 var caster := Caster.new()
 var wizard_data: Dictionary = {}
-var effects: Array = []  # {pos, radius, color, ttl}: spell flashes for the view
+var effects: Array = []  # {kind: circle|beam, pos, radius, color, ttl, dir, length}: spell flashes
+var popups: Array = []  # {pos, text, color, ttl}: floating damage numbers
 var state := "playing"  # playing | complete | dead | failed
 
 
@@ -58,6 +62,11 @@ func tick(delta: float, input: Vector2) -> void:
 	for e in effects:
 		e["ttl"] -= delta
 	effects = effects.filter(func(e): return e["ttl"] > 0.0)
+	for pop in popups:
+		pop["ttl"] -= delta
+		pop["pos"] = pop["pos"] + Vector2(0, -40.0 * delta)
+	popups = popups.filter(func(pop): return pop["ttl"] > 0.0)
+	var hp_before: int = wizard.health.current
 	wizard.step(delta, input)
 	var cell: Vector2i = grid.world_to_cell(wizard.position)
 	grid.update_gate_hold(cell, delta)
@@ -68,6 +77,9 @@ func tick(delta: float, input: Vector2) -> void:
 		e.step(delta, wizard)
 	if boss != null:
 		boss.step(delta, wizard)
+	var lost: int = hp_before - wizard.health.current
+	if lost > 0:
+		_popup(wizard.position, "-%d" % lost, HURT_COLOR)
 	# Zones without a hold rule open their gates once every thrall is dead.
 	if not grid.gates_open and not grid.GATE_HOLD.has(grid.id) and not enemies.is_empty() \
 			and enemies.all(func(e): return e.health.is_dead()):
@@ -78,7 +90,30 @@ func tick(delta: float, input: Vector2) -> void:
 
 
 func queue_element(element: String) -> bool:
-	return queue.push(element)
+	var ok := queue.push(element)
+	_sync_view()
+	return ok
+
+
+# What the queue would cast right now: {name, id, type, complete, ready, cooldown}, or {}.
+func queue_preview() -> Dictionary:
+	var q: Array = queue.queue
+	if q.is_empty():
+		return {}
+	var spell := SpellBook.find(q) if q.size() == 2 else {}
+	if spell.is_empty():
+		spell = SpellBook.fallback_bolt(q[0])
+	var left := caster.cooldown_left(spell)
+	return {"name": spell["name"], "id": spell["id"], "type": spell["type"],
+		"complete": q.size() == 2, "ready": left <= 0.0, "cooldown": left}
+
+
+func _sync_view() -> void:
+	wizard.queued_colors = queue.queue.map(func(e): return SpellBook.element_color(e))
+
+
+func _popup(pos: Vector2, text: String, color: Color) -> void:
+	popups.append({"pos": pos, "text": text, "color": color, "ttl": POPUP_TIME})
 
 
 # Resolves the queue and casts it. Returns targets hit, or -1 if nothing was queued,
@@ -88,17 +123,34 @@ func cast() -> int:
 	if state != "playing":
 		return -1
 	var spell := queue.resolve()
+	_sync_view()
 	if spell.is_empty():
 		return -1
 	var targets: Array = enemies.filter(func(e): return not e.health.is_dead())
 	if boss != null and not boss.health.is_dead():
 		targets.append(boss)
 	var boost := Roster.boost_for(wizard_data, spell)
+	var before := {}
+	for t in targets:
+		before[t] = t.health.current
+	var hp_before: int = wizard.health.current
 	var hits := caster.cast(spell, wizard.position, targets, wizard.facing, wizard, boost)
 	var recipe: Array = spell.get("recipe", [spell.get("category", "")])
 	if hits >= 0:
-		effects.append({"pos": wizard.position, "radius": float(spell["radius"]),
-			"color": Color(ELEMENT_COLORS.get(recipe[0], "#ffffff")), "ttl": EFFECT_TIME})
+		var fx := {"kind": "circle", "pos": wizard.position, "radius": float(spell["radius"]),
+			"color": SpellBook.element_color(recipe[0]), "ttl": EFFECT_TIME}
+		if spell["type"] == "beam":
+			fx["kind"] = "beam"
+			fx["dir"] = wizard.facing
+			fx["length"] = Caster.BEAM_LENGTH
+		effects.append(fx)
+		for t in targets:
+			var dealt: int = before[t] - t.health.current
+			if dealt > 0:
+				_popup(t.position, str(dealt), DAMAGE_COLOR)
+		var gained: int = wizard.health.current - hp_before
+		if gained > 0:
+			_popup(wizard.position, "+%d" % gained, HEAL_COLOR)
 	if hits >= 0 and spell["type"] == "aoe" and "fire" in recipe:
 		for c in grid.cells_of("D"):
 			if grid.cell_center(c).distance_to(wizard.position) <= float(spell["radius"]):

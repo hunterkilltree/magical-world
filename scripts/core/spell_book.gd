@@ -3,6 +3,9 @@ extends RefCounted
 
 const DATA_PATH := "res://data/spells.json"
 
+const ELEMENT_COLORS := {"fire": "#f97316", "water": "#06b6d4", "earth": "#a16207", "nature": "#22c55e",
+	"lightning": "#eab308", "ice": "#38bdf8", "wind": "#14b8a6", "light": "#fbbf24", "dark": "#6b21a8"}
+
 static var _data: Dictionary = {}
 
 
@@ -11,6 +14,10 @@ static func _load() -> void:
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
 		if parsed is Dictionary:
 			_data = parsed
+
+
+static func element_color(element: String) -> Color:
+	return Color(ELEMENT_COLORS.get(element, "#ffffff"))
 
 
 static func all() -> Array:
