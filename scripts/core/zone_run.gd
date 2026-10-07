@@ -1,7 +1,8 @@
 # Tracks completion of a zone. The objective depends on the zone:
 #   tundra: gates open + a cache looted + reach the north exit
 #   pine:   loot the north-east cache
-#   cavern: reach the boss dais (`at_boss`); completion needs the boss defeated (R-015)
+#   boss zones (keep, volcano, cavern): reaching the pad sets `at_boss`; completion is
+#   bind_boss(): defeating the boss completes the zone and drops its fragment
 #   bog:    loot the barge and return to the ferry landing before dark (90 s)
 extends RefCounted
 
@@ -74,6 +75,17 @@ func tick(delta: float) -> void:
 	if DARK_TIME.has(grid.id) and elapsed >= DARK_TIME[grid.id]:
 		failed = true
 		failed_signal.emit()
+
+
+# Killing the boss completes the zone and drops its rune fragment (if it has one).
+func bind_boss(boss) -> void:
+	boss.health.died.connect(func():
+		if done or failed:
+			return
+		if boss.fragment != "":
+			inventory.add({"id": boss.fragment, "kind": "rune_fragment"})
+		done = true
+		completed.emit())
 
 
 func update(party_cell: Vector2i) -> void:

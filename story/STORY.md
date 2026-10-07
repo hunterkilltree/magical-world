@@ -127,9 +127,11 @@ zone at a time in chapter order. Progress, in `tests/story/test_r014_zone_runs.g
 cache) and bog (loot the barge, return to the landing before dark) done; cavern
 (reach the boss dais; completion waits on R-015) done; keep and volcano remain.
 
-### R-015 [planned] Bosses fight in phases and end their zone
+### R-015 [done] Bosses fight in phases and end their zone
 Chapters 3, 4, 6. A `B` pad spawns the zone's boss with health and at least two
-phases; defeating it completes the zone and drops its rune fragment.
+phases; defeating it completes the zone and drops its rune fragment (keep and
+volcano drop fragments 2 and 3; the final boss in the cavern drops none).
+Boss data lives in `data/bosses.json`.
 
 ### R-016 [planned] The campaign follows the route graph
 Overworld. Completing a zone unlocks its connected zones per

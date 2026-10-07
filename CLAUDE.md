@@ -60,7 +60,7 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `mover`, `zone_run`.
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json), `mover`, `zone_run`.
 - `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
 - Known data issue: in `keep` the boss court (`B`) is not reachable from the entry even with gates open and
   destructibles broken. Resolve before R-014/R-015 for that zone.
