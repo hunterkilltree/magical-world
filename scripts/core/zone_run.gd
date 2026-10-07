@@ -1,11 +1,13 @@
 # Tracks completion of a zone. The objective depends on the zone:
 #   tundra: gates open + a cache looted + reach the north exit
 #   pine:   loot the north-east cache
+#   cavern: reach the boss dais (`at_boss`); completion needs the boss defeated (R-015)
 #   bog:    loot the barge and return to the ferry landing before dark (90 s)
 extends RefCounted
 
 signal completed
 signal failed_signal
+signal boss_reached
 
 # Seconds until dark; zones listed here fail if not completed in time.
 const DARK_TIME := {"bog": 90.0}
@@ -14,6 +16,7 @@ var grid
 var inventory
 var done := false
 var failed := false
+var at_boss := false  # the party has stood on a boss pad (defeating the boss is R-015)
 var elapsed := 0.0
 
 
@@ -74,7 +77,12 @@ func tick(delta: float) -> void:
 
 
 func update(party_cell: Vector2i) -> void:
-	if done or failed or not _objective_met(party_cell):
+	if done or failed:
+		return
+	if not at_boss and grid.tile_at(party_cell) == "B":
+		at_boss = true
+		boss_reached.emit()
+	if not _objective_met(party_cell):
 		return
 	done = true
 	completed.emit()

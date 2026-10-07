@@ -135,3 +135,51 @@ func test_bog_dark_falls_and_fails_the_run() -> void:
 	g.open_loot(_barge(g), inv)
 	run.update(g.cells_of("S")[0])
 	assert_true(not run.done, "too late to complete")
+
+
+# ---- zone 6: Sunken Verrglass ---------------------------------------------
+# Objective: descend the throat to the hollow and stand on the boss dais.
+# Completion needs the boss defeated, which arrives with R-015.
+
+func _dais(g) -> Vector2i:
+	return g.cells_of("B")[0]
+
+
+func test_cavern_dais_reachable_dry_and_through_the_void() -> void:
+	var g = ZoneGrid.load_zone("cavern")
+	var start: Vector2i = g.cells_of("S")[0]
+	assert_true(not g.find_path(start, _dais(g), ["~"]).is_empty(), "dry route")
+	var wet: Array = g.find_path(start, _dais(g))
+	assert_true(not wet.is_empty(), "route through the void pools")
+	assert_true(wet.size() < g.find_path(start, _dais(g), ["~"]).size(), "void route is the short one")
+
+
+func test_cavern_dry_run_reaches_the_boss_with_a_thrall_chasing() -> void:
+	var g = ZoneGrid.load_zone("cavern")
+	var run = ZoneRun.new(g, Inventory.new())
+	var reached := [0]
+	run.boss_reached.connect(func(): reached[0] += 1)
+	var p = _wizard(g)
+	assert_true(not run.at_boss, "not at the boss yet")
+	Walker.walk_to(self, p, g, run, _dais(g), ["~"], _thralls(g))
+	assert_true(run.at_boss, "reached the hollow")
+	assert_eq(reached[0], 1, "signalled once")
+	assert_true(not run.done, "zone is not complete until the boss falls")
+	assert_eq(p.health.current, 100, "dry route takes no void damage")
+
+
+func test_cavern_void_shortcut_hurts_but_works() -> void:
+	var g = ZoneGrid.load_zone("cavern")
+	var run = ZoneRun.new(g, Inventory.new())
+	var p = _wizard(g)
+	Walker.walk_to(self, p, g, run, _dais(g))
+	assert_true(run.at_boss, "reached the hollow")
+	assert_true(p.health.current < 100, "void pools cost health")
+	assert_true(p.health.current > 0, "but not the wizard")
+
+
+func test_cavern_other_zones_never_report_a_boss() -> void:
+	var g = ZoneGrid.load_zone("pine")
+	var run = ZoneRun.new(g, Inventory.new())
+	run.update(g.cells_of("S")[0])
+	assert_true(not run.at_boss, "pine has no boss pad")
