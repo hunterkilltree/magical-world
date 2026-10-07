@@ -1,4 +1,6 @@
-# Tracks completion of a zone that ends at an exit: gates must be open and a cache looted.
+# Tracks completion of a zone. The objective depends on the zone:
+#   tundra: gates open + a cache looted + reach the north exit
+#   pine:   loot the north-east cache
 extends RefCounted
 
 signal completed
@@ -26,9 +28,28 @@ func any_loot_opened() -> bool:
 	return not inventory.items.is_empty()
 
 
+# Caches in the north-east quadrant (the pine objective).
+func north_east_caches() -> Array:
+	var out := []
+	for c in grid.cells_of("C"):
+		if c.x >= grid.width / 2 and c.y < grid.height / 2:
+			out.append(c)
+	return out
+
+
+func _objective_met(party_cell: Vector2i) -> bool:
+	match grid.id:
+		"tundra":
+			return grid.gates_open and any_loot_opened() and party_cell in exit_cells()
+		"pine":
+			for c in north_east_caches():
+				if grid.is_looted(c):
+					return true
+	return false
+
+
 func update(party_cell: Vector2i) -> void:
-	if done or not grid.gates_open or not any_loot_opened():
+	if done or not _objective_met(party_cell):
 		return
-	if party_cell in exit_cells():
-		done = true
-		completed.emit()
+	done = true
+	completed.emit()

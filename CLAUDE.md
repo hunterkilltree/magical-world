@@ -64,3 +64,5 @@ a random or auto-generated name.
 - `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
 - Known data issue: in `keep` the boss court (`B`) is not reachable from the entry even with gates open and
   destructibles broken. Resolve before R-014/R-015 for that zone.
+- Pine note: the north-east cache is reachable in 30 steps whether or not the log pile (`D`) is burned, so
+  "burn it or go the long way" is not reflected in the grid; the pine gates are not needed for the objective.
