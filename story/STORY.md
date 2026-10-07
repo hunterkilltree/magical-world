@@ -158,3 +158,27 @@ without all three he cannot be damaged.
 ### R-020 [planned] Non-area spell types
 Chapters 1-6. Beam, projectile, vortex, barrier, summon and buff spells each
 behave per their `type` in `data/spells.json` (R-006 covers aoe only).
+
+## Playable flow
+
+Wiring the finished systems into the running game. The logic lives in
+`scripts/core/` (testable headlessly); `scripts/main.gd` is a thin view.
+
+### R-021 [done] A game session ties campaign, save and zones together
+Flow. A new game starts at Hvítmark Tundra with nothing. Only unlocked zones can
+be entered. Completing a zone autosaves; continuing restores completed zones,
+looted caches and the inventory, and a looted cache stays looted when the zone
+is re-entered. Finishing the game is remembered (the mended rune is saved).
+
+### R-022 [done] A zone plays out end to end
+Flow. Entering a zone puts the wizard on the entry, thralls on the enemy spawns
+and the boss on its pad. Each tick runs movement, terrain, gates, enemies, the
+boss, the dark timer and the objective. Stepping on a cache opens it. Spells
+cast from the element queue hit enemies and the boss, and fire spells burn
+destructible tiles in their radius. A zone ends complete, dead or failed.
+
+### R-023 [done] The main scene is a playable menu, overworld, zone and ending
+Flow. Menu (New Game, Continue), an overworld listing the six zones with their
+locked, open and complete state, the zone view with a HUD, a result banner
+after each zone, and an ending screen after the Hollow Warden falls.
+

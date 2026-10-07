@@ -8,6 +8,7 @@ const DATA_PATH := "res://data/overworld.json"
 
 var routes: Array = []
 var _order: Array = []
+var _names: Dictionary = {}
 var _unlocked: Dictionary = {}
 var _completed: Dictionary = {}
 
@@ -16,12 +17,17 @@ func _init() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
 	for r in data["regions"]:
 		_order.append(r["id"])
+		_names[r["id"]] = r["name"]
 	routes = data["routes"]
 	_unlocked[_order[0]] = true
 
 
 func zone_ids() -> Array:
 	return _order.duplicate()
+
+
+func zone_name(id: String) -> String:
+	return _names.get(id, id)
 
 
 func neighbours(id: String) -> Array:

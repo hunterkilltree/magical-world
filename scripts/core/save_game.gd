@@ -40,6 +40,19 @@ static func apply_grid(data: Dictionary, grid) -> void:
 	grid.restore_loot(cells)
 
 
+# zone id -> Array of Vector2i for every looted cache recorded in a save.
+static func looted_map(data: Dictionary) -> Dictionary:
+	var out := {}
+	var saved: Dictionary = data.get("looted", {})
+	for zone_id in saved:
+		var cells := []
+		for c in saved[zone_id]:
+			if c is Array and c.size() == 2:
+				cells.append(Vector2i(int(c[0]), int(c[1])))
+		out[zone_id] = cells
+	return out
+
+
 static func write(path: String, data: Dictionary) -> bool:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:

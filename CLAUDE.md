@@ -60,8 +60,14 @@ a random or auto-generated name.
 ## Code layout
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`.
-- `scripts/level.gd` draws a grid; `scripts/main.gd` wires zone 1 (tundra). Controls: arrows move, 1-9 queue an element, Space casts.
+  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster`, `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells), `game_session` (campaign + save + zone entry).
+- `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
+  1-9 queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
+  Save file: `user://savegame.json` (autosaved when a zone completes).
+- `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
+  after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
+- Nodes added to the root during a `--script` run get `_ready` late; scenes under test expose `start()` instead.
+- Avoid lambdas that capture an object which owns the signal's emitter (reference cycle -> leak warnings at exit).
 - Data patch: the design's `keep` court was sealed (the boss pad was unreachable). `data/zones.json` row 12,
   columns 11-12 were opened (`#` -> `.`) beside the court gate; `story/design/` still shows the original.
 - Pine note: the north-east cache is reachable in 30 steps whether or not the log pile (`D`) is burned, so
