@@ -8,6 +8,9 @@ const TEST_DIR := "res://tests"
 
 
 func _initialize() -> void:
+	# Wait one frame so the root is live: nodes added to it then enter the tree and run _ready,
+	# and Tweens bound to them actually step.
+	await process_frame
 	var filter := ""
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:

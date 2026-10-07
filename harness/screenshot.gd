@@ -7,6 +7,24 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var what: String = args[0] if args.size() > 0 else "menu"
 	var out: String = args[1] if args.size() > 1 else "/tmp/shot.png"
+	if what == "queue5":
+		# The element-queue bar on its own, all five slots filled (its design size).
+		var bg := ColorRect.new()
+		bg.color = Color("#2b3a2a")
+		bg.size = Vector2(832, 700)
+		root.add_child(bg)
+		var bar = load("res://ui/element_queue.tscn").instantiate()
+		root.add_child(bar)
+		bar.setup()
+		for e in ["Fire", "Lightning", "Ice", "Nature", "Dark"]:
+			bar.add_element(e)
+		for i in 30:
+			await process_frame
+		var shot := root.get_texture().get_image()
+		shot.save_png(out)
+		print("saved ", out, " ", shot.get_size())
+		quit(0)
+		return
 	var main = load("res://scenes/main.tscn").instantiate()
 	main.save_path = "user://screenshot_save.json"
 	root.add_child(main)

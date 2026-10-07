@@ -237,3 +237,15 @@ nothing solid stands below; floor tiles vary slightly and have slab edges;
 characters have a shadow, thralls and bosses a health bar, and the wizard a hat
 and a staff pointing the way they face.
 
+### R-031 [done] A bottom-centre element queue bar
+Presentation. `ui/element_queue.tscn` is a CanvasLayer holding the exact tree
+`UIBottomCenter` (MarginContainer, bottom-centre anchors, bottom padding) >
+`BackgroundFrame` (TextureRect) > `SlotContainer` (centred HBoxContainer) >
+`Slot1`..`Slot5` (TextureRect, circular frame) > `ElementIcon` (TextureRect,
+ignore texture size, keep aspect centred). Its script keeps up to five queued
+elements in a `PackedStringArray`, `add_element(name)` fills the next empty slot
+with that element's icon and pops the slot (scale 1.0 to 1.2 and back with a
+Tween), and `clear_queue()` empties every slot. Element names map to texture
+paths (Fire, Water, Earth, Nature, Lightning, Ice, Wind, Light, Dark). The game
+mirrors its two-element queue into this bar, hiding the unused slots.
+

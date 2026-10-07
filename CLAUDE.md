@@ -81,3 +81,9 @@ a random or auto-generated name.
 - Presentation (Magicka-inspired, R-027 to R-030): `scripts/hud.gd` (element bar, queue slots, spell preview), `effects_view.gd`
   (circles, beams, floating numbers), `level.gd` (raised walls, tile variation). The logic they show (popups, effects,
   `queue_preview`, `cooldown_left`) lives in ZonePlay/Caster and is unit-tested; check the look with `run.sh shot ... demo`.
+- Element queue bar (R-031): `ui/element_queue.tscn` + `ui/element_queue.gd` (CanvasLayer > UIBottomCenter > BackgroundFrame >
+  SlotContainer > Slot1..5 > ElementIcon). `add_element("Fire")`, `clear_queue()`, `sync_queue([...])`; main mirrors the game's
+  two-element queue into it (`max_slots = 2` hides the rest). Textures are generated placeholders: `python3 tools/make_ui_placeholders.py`
+  (replace the PNGs in `ui/` with real art; keep the paths). The window is 832x700: the 576 px map is pinned to the top and the
+  bottom strip is the spell UI, so nothing covers the spawn tiles.
+- `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
