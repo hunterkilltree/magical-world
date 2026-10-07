@@ -3,10 +3,15 @@
 #   harness/run.sh check          parse every .gd file
 #   harness/run.sh boot           boot the project headlessly, fail on engine errors
 #   harness/run.sh test [filter]  run tests/test_*.gd
-#   harness/run.sh all            check + boot + test
+#   harness/run.sh reqs           every active/done requirement in story/STORY.md has a test
+#   harness/run.sh story          run tests, regenerate story/progress.md
+#   harness/run.sh all            check + boot + reqs + story
 # Set GODOT=/path/to/godot if it is not on PATH as godot or godot4.
 set -u
 cd "$(dirname "$0")/.."
+
+# reqs only reads files, so it works without Godot.
+if [ "${1:-}" = reqs ]; then source harness/reqs.sh; cmd_reqs; exit $?; fi
 
 GODOT_BIN="${GODOT:-}"
 if [ -z "$GODOT_BIN" ]; then
@@ -40,10 +45,14 @@ cmd_boot() {
 
 cmd_test() { "$GODOT_BIN" --headless --path . --script res://harness/run_tests.gd -- "$@"; }
 
+source harness/reqs.sh
+
 case "${1:-all}" in
   check) cmd_check ;;
   boot)  cmd_boot ;;
   test)  shift; cmd_test "$@" ;;
-  all)   cmd_check && cmd_boot && cmd_test ;;
-  *) echo "usage: $0 {check|boot|test [filter]|all}" >&2; exit 2 ;;
+  reqs)  cmd_reqs ;;
+  story) cmd_story ;;
+  all)   cmd_check && cmd_boot && cmd_reqs && cmd_story ;;
+  *) echo "usage: $0 {check|boot|test [filter]|reqs|story|all}" >&2; exit 2 ;;
 esac
