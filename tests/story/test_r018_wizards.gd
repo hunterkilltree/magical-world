@@ -93,8 +93,8 @@ func test_the_choice_is_saved_and_restored() -> void:
 
 
 func test_the_chosen_wizard_deals_boosted_damage_and_is_drawn_in_their_colour() -> void:
-	# Volcano boss has 900 hp: supernova does 850 (Aldric) or 1105 (Brann, fire).
-	var results := {}
+	# Supernova is 850: Aldric (light) deals it as is, Brann (fire) deals 850 x 1.3 = 1105.
+	var lost := {}
 	for id in ["arcane_archmage", "ember_pyromancer"]:
 		var p = ZonePlay.create(ZoneGrid.load_zone("volcano"), Inventory.new(), Roster.find(id))
 		plays.append(p)
@@ -102,7 +102,7 @@ func test_the_chosen_wizard_deals_boosted_damage_and_is_drawn_in_their_colour() 
 		p.queue_element("fire")
 		p.queue_element("fire")
 		p.cast()
-		results[id] = p.boss.health.is_dead()
+		lost[id] = p.boss.health.max_health - p.boss.health.current
 		assert_eq(p.wizard.color, Color(Roster.find(id)["glow"]), "%s colour" % id)
-	assert_true(not results["arcane_archmage"], "Aldric leaves the Colossus at 50")
-	assert_true(results["ember_pyromancer"], "Brann's fire finishes it")
+	assert_eq(lost["arcane_archmage"], 850, "Aldric: no bonus on fire")
+	assert_eq(lost["ember_pyromancer"], 1105, "Brann: +30% on fire")

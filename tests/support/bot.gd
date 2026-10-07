@@ -12,6 +12,8 @@ const AVOID := {"tundra": ["~"], "pine": [], "keep": [], "volcano": [], "bog": [
 # Plays one zone. Returns {play, state, seconds, casts}. Caller frees play.
 static func play_zone(session, id: String, max_seconds := 180.0) -> Dictionary:
 	var play = session.enter_zone(id)
+	if play == null:
+		return {"play": null, "state": "locked", "seconds": 0.0, "casts": 0}
 	var ctx := {"t": 0.0, "rot": 0, "casts": 0, "max": max_seconds}
 	var g = play.grid
 	var avoid: Array = AVOID[id]
@@ -72,13 +74,45 @@ static func _fight_boss(play, avoid: Array, ctx: Dictionary) -> void:
 		if g.cell_center(cell).distance_to(play.boss.position) <= 150.0:
 			_goto(play, cell, avoid, ctx)
 			break
-	var recipes := [["fire", "fire"], ["fire", "ice"], ["water", "water"], ["fire", "wind"]]
+	# Hold a 100-125 px band from the boss (it chases at 60-90 px/s, the wizard moves at 200),
+	# cycling through aoe spells every tick; thralls get the same treatment as elsewhere.
+	var recipes := [["fire", "fire"], ["fire", "ice"], ["fire", "nature"], ["fire", "wind"]]
+	var guards := [["nature", "nature"], ["water", "light"], ["earth", "water"]]  # invulnerable, regen, shield
 	var i := 0
-	while play.state == "playing" and not play.boss.health.is_dead() and ctx["t"] < ctx["max"] and i < 40:
+	while play.state == "playing" and not play.boss.health.is_dead() and ctx["t"] < ctx["max"]:
 		var r: Array = recipes[i % recipes.size()]
+		if play.wizard.health.current < 60:
+			r = guards[(i / 7) % guards.size()]  # try a different defensive spell each time
 		play.queue_element(r[0])
 		play.queue_element(r[1])
 		if play.cast() >= 0:
 			ctx["casts"] += 1
-		_tick(play, Vector2.ZERO, ctx)
+		var away: Vector2 = play.wizard.position - play.boss.position
+		var move := Vector2.ZERO
+		if away.length() < 110.0:
+			move = _flee_dir(play)
+		elif away.length() > 135.0:
+			move = -away.normalized()
+		_tick(play, move, ctx)
 		i += 1
+
+
+# Of 16 headings, the one that ends furthest from the boss after 80 px while staying on
+# walkable ground the whole way. Straight-line fleeing gets the wizard cornered.
+static func _flee_dir(play) -> Vector2:
+	var best := Vector2.ZERO
+	var best_d := -1.0
+	for k in 16:
+		var dir := Vector2.from_angle(TAU * k / 16.0)
+		var ok := true
+		for step in [20.0, 40.0, 60.0, 80.0]:
+			if not play.grid.can_stand(play.wizard.position + dir * step, 12.0):
+				ok = false
+				break
+		if not ok:
+			continue
+		var d: float = (play.wizard.position + dir * 80.0).distance_to(play.boss.position)
+		if d > best_d:
+			best_d = d
+			best = dir
+	return best

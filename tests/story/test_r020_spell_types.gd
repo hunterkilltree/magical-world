@@ -175,7 +175,7 @@ func test_bosses_cannot_be_rooted_but_still_take_damage() -> void:
 	assert_true(not b.has_method("root"), "no root on bosses")
 	var hits: int = Caster.new().cast(_spell("water", "nature"), Vector2.ZERO, [b], Vector2.RIGHT, Actor.new())
 	assert_eq(hits, 1, "still hit")
-	assert_eq(b.health.current, 600 - 380, "took damage")
+	assert_eq(b.health.current, b.health.max_health - 380, "took damage")
 
 
 func test_death_forest_steals_health() -> void:

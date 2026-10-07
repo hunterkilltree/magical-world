@@ -7,6 +7,7 @@ const Boss = preload("res://scripts/core/boss.gd")
 const Player = preload("res://scripts/player.gd")
 const Caster = preload("res://scripts/core/caster.gd")
 const SpellBook = preload("res://scripts/core/spell_book.gd")
+const Fight = preload("res://tests/support/fight.gd")
 
 const BOSS_ZONES := ["keep", "volcano", "cavern"]
 
@@ -55,17 +56,18 @@ func test_spawns_on_the_pad_and_only_in_boss_zones() -> void:
 
 
 func test_phases_advance_as_health_drops() -> void:
-	var b = _boss("volcano")  # 900 hp, 3 phases
+	var b = _boss("volcano")  # 3 phases
+	var max: int = b.health.max_health
 	var seen := []
 	b.phase_changed.connect(func(i): seen.append(i))
 	assert_eq(b.phase, 0, "starts in phase 0")
 	var slow: float = b.speed()
-	b.take_damage(200)  # 700/900 left, 22% lost
+	b.take_damage(int(max * 0.22))
 	assert_eq(b.phase, 0, "still phase 0")
-	b.take_damage(200)  # 500/900 left, 44% lost
+	b.take_damage(int(max * 0.22))  # 44% lost
 	assert_eq(b.phase, 1, "phase 1")
 	assert_true(b.speed() > slow, "faster in phase 1")
-	b.take_damage(300)  # 200/900 left, 78% lost
+	b.take_damage(int(max * 0.34))  # 78% lost
 	assert_eq(b.phase, 2, "phase 2")
 	assert_eq(seen, [1, 2], "each change signalled once")
 
@@ -78,7 +80,7 @@ func test_boss_fights_back_with_phase_damage_and_cooldown() -> void:
 	assert_eq(p.health.current, 85, "phase 0 hit (15)")
 	b.step(0.5, p)
 	assert_eq(p.health.current, 85, "cooldown")
-	b.take_damage(400)  # into phase 1
+	b.take_damage(int(b.health.max_health * 0.6))  # into phase 1
 	b.step(0.6, p)
 	assert_eq(p.health.current, 60, "phase 1 hit (25)")
 
@@ -100,7 +102,7 @@ func test_defeating_the_boss_completes_the_zone_and_drops_its_fragment() -> void
 	run.bind_boss(b)
 	var completed := [0]
 	run.completed.connect(func(): completed[0] += 1)
-	b.take_damage(599)
+	b.take_damage(b.health.max_health - 1)
 	assert_true(not run.done, "alive at 1 hp")
 	b.take_damage(1)
 	assert_true(run.done, "zone complete")
@@ -120,7 +122,7 @@ func test_final_boss_completes_the_zone_without_a_fragment() -> void:
 	var run = ZoneRun.new(g, inv)
 	var b = _boss("cavern")
 	run.bind_boss(b)
-	b.take_damage(5000)
+	b.take_damage(b.health.max_health)
 	assert_true(run.done, "zone complete")
 	assert_true(not inv.has_item("rune_fragment_4") and b.fragment == "", "the Verrglass drops no fragment")
 
@@ -134,7 +136,7 @@ func test_dead_boss_does_nothing() -> void:
 	assert_eq(p.health.current, 100, "dead boss deals no damage")
 
 
-func test_two_spells_kill_the_verrglass_hollow() -> void:
+func test_sustained_casting_kills_the_verrglass_hollow() -> void:
 	var g = ZoneGrid.load_zone("cavern")
 	var inv = Inventory.new()
 	_give_all_fragments(inv)
@@ -145,7 +147,10 @@ func test_two_spells_kill_the_verrglass_hollow() -> void:
 	p.position = b.position + Vector2(50, 0)
 	var caster = Caster.new()
 	assert_eq(caster.cast(SpellBook.find(["fire", "fire"]), p.position, [b]), 1, "supernova")
-	assert_true(not run.done, "850 of 1500")
+	caster.update(Caster.GLOBAL_COOLDOWN)
 	assert_eq(caster.cast(SpellBook.find(["fire", "ice"]), p.position, [b]), 1, "thermal shock")
+	assert_true(not run.done, "two spells do not fell the final boss")
+	assert_eq(b.health.current, b.health.max_health - 850 - 980, "both landed")
+	Fight.burn_down(caster, p.position, b)
 	assert_true(b.health.is_dead(), "boss dead")
 	assert_true(run.done, "zone complete")

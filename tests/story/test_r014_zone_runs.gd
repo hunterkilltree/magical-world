@@ -10,6 +10,7 @@ const Walker = preload("res://tests/support/walker.gd")
 const Boss = preload("res://scripts/core/boss.gd")
 const Caster = preload("res://scripts/core/caster.gd")
 const SpellBook = preload("res://scripts/core/spell_book.gd")
+const Fight = preload("res://tests/support/fight.gd")
 
 var nodes: Array = []
 
@@ -223,7 +224,7 @@ func test_volcano_lava_run_reaches_the_colossus_and_survives() -> void:
 	assert_true(p.health.current > 0, "wizard survived the crossing (health %d)" % p.health.current)
 
 
-func test_volcano_colossus_falls_to_two_spells_and_drops_fragment_three() -> void:
+func test_volcano_colossus_falls_to_sustained_casting_and_drops_fragment_three() -> void:
 	var g = ZoneGrid.load_zone("volcano")
 	var inv = Inventory.new()
 	var run = ZoneRun.new(g, inv)
@@ -231,10 +232,10 @@ func test_volcano_colossus_falls_to_two_spells_and_drops_fragment_three() -> voi
 	var p = _wizard(g)
 	p.position = colossus.position + Vector2(50, 0)
 	var caster = Caster.new()
-	caster.cast(SpellBook.find(["fire", "fire"]), p.position, [colossus])  # 850 of 900
-	assert_true(not run.done, "50 hp left")
-	assert_eq(colossus.phase, 2, "final phase near death")
-	caster.cast(SpellBook.find(["fire", "ice"]), p.position, [colossus])
+	caster.cast(SpellBook.find(["fire", "fire"]), p.position, [colossus])
+	assert_eq(colossus.health.current, colossus.health.max_health - 850, "supernova lands")
+	assert_true(not run.done, "one spell does not break the Colossus")
+	Fight.burn_down(caster, p.position, colossus)
 	assert_true(colossus.health.is_dead(), "Colossus broken")
 	assert_true(run.done, "zone complete")
 	assert_true(inv.has_item("rune_fragment_3"), "third fragment")
@@ -273,7 +274,9 @@ func test_keep_run_reaches_the_court_and_the_warden_falls() -> void:
 	assert_true(p.health.current > 0, "wizard survived (health %d)" % p.health.current)
 	p.position = warden.position + Vector2(50, 0)
 	var caster = Caster.new()
-	caster.cast(SpellBook.find(["fire", "fire"]), p.position, [warden])  # 850 vs 600 hp
+	caster.cast(SpellBook.find(["fire", "fire"]), p.position, [warden])
+	assert_true(not warden.health.is_dead(), "one spell does not kill the Warden")
+	Fight.burn_down(caster, p.position, warden)
 	assert_true(warden.health.is_dead(), "Warden dead")
 	assert_true(run.done, "zone complete")
 	assert_true(inv.has_item("rune_fragment_2"), "second fragment")

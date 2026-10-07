@@ -20,11 +20,14 @@ const SPLASH := 0.5
 const PULL := 64.0
 const LIFESTEAL := {"death_forest": 0.3}
 const REGEN_RATES := {"rainbow_mist": 120.0}
+const GLOBAL_COOLDOWN := 0.8  # no two casts closer than this: queueing two elements takes time
 
 var _cooldowns: Dictionary = {}  # spell id -> seconds remaining
+var _global := 0.0
 
 
 func update(delta: float) -> void:
+	_global = maxf(0.0, _global - delta)
 	for k in _cooldowns.keys():
 		_cooldowns[k] -= delta
 		if _cooldowns[k] <= 0.0:
@@ -35,11 +38,13 @@ func can_cast(spell: Dictionary) -> bool:
 	return not _cooldowns.has(spell["id"])
 
 
-# Returns the number of targets hit (0 for barriers and buffs), or -1 if on cooldown.
+# Returns the number of targets hit (0 for barriers and buffs), or -1 if the spell or the
+# global cooldown is still running.
 func cast(spell: Dictionary, origin: Vector2, targets: Array, aim := Vector2.RIGHT, actor = null, boost := 1.0) -> int:
-	if spell.is_empty() or not can_cast(spell):
+	if spell.is_empty() or _global > 0.0 or not can_cast(spell):
 		return -1
 	_cooldowns[spell["id"]] = float(spell["cooldown"])
+	_global = GLOBAL_COOLDOWN
 	var damage := int(round(float(spell["damage"]) * boost))
 	var radius := float(spell["radius"])
 	var dealt := 0

@@ -4,6 +4,7 @@ const ZonePlay = preload("res://scripts/core/zone_play.gd")
 const ZoneGrid = preload("res://scripts/core/zone_grid.gd")
 const Inventory = preload("res://scripts/core/inventory.gd")
 const PlayWalker = preload("res://tests/support/play_walker.gd")
+const Fight = preload("res://tests/support/fight.gd")
 
 var plays: Array = []
 
@@ -112,9 +113,13 @@ func test_spells_hit_thralls_and_the_boss_and_finish_the_zone() -> void:
 	assert_true(p.cast() >= 1, "supernova hits")
 	assert_true(thrall.health.is_dead(), "thrall dead")
 	p.wizard.position = p.boss.position + Vector2(40, 0)
+	var first: int = p.boss.health.current
+	p.caster.update(1.0)
 	p.queue_element("fire")
 	p.queue_element("ice")
 	p.cast()
+	assert_true(p.boss.health.current < first and not p.boss.health.is_dead(), "spells wear the Warden down")
+	Fight.burn_down_play(p)
 	assert_true(p.boss.health.is_dead(), "Warden dead")
 	assert_eq(p.state, "complete", "keep complete")
 

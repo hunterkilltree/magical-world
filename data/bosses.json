@@ -3,7 +3,7 @@
   {
    "zone": "keep",
    "name": "Warden of the Keep",
-   "health": 600,
+   "health": 6000,
    "fragment": "rune_fragment_2",
    "phases": [
     {
@@ -19,7 +19,7 @@
   {
    "zone": "volcano",
    "name": "Cinder Colossus",
-   "health": 900,
+   "health": 10000,
    "fragment": "rune_fragment_3",
    "phases": [
     {
@@ -39,7 +39,7 @@
   {
    "zone": "cavern",
    "name": "Verrglass Hollow",
-   "health": 1500,
+   "health": 18000,
    "fragment": "",
    "phases": [
     {

@@ -8,6 +8,7 @@ const Campaign = preload("res://scripts/core/campaign.gd")
 const Caster = preload("res://scripts/core/caster.gd")
 const SpellBook = preload("res://scripts/core/spell_book.gd")
 const Player = preload("res://scripts/player.gd")
+const Fight = preload("res://tests/support/fight.gd")
 
 const FRAGMENTS := ["rune_fragment_1", "rune_fragment_2", "rune_fragment_3"]
 
@@ -75,10 +76,11 @@ func test_all_three_fragments_make_him_mortal_and_play_the_ending() -> void:
 	var b = pair[1]
 	var heard := [0]
 	run.ending_started.connect(func(): heard[0] += 1)
-	b.take_damage(1000)
-	assert_eq(b.health.current, 500, "damage lands")
+	var max: int = b.health.max_health
+	b.take_damage(max / 2)
+	assert_eq(b.health.current, max - max / 2, "damage lands")
 	assert_true(not run.ending_played, "still alive")
-	b.take_damage(500)
+	b.take_damage(max)
 	assert_true(b.health.is_dead(), "dead")
 	assert_true(run.done and run.ending_played, "zone complete, ending played")
 	assert_eq(heard[0], 1, "ending signalled once")
@@ -142,8 +144,7 @@ func test_full_campaign_from_landing_to_ending() -> void:
 	nodes.append(wizard)
 	wizard.position = boss.position + Vector2(50, 0)
 	var caster = Caster.new()
-	caster.cast(SpellBook.find(["fire", "fire"]), wizard.position, [boss])
-	caster.cast(SpellBook.find(["fire", "ice"]), wizard.position, [boss])
+	Fight.burn_down(caster, wizard.position, boss)
 	assert_true(boss.health.is_dead(), "Hollow Warden dead")
 	assert_true(cav_run.ending_played, "ending")
 	assert_true(camp.all_complete(), "all six zones complete")

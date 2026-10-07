@@ -43,4 +43,16 @@ func test_cooldowns_are_per_spell() -> void:
 	var c = Caster.new()
 	var d := Dummy.new()
 	c.cast(_supernova(), Vector2.ZERO, [d])
+	c.update(Caster.GLOBAL_COOLDOWN)
 	assert_eq(c.cast(SpellBook.find(["water", "water"]), Vector2.ZERO, [d]), 1, "different spell")
+
+
+func test_a_global_cooldown_stops_back_to_back_casts() -> void:
+	var c = Caster.new()
+	var d := Dummy.new()
+	assert_eq(c.cast(SpellBook.find(["fire", "fire"]), Vector2.ZERO, [d]), 1, "first")
+	assert_eq(c.cast(SpellBook.find(["water", "water"]), Vector2.ZERO, [d]), -1, "a different spell is still blocked")
+	c.update(0.79)
+	assert_eq(c.cast(SpellBook.find(["water", "water"]), Vector2.ZERO, [d]), -1, "just short of 0.8 s")
+	c.update(0.02)
+	assert_eq(c.cast(SpellBook.find(["water", "water"]), Vector2.ZERO, [d]), 1, "free after 0.8 s")

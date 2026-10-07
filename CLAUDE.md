@@ -72,8 +72,9 @@ a random or auto-generated name.
   columns 11-12 were opened (`#` -> `.`) beside the court gate; `story/design/` still shows the original.
 - Pine note: the north-east cache is reachable in 30 steps whether or not the log pile (`D`) is burned, so
   "burn it or go the long way" is not reflected in the grid; the pine gates are not needed for the objective.
-- `tests/support/bot.gd` + `test_r026_whole_game.gd`: a bot beats all six zones and the ending through GameSession/ZonePlay
-  (about 35 s of game time). It keeps the game provably beatable. Balance note from it: bosses are pushovers
-  (Warden 600 hp dies to one 850-damage supernova; the bot ends zones at 85-100 hp). Boss health and damage in
-  `data/bosses.json` were chosen without playtesting; raising health means updating the literals in the R-014,
-  R-015, R-019 and R-022 tests and teaching the bot to kite.
+- `tests/support/bot.gd` + `test_r026_whole_game.gd`: a bot (playing Brann) beats all six zones and the ending
+  through GameSession/ZonePlay, kiting bosses and using shield/regen/invulnerability spells. It keeps the game
+  provably beatable (about 10 s keep, 20 s volcano, 40 s final boss at last run). Balance knobs: boss health and
+  damage in `data/bosses.json` (6000 / 10000 / 18000 hp), the 0.8 s global cooldown in `caster.gd`. Without the
+  global cooldown the bot burst 4000 damage in a second. Boss tests use the boss's own max health, so retuning
+  needs no test edits; re-run the bot test to check the game is still beatable. Not playtested by a human.

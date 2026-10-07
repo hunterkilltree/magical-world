@@ -19,10 +19,14 @@ func after_test() -> void:
 func test_a_bot_beats_the_whole_game_through_the_real_loop() -> void:
 	var s = GameSession.new(PATH)
 	s.new_game()
+	s.select_wizard("ember_pyromancer")  # fire affinity: +30% on the bot's fire spells
 	var log := []
 	for id in ORDER:
 		assert_true(s.campaign.is_unlocked(id), "%s is open when the bot gets there" % id)
 		var r: Dictionary = Bot.play_zone(s, id)
+		if r["play"] == null:
+			assert_true(false, "%s was locked: %s" % [id, str(log)])
+			break
 		plays.append(r["play"])
 		log.append("%s %s %.0fs hp%d casts%d" % [id, r["state"], r["seconds"], r["play"].wizard.health.current, r["casts"]])
 		assert_eq(r["state"], "complete", "%s -> %s" % [id, str(log)])

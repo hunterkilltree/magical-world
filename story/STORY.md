@@ -90,7 +90,8 @@ element.
 
 ### R-006 [done] Spells deal damage with cooldowns
 Chapter 1. An aoe spell damages every enemy within its radius once per cast;
-a spell cannot be recast until its cooldown has elapsed.
+a spell cannot be recast until its cooldown has elapsed, and no two casts may
+be closer than 0.8 s (global cooldown).
 
 ### R-007 [done] The wizard has health and can fall
 Chapter 1. Health starts at 100, never goes below 0, and a `died` signal fires
