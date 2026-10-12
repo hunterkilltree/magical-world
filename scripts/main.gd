@@ -3,8 +3,10 @@
 extends Node2D
 
 const GameSession = preload("res://scripts/core/game_session.gd")
-const Level = preload("res://scripts/level.gd")
 const EffectsView = preload("res://scripts/effects_view.gd")
+const OverheadView = preload("res://scripts/overhead_view.gd")
+const ZoneView = preload("res://scripts/view3d/zone_view.gd")
+const WizardShowcase = preload("res://scripts/view3d/wizard_showcase.gd")
 const Controls = preload("res://scripts/core/controls.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const QueueBarScene = preload("res://ui/element_queue.tscn")
@@ -23,8 +25,12 @@ var zone_buttons: Dictionary = {}  # zone id -> Button
 var continue_button: Button = null
 
 var _ui: CanvasLayer
-var _world: Node2D
-var _level
+var _world: Node2D  # holds the zone's logic nodes (wizard, thralls, boss); hidden, ZoneView draws them
+var _stage: Node  # 3D content: the zone view or the overworld showcase
+var _overlay: Node2D  # 2D over the 3D: spell effects, numbers, health bars
+var zone_view = null  # ZoneView while in a zone
+var showcase = null  # WizardShowcase on the overworld
+var overhead = null
 var effects_view = null
 var wizard_button: Button = null
 var hud = null  # the element key reference (Control)
@@ -48,8 +54,12 @@ func start() -> void:
 		return
 	_started = true
 	_world = Node2D.new()
-	_world.y_sort_enabled = true  # 2.5D depth: whoever stands lower is drawn in front
+	_world.visible = false
 	add_child(_world)
+	_stage = Node.new()
+	add_child(_stage)
+	_overlay = Node2D.new()
+	add_child(_overlay)
 	var cam := Camera2D.new()
 	cam.position = Vector2(832, 700) / 2.0  # the 576 px map sits at the top; the bottom 124 px is the spell UI
 	add_child(cam)
@@ -114,6 +124,9 @@ func show_overworld() -> void:
 	wizard_button.text = _wizard_label()
 	wizard_button.pressed.connect(cycle_wizard)
 	box.add_child(wizard_button)
+	showcase = WizardShowcase.new()
+	_stage.add_child(showcase)
+	showcase.show_wizard(session.wizard()["id"])
 	var back := Button.new()
 	back.text = "Main menu"
 	back.pressed.connect(show_menu, CONNECT_DEFERRED)
@@ -124,11 +137,13 @@ func cycle_wizard() -> void:
 	session.cycle_wizard()
 	if wizard_button != null:
 		wizard_button.text = _wizard_label()
+	if showcase != null:
+		showcase.show_wizard(session.wizard()["id"])
 
 
 func _wizard_label() -> String:
 	var w: Dictionary = session.wizard()
-	return "Wizard: %s - %s (%s +%d%%)  [click to change]" % [w["name"], w["role"],
+	return "Wizard: %s - %s (%s +%d%%)  [change]" % [w["name"], w["role"],
 		", ".join(w["affinity"]), int(round((float(w["boost"]) - 1.0) * 100.0))]
 
 
@@ -141,25 +156,33 @@ func enter_zone(id: String) -> bool:
 	_clear_ui()
 	play = p
 	state = "zone"
-	_level = Level.new()
-	_level.z_index = -1  # under every character, whatever the y-sort says
-	_world.add_child(_level)
-	_level.show_grid(play.grid)
 	for e in play.enemies:
 		_world.add_child(e)
 	if play.boss != null:
 		_world.add_child(play.boss)
 	_world.add_child(play.wizard)
+	zone_view = ZoneView.new()
+	_stage.add_child(zone_view)
+	zone_view.setup(play, session.wizard()["id"])
 	effects_view = EffectsView.new()
-	effects_view.z_index = 1  # spell effects and numbers over the characters
 	effects_view.play = play
-	_world.add_child(effects_view)
+	_overlay.add_child(effects_view)
+	overhead = OverheadView.new()
+	overhead.view = zone_view
+	_overlay.add_child(overhead)
 	_hud = Label.new()
-	_hud.position = Vector2(8, 4)
+	_hud.position = Vector2(0, 0)
 	_hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hud.custom_minimum_size = Vector2(816, 0)
 	_hud.add_theme_color_override("font_outline_color", Color.BLACK)
 	_hud.add_theme_constant_override("outline_size", 5)
+	var strip := StyleBoxFlat.new()
+	strip.bg_color = Color(0, 0, 0, 0.45)
+	strip.content_margin_left = 6
+	strip.content_margin_right = 6
+	strip.content_margin_top = 2
+	strip.content_margin_bottom = 4
+	_hud.add_theme_stylebox_override("normal", strip)
 	_ui.add_child(_hud)
 	hud = HudScript.new()
 	hud.play = play
@@ -207,17 +230,17 @@ func tick(delta: float, input: Vector2) -> void:
 	if state != "zone" or play == null:
 		return
 	play.tick(delta, input)
-	_level.queue_redraw()
+	zone_view.sync(delta)
+	if zone_view.is_inside_tree():
+		effects_view.ground = zone_view.ground_transform()
 	effects_view.queue_redraw()
+	overhead.queue_redraw()
 	hud.queue_redraw()
 	_sync_queue_view()
-	play.wizard.queue_redraw()
 	for e in play.enemies:
 		e.visible = not e.health.is_dead()
-		e.queue_redraw()
 	if play.boss != null:
 		play.boss.visible = not play.boss.health.is_dead()
-		play.boss.queue_redraw()
 	_update_hud()
 	if play.state != "playing":
 		_finish_zone()
@@ -250,8 +273,10 @@ func continue_after_zone() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if state == "zone" and (event is InputEventMouseButton or event is InputEventMouseMotion):
-		handle_zone_mouse(event, _world.get_local_mouse_position())
+	if state == "zone" and zone_view != null and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		var point = zone_view.screen_to_logic(event.position)
+		if point != null:
+			handle_zone_mouse(event, point)
 
 
 # Mouse in a zone: motion aims, left click walks to `point`, right click aims there and casts.
@@ -289,7 +314,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_sync_queue_view()
 			hud.queue_redraw()
 			effects_view.queue_redraw()
-			play.wizard.queue_redraw()
 
 
 # Mirrors the game's queue into the bottom-centre bar and the spell-name preview above it.
@@ -348,11 +372,12 @@ func _leave_world() -> void:
 	if play != null:
 		play.free_nodes()
 		play = null
-	if _level != null and is_instance_valid(_level):
-		_level.free()
-	_level = null
-	if effects_view != null and is_instance_valid(effects_view):
-		effects_view.free()
+	for n in [zone_view, showcase, overhead, effects_view]:
+		if n != null and is_instance_valid(n):
+			n.free()
+	zone_view = null
+	showcase = null
+	overhead = null
 	effects_view = null
 	if queue_bar != null and is_instance_valid(queue_bar):
 		queue_bar.free()

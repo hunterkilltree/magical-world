@@ -91,8 +91,17 @@ a random or auto-generated name.
   elements pick the recipe (exact order, else reversed, else a bolt of the first); elements 3-5 are infusions (+25% damage
   and +0.5 s cooldown each, +15% radius when the element is in the recipe). It returns a copy; cooldowns key on the base id.
   The bot only casts pairs, so infusions are extra power for a human player on top of the proven-beatable baseline.
-- Mouse (R-033): `ZonePlay.move_to(point)` / `aim_at(point)`; `main.handle_zone_mouse(event, point)` routes clicks. The world
-  node is Y-sorted (R-034): level `z_index -1`, effects `+1`. Movement stays grid-based (`Mover`), not CharacterBody2D.
+- Mouse (R-033): `ZonePlay.move_to(point)` / `aim_at(point)`; `main.handle_zone_mouse(event, point)` routes clicks (main maps
+  the cursor to a logic point with `ZoneView.screen_to_logic`). Movement stays grid-based (`Mover`), not CharacterBody2D.
+- 3D view (R-034 to R-036), `scripts/view3d/`: logic stays 2D in pixels; `zone_view.gd` draws it. `mesh_kit.gd` has the
+  three.js primitives (same parameters, so the design's builders port line for line) and a `Batch` that merges parts into
+  one mesh per material. `zone_model.gd` ports `zone-model.js`, `wizard_model.gd` ports `wizards-model.js` (rig + gait;
+  looks in `data/wizard_models.json`), `wizard_showcase.gd` is the overworld pedestal. 1 tile = 0.42 world units.
+  The 2D wizard/thrall/boss nodes still live in main's hidden `_world` (ZonePlay needs them); `level.gd` is no longer
+  shown. Rendering is Compatibility: glow bleeds over the whole frame there and tonemap white is ignored, so lights are
+  kept low enough that snow and lava do not clip. Headless runs have a 64x64 viewport: use `ZoneView.map_rect()`,
+  not pixel constants. Check the look on Windows with
+  `"$GODOT" --path . --script res://harness/screenshot.gd -- zone:<id> out.png [wizard_id] [demo|cast]`.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
 - `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
   milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects

@@ -2,8 +2,8 @@
 
 Design reference lives in `story/design/` (Three.js mockups: zone maps, overworld,
 wizards, weapons). Game data extracted from it lives in `data/`
-(`zones.json`, `overworld.json`, `spells.json`). 2D top-down view; the zone grids
-are tile maps (26 x 18).
+(`zones.json`, `overworld.json`, `spells.json`, `wizard_models.json`). The game
+logic is 2D on tile maps (26 x 18); zones are shown in 3D from above (R-035).
 
 ## Core pillar (most important)
 
@@ -293,7 +293,39 @@ wizard faces the mouse cursor, so beams fire where you point; right-click aims
 and casts. (WASD is not used for movement: those keys queue elements, R-027.)
 
 ### R-034 [done] Characters are drawn in depth order
-Core. The zone world is Y-sorted for a 2.5D look: whoever stands lower on the
-screen is drawn in front. The level is drawn beneath every character and spell
-effects above them.
+Core. The zone is drawn in 3D (R-035), so depth comes from the depth buffer:
+characters stand in the world in front of or behind walls, props and each
+other, at the height of the tile under them (wading in hazard tiles). Spell
+rings, beams, damage numbers and health bars are drawn over the 3D view. (This
+replaces the earlier Y-sorted 2D layer.)
 
+## Magicka look
+
+The zones and wizards from the design mockups, in 3D, under an angled camera.
+
+### R-035 [done] Zones are the design's 3D dioramas under a Magicka-style camera
+Presentation. Each zone is built from its live grid the way
+`story/design/zone-model.js` builds it: tiles as blocks of different heights,
+rock walls with a ground-coloured cap, boulders, crates, gates, chests, entry
+and spawn markers, the boss pad, the shrine and the biome dressing (ice spikes,
+pines, basalt, dead trees, crystals). It changes with the run: closed gates
+have portcullis bars that go when the gates open, burnt crates disappear, broken
+ice turns to water, looted chests open. The camera is orthographic, tilted 50
+degrees with north up the screen, about 14 tiles across, and follows the wizard
+while keeping its view inside the map. Walls with open ground just north of them
+are cut down to a low rim so they never hide whoever stands behind them. A key
+light casts shadows and a fill light takes the zone's glow colour. Clicking the
+floor picks the logic point under the cursor; spell rings and beams lie flat on
+the floor.
+
+### R-036 [done] The wizards are the design's 3D models
+Presentation. The six wizards are built part for part from
+`story/design/wizards-model.js` (looks in `data/wizard_models.json`), with its
+rig (hips, knees, ankles, shoulders, coat panels, head) and its idle, walk and
+run gait; the feet stay planted. In a zone the chosen wizard's model stands at
+the wizard's position and turns to face where it aims; thralls and bosses use
+the same rig with their own looks (hooded thralls with red eyes, a crowned
+Warden, the Cinder Colossus, the Hollow Warden). Fallen characters sink and
+vanish. Queued elements orbit the wizard as glowing orbs, and each cast throws
+a burst of coloured light. The overworld shows the chosen wizard on a pedestal
+and follows the wizard button.
