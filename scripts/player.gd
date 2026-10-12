@@ -16,7 +16,7 @@ var _dot_carry := 0.0
 
 
 static func velocity_for(input: Vector2) -> Vector2:
-	return input.normalized() * SPEED
+	return input.limit_length(1.0) * SPEED
 
 
 func take_damage(amount: int) -> void:
@@ -33,7 +33,7 @@ func step(delta: float, input: Vector2) -> void:
 	if health.is_dead():
 		return
 	if input.length() > 0.1:
-		facing = input.normalized()
+		facing = input.normalized()  # ZonePlay turns it back to the mouse aim, if any
 	var v := velocity_for(input)
 	if grid != null:
 		var effect: Dictionary = grid.stand_on(grid.world_to_cell(position), delta)
@@ -60,7 +60,7 @@ func _draw() -> void:
 	# queued elements orbit the wizard
 	var t := Time.get_ticks_msec() / 450.0
 	for i in queued_colors.size():
-		var orb := Vector2.from_angle(t + i * PI) * (RADIUS + 9.0) + Vector2(0, -4)
+		var orb := Vector2.from_angle(t + i * TAU / queued_colors.size()) * (RADIUS + 9.0) + Vector2(0, -4)
 		draw_circle(orb, 5.0, queued_colors[i])
 		draw_arc(orb, 5.0, 0.0, TAU, 12, Color.WHITE, 1.5)
 	DrawUtil.bar(self, -36.0, 30.0, float(health.current) / float(health.max_health), Color("#4ade80"))

@@ -16,6 +16,7 @@ const POPUP_TIME := 1.0
 const DAMAGE_COLOR := Color("#fde047")
 const HURT_COLOR := Color("#ef4444")
 const HEAL_COLOR := Color("#4ade80")
+const ARRIVE := 3.0  # px: a click-to-move walk ends this close to its point
 
 var grid
 var inventory
@@ -29,6 +30,8 @@ var wizard_data: Dictionary = {}
 var effects: Array = []  # {kind: circle|beam, pos, radius, color, ttl, dir, length}: spell flashes
 var popups: Array = []  # {pos, text, color, ttl}: floating damage numbers
 var state := "playing"  # playing | complete | dead | failed
+var _move_target = null  # Vector2 the wizard is walking to (left click), or null
+var _aim_point = null  # Vector2 the wizard faces (mouse cursor), or null to face the way it walks
 
 
 static func create(g, inv, wizard_info := {}):
@@ -67,7 +70,20 @@ func tick(delta: float, input: Vector2) -> void:
 		pop["pos"] = pop["pos"] + Vector2(0, -40.0 * delta)
 	popups = popups.filter(func(pop): return pop["ttl"] > 0.0)
 	var hp_before: int = wizard.health.current
+	if input.length() > 0.1:
+		_move_target = null
+	elif _move_target != null:
+		var to: Vector2 = _move_target - wizard.position
+		if to.length() <= ARRIVE:
+			_move_target = null
+		else:
+			# slow down on the last step so the wizard lands on the point instead of overshooting
+			input = to.normalized() * minf(1.0, to.length() / (wizard.SPEED * delta))
+	var pos_before: Vector2 = wizard.position
 	wizard.step(delta, input)
+	if _move_target != null and wizard.position.distance_to(pos_before) < 0.01:
+		_move_target = null  # blocked (or rooted): give up rather than push into the wall
+	_face_aim()
 	var cell: Vector2i = grid.world_to_cell(wizard.position)
 	grid.update_gate_hold(cell, delta)
 	if grid.tile_at(cell) == "C":
@@ -89,23 +105,46 @@ func tick(delta: float, input: Vector2) -> void:
 	_update_state()
 
 
+# Walks the wizard to `point` (world coordinates) until it arrives, is blocked, or keys move it.
+func move_to(point: Vector2) -> void:
+	_move_target = point
+
+
+func has_move_target() -> bool:
+	return _move_target != null
+
+
+# Faces the wizard toward `point` (the mouse cursor); beams fire this way.
+func aim_at(point: Vector2) -> void:
+	_aim_point = point
+	_face_aim()
+
+
+func _face_aim() -> void:
+	if _aim_point == null or wizard == null:
+		return
+	var dir: Vector2 = _aim_point - wizard.position
+	if dir.length() > 1.0:
+		wizard.facing = dir.normalized()
+
+
 func queue_element(element: String) -> bool:
 	var ok := queue.push(element)
 	_sync_view()
 	return ok
 
 
-# What the queue would cast right now: {name, id, type, complete, ready, cooldown}, or {}.
+# What the queue would cast right now: {name, id, type, infusions, complete, ready, cooldown},
+# or {}. `name` carries the infusion count ("Supernova +2"); `complete` means a recipe pair is in.
 func queue_preview() -> Dictionary:
 	var q: Array = queue.queue
 	if q.is_empty():
 		return {}
-	var spell := SpellBook.find(q) if q.size() == 2 else {}
-	if spell.is_empty():
-		spell = SpellBook.fallback_bolt(q[0])
+	var spell := ElementQueue.spell_for(q)
 	var left := caster.cooldown_left(spell)
-	return {"name": spell["name"], "id": spell["id"], "type": spell["type"],
-		"complete": q.size() == 2, "ready": left <= 0.0, "cooldown": left}
+	var n: int = spell["infusions"]
+	return {"name": spell["name"] + (" +%d" % n if n > 0 else ""), "id": spell["id"], "type": spell["type"],
+		"infusions": n, "complete": q.size() >= 2, "ready": left <= 0.0, "cooldown": left}
 
 
 func _sync_view() -> void:

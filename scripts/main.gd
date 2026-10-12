@@ -48,6 +48,7 @@ func start() -> void:
 		return
 	_started = true
 	_world = Node2D.new()
+	_world.y_sort_enabled = true  # 2.5D depth: whoever stands lower is drawn in front
 	add_child(_world)
 	var cam := Camera2D.new()
 	cam.position = Vector2(832, 700) / 2.0  # the 576 px map sits at the top; the bottom 124 px is the spell UI
@@ -141,6 +142,7 @@ func enter_zone(id: String) -> bool:
 	play = p
 	state = "zone"
 	_level = Level.new()
+	_level.z_index = -1  # under every character, whatever the y-sort says
 	_world.add_child(_level)
 	_level.show_grid(play.grid)
 	for e in play.enemies:
@@ -149,6 +151,7 @@ func enter_zone(id: String) -> bool:
 		_world.add_child(play.boss)
 	_world.add_child(play.wizard)
 	effects_view = EffectsView.new()
+	effects_view.z_index = 1  # spell effects and numbers over the characters
 	effects_view.play = play
 	_world.add_child(effects_view)
 	_hud = Label.new()
@@ -164,7 +167,7 @@ func enter_zone(id: String) -> bool:
 	hud.size = Vector2(214, 100)
 	_ui.add_child(hud)
 	queue_bar = QueueBarScene.instantiate()
-	queue_bar.max_slots = ElementQueue.MAX  # the game queues pairs; the bar hides the other slots
+	queue_bar.max_slots = ElementQueue.MAX
 	add_child(queue_bar)
 	queue_bar.setup()
 	preview_label = Label.new()
@@ -246,6 +249,28 @@ func continue_after_zone() -> void:
 	show_overworld()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if state == "zone" and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		handle_zone_mouse(event, _world.get_local_mouse_position())
+
+
+# Mouse in a zone: motion aims, left click walks to `point`, right click aims there and casts.
+# `point` is in world coordinates (tests pass it directly).
+func handle_zone_mouse(event: InputEvent, point: Vector2) -> void:
+	if state != "zone" or play == null:
+		return
+	if event is InputEventMouseMotion:
+		play.aim_at(point)
+	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			play.move_to(point)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			play.aim_at(point)
+			play.cast()
+			_sync_queue_view()
+			effects_view.queue_redraw()
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
@@ -277,7 +302,7 @@ func _sync_queue_view() -> void:
 		preview_label.text = ""
 		return
 	var note: String = "" if not p["complete"] else (" - ready" if p["ready"] else " - %.1fs" % p["cooldown"])
-	preview_label.text = "%s%s" % [p["name"], note if p["complete"] else " (add one more)"]
+	preview_label.text = "%s%s" % [p["name"], note if p["complete"] else " (add elements, up to five)"]
 	preview_label.add_theme_color_override("font_color", Color.WHITE if p["ready"] else Color(1, 0.65, 0.55))
 
 
@@ -290,7 +315,8 @@ func _update_hud() -> void:
 		(" +%d shield" % h.shield) if h.shield > 0 else "", ", ".join(play.queue.queue)]
 	if play.boss != null:
 		line += "   %s %d/%d" % [play.boss.display_name, play.boss.health.current, play.boss.health.max_health]
-	_hud.text = line + "\nQ W E R T / A S D F (or 1-9) queue elements, Space casts, Esc leaves.  " + play.grid.objective
+	_hud.text = line + "\nQ W E R T / A S D F queue up to 5 elements, Space or right-click casts at the cursor, " \
+		+ "click or arrows move, Esc leaves.  " + play.grid.objective
 
 
 # ---- helpers ---------------------------------------------------------------

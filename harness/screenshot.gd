@@ -43,7 +43,7 @@ func _initialize() -> void:
 			for i in 20:
 				main.tick(0.016, Vector2.ZERO)
 			if args.size() > 3 and args[3] == "demo":
-				# A mid-fight scene: a beam just fired through two beefy thralls, a fresh pair queued.
+				# A mid-fight scene: a beam just fired through two beefy thralls, an infused combo queued.
 				var p = main.play
 				p.wizard.position = p.grid.cell_center(Vector2i(8, 14))
 				p.wizard.facing = Vector2.RIGHT
@@ -54,8 +54,8 @@ func _initialize() -> void:
 				p.queue_element("fire")
 				p.queue_element("lightning")
 				p.cast()
-				p.queue_element("fire")
-				p.queue_element("ice")
+				for el in ["fire", "ice", "fire", "fire"]:
+					p.queue_element(el)
 				main.tick(0.1, Vector2.ZERO)
 			if args.size() > 3 and args[3] == "cast":
 				main.play.queue_element("fire")

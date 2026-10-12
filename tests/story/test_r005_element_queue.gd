@@ -3,12 +3,12 @@ extends "res://harness/test_case.gd"
 const ElementQueue = preload("res://scripts/core/element_queue.gd")
 
 
-func test_queue_holds_two_elements_in_order() -> void:
+func test_queue_holds_elements_in_order() -> void:
 	var q = ElementQueue.new()
 	assert_true(q.push("fire"), "first")
 	assert_true(q.push("ice"), "second")
-	assert_true(not q.push("water"), "third is rejected")
-	assert_eq(q.queue, ["fire", "ice"], "queue contents")
+	assert_true(q.push("water"), "third is an infusion (R-032)")
+	assert_eq(q.queue, ["fire", "ice", "water"], "queue contents")
 
 
 func test_unknown_element_rejected() -> void:
@@ -32,6 +32,13 @@ func test_order_matters() -> void:
 	q.push("earth")
 	q.push("water")
 	assert_eq(q.resolve()["id"], "mountain_rise", "earth+water")
+
+
+func test_the_reversed_pair_is_tried_before_the_bolt() -> void:
+	var q = ElementQueue.new()
+	q.push("nature")
+	q.push("water")
+	assert_eq(q.resolve()["id"], "living_vines", "water+nature reversed")
 
 
 func test_unknown_pair_falls_back_to_bolt_of_first_element() -> void:
