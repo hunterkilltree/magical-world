@@ -68,12 +68,12 @@ func show_menu() -> void:
 	var box := _column("Grauhold Reach")
 	var new_btn := Button.new()
 	new_btn.text = "New Game"
-	new_btn.pressed.connect(new_game)
+	new_btn.pressed.connect(new_game, CONNECT_DEFERRED)  # the handler frees this button
 	box.add_child(new_btn)
 	continue_button = Button.new()
 	continue_button.text = "Continue"
 	continue_button.disabled = not session.has_save()
-	continue_button.pressed.connect(continue_game)
+	continue_button.pressed.connect(continue_game, CONNECT_DEFERRED)
 	box.add_child(continue_button)
 
 
@@ -100,7 +100,7 @@ func show_overworld() -> void:
 		var tag := "complete" if c["complete"] else ("open" if c["unlocked"] else "locked")
 		b.text = "%s  [%s]" % [c["name"], tag]
 		b.disabled = not c["unlocked"]
-		b.pressed.connect(enter_zone.bind(c["id"]))
+		b.pressed.connect(enter_zone.bind(c["id"]), CONNECT_DEFERRED)
 		box.add_child(b)
 		zone_buttons[c["id"]] = b
 	var frags := 0
@@ -116,7 +116,7 @@ func show_overworld() -> void:
 	box.add_child(wizard_button)
 	var back := Button.new()
 	back.text = "Main menu"
-	back.pressed.connect(show_menu)
+	back.pressed.connect(show_menu, CONNECT_DEFERRED)
 	box.add_child(back)
 
 
@@ -197,7 +197,7 @@ func show_ending() -> void:
 	box.add_child(text)
 	var btn := Button.new()
 	btn.text = "Main menu"
-	btn.pressed.connect(show_menu)
+	btn.pressed.connect(show_menu, CONNECT_DEFERRED)
 	box.add_child(btn)
 
 
