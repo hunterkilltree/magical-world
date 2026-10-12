@@ -183,7 +183,7 @@ func test_the_queue_bar_mirrors_the_games_queue() -> void:
 	main.new_game()
 	main.enter_zone("tundra")
 	assert_true(main.queue_bar != null, "bar present in a zone")
-	assert_eq(main.queue_bar.max_slots, 2, "the game queues pairs")
+	assert_eq(main.queue_bar.max_slots, 5, "the game queues up to five")
 	var ev := InputEventKey.new()
 	ev.keycode = KEY_Q
 	ev.pressed = true

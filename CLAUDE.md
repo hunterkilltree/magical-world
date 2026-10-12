@@ -62,8 +62,8 @@ a random or auto-generated name.
 
 - `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
   `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `controls` (key bindings), `draw_util` (shadows, health bars), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
-- `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows move,
-  Q W E R T / A S D F (or 1-9) queue an element, Space casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
+- `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows or left-click move,
+  the wizard faces the mouse, Q W E R T / A S D F (or 1-9) queue up to five elements, Space or right-click casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
   Save file: `user://savegame.json` (autosaved when a zone completes).
 - `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
   after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
@@ -84,9 +84,15 @@ a random or auto-generated name.
   `queue_preview`, `cooldown_left`) lives in ZonePlay/Caster and is unit-tested; check the look with `run.sh shot ... demo`.
 - Element queue bar (R-031): `ui/element_queue.tscn` + `ui/element_queue.gd` (CanvasLayer > UIBottomCenter > BackgroundFrame >
   SlotContainer > Slot1..5 > ElementIcon). `add_element("Fire")`, `clear_queue()`, `sync_queue([...])`; main mirrors the game's
-  two-element queue into it (`max_slots = 2` hides the rest). Textures are generated placeholders: `python3 tools/make_ui_placeholders.py`
+  five-element queue into it. Textures are generated placeholders: `python3 tools/make_ui_placeholders.py`
   (replace the PNGs in `ui/` with real art; keep the paths). The window is 832x700: the 576 px map is pinned to the top and the
   bottom strip is the spell UI, so nothing covers the spawn tiles.
+- Element combining (R-032): `ElementQueue.spell_for(elements)` is the one place a queue becomes a spell: the first two
+  elements pick the recipe (exact order, else reversed, else a bolt of the first); elements 3-5 are infusions (+25% damage
+  and +0.5 s cooldown each, +15% radius when the element is in the recipe). It returns a copy; cooldowns key on the base id.
+  The bot only casts pairs, so infusions are extra power for a human player on top of the proven-beatable baseline.
+- Mouse (R-033): `ZonePlay.move_to(point)` / `aim_at(point)`; `main.handle_zone_mouse(event, point)` routes clicks. The world
+  node is Y-sorted (R-034): level `z_index -1`, effects `+1`. Movement stays grid-based (`Mover`), not CharacterBody2D.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
 - `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
   milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects

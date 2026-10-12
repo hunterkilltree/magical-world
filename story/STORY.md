@@ -104,10 +104,12 @@ at the entry tiles, and exposes enemy spawns, loot, gates and boss pads on
 their tiles.
 
 ### R-005 [done] Elements queue and combine into spells
-Chapter 1. The wizard queues up to two elements; order matters. Casting a full
-queue resolves the recipe in `spells.json` (e.g. fire + ice = Thermal Shock)
-and clears the queue. An unknown pair falls back to a plain bolt of the first
-element.
+Chapter 1. The wizard queues up to five elements (R-032). The first two form
+the recipe in `spells.json`; order matters when both orders are recipes (water
++ earth = Mud Prison, earth + water = Mountain Rise), otherwise the reversed
+pair is used (nature + water = Living Vines). Casting resolves the recipe (e.g.
+fire + ice = Thermal Shock) and clears the queue. A pair with no recipe either
+way falls back to a plain bolt of the first element.
 
 ### R-006 [done] Spells deal damage with cooldowns
 Chapter 1. An aoe spell damages every enemy within its radius once per cast;
@@ -239,7 +241,7 @@ raised ruined walls). The game stays 2D top-down; these adapt the interface and 
 ### R-027 [done] An element bar and letter keys
 Presentation. The nine elements are bound to letter keys (Q W E R T / A S D F in
 element order) as well as 1-9. The zone HUD shows the nine orbs in two rows with
-their letters, two queue slots, a preview of the spell the queue will cast (its
+their letters, five queue slots, a preview of the spell the queue will cast (its
 name, and whether it is ready or how long until it is), and the wizard's weapon.
 Queued elements also orbit the wizard.
 
@@ -268,5 +270,30 @@ elements in a `PackedStringArray`, `add_element(name)` fills the next empty slot
 with that element's icon and pops the slot (scale 1.0 to 1.2 and back with a
 Tween), and `clear_queue()` empties every slot. Element names map to texture
 paths (Fire, Water, Earth, Nature, Lightning, Ice, Wind, Light, Dark). The game
-mirrors its two-element queue into this bar, hiding the unused slots.
+mirrors its five-element queue into this bar, all five slots shown.
+
+## Core pillar: combining elements
+
+Bringing the build closer to the core pillar (top of this file): more freedom in
+how elements combine, and Magicka-style mouse controls.
+
+### R-032 [done] Up to five elements combine into one spell
+Core. The queue holds five elements; a sixth is refused. The first two pick the
+spell (R-005); every element after them is an infusion. Each infusion adds 25%
+to the spell's damage (shields and heals included) and 0.5 s to its cooldown;
+an infusion of an element already in the recipe also widens the radius by 15%.
+So fire, fire, fire is a bigger, slower Supernova, and fire, ice, fire, fire is
+a Thermal Shock with two infusions. The preview names the spell with its
+infusion count ("Supernova +1"). Queued orbs spread evenly round the wizard.
+
+### R-033 [done] Click to move, aim with the mouse
+Core. Left-clicking in a zone walks the wizard to that point (stopping when it
+arrives or is blocked); the arrow keys take over and cancel the walk. The
+wizard faces the mouse cursor, so beams fire where you point; right-click aims
+and casts. (WASD is not used for movement: those keys queue elements, R-027.)
+
+### R-034 [done] Characters are drawn in depth order
+Core. The zone world is Y-sorted for a 2.5D look: whoever stands lower on the
+screen is drawn in front. The level is drawn beneath every character and spell
+effects above them.
 
