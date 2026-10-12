@@ -5,6 +5,27 @@ wizards, weapons). Game data extracted from it lives in `data/`
 (`zones.json`, `overworld.json`, `spells.json`). 2D top-down view; the zone grids
 are tile maps (26 x 18).
 
+## Core pillar (most important)
+
+**Grauhold Reach is a top-down action RPG (Top-Down ARPG) whose defining
+mechanic is combining elements to create spells.** Everything else (zones,
+bosses, story, UI) exists to serve that loop: queue elements, see the
+resulting spell, cast it, and live with the consequences. When a design or
+implementation choice competes with this, the element-combining spell system
+wins.
+
+Reference plan: a semi-2D / 2.5D game in the style of Magicka 2, built as a
+Godot 4 prototype.
+
+| Component | Godot 4 implementation | Role |
+|-----------|------------------------|------|
+| Camera | A `Camera2D` attached to the player, with Y-sort tuned to give 2.5D depth. | The player looks down at the world from an angled top-down view. |
+| Movement & collision | `CharacterBody2D` for both the player and enemies. | Move with the mouse (click-to-move) or the WASD keys. |
+| Element system | An array or queue holding up to 5 elements. | Stores the element keys the player just pressed. |
+
+(The current build uses a two-element queue and arrow-key movement; the table
+is the target the prototype grows toward.)
+
 ## Premise
 
 Grauhold Reach is a single landmass of six linked zones. Its keep fell to the

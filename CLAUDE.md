@@ -37,7 +37,8 @@ Each `test_*` method gets a fresh instance; `before_each()` runs first and
 
 ## Story-driven workflow
 
-The game is Grauhold Reach (2D top-down). It follows `story/STORY.md`; design mockups are in
+The game is Grauhold Reach (2D top-down). Most important: it is a top-down ARPG whose core mechanic is combining
+elements to create spells (see "Core pillar" in `story/STORY.md`). It follows `story/STORY.md`; design mockups are in
 `story/design/` (reference only), game data in `data/*.json` (extracted from them). Requirements are `### R-NNN [status] Title`
 entries (`planned` -> `active` -> `done`).
 
