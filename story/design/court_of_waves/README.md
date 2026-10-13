@@ -3,6 +3,11 @@
 ## Overview
 This is a playable prototype of an elemental arena combat game in the style of Magicka. The player queues up to 3 of 6 elements and casts. The mix of elements decides the spell's shape and effect. Enemies arrive in waves of three types. Elements react with each other, with enemies and with the arena (puddles, brush, barrels). Careless casting can hurt the player.
 
+
+> **Visual effects pass:** see **`VFX_HANDOFF.md`**. It covers the combo charge-up, release and impact effects, screen effects, camera feel and audio.
+> The supporting files are `data/vfx_presets.json` and `godot/shaders/*.gdshader`, plus `godot/lightning_bolt.gd`.
+> The only gameplay change is that combo casts now briefly freeze time: 0.035 s, or 0.16 s the first time a combo is ever cast.
+
 ## About these files
 - **`Court of Waves - playable.html`** is the prototype itself, packed into one file that works offline. Open it in Chrome or Edge and play it first. It is the reference for game feel.
 - **`reference/`** holds the readable JavaScript source. It is a **design reference, not code to ship**. Recreate the behaviour in Godot using Godot's own patterns.
@@ -128,4 +133,5 @@ HP 100 · speed 5.4 · radius 0.42 · arena radius 15 (walkable radius 14.1) · 
 - `reference/game/sim.js`: all gameplay rules (the main file to read).
 - `reference/game/render.js`, `models.js`: visuals (VFX reference only).
 - `reference/game/hud.js`, `input.js`, `main.js`: UI, input and the game loop.
+- `reference/game/vfx.js`, `wow.js`, `audio.js`: the visual effects and sound (see `VFX_HANDOFF.md`).
 - `reference/wizard-rig.js`: the six wizard designs and the walk-cycle rig.

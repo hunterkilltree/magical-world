@@ -32,9 +32,12 @@ func test_faces_the_cursor() -> void:
 
 func test_energy_is_spent_and_regenerates() -> void:
 	F.cast(s, ["fire", "lightning"], Vector2(0, -10))
-	assert_true(absf(s.player.energy - (100 - 16 + 18 * F.DT)) < 0.01, "Thunderflare costs 16: %s" % s.player.energy)
+	assert_true(absf(s.player.energy - (100 - 16)) < 0.4, "Thunderflare costs 16: %s" % s.player.energy)
+	s.player.energy = 50
+	s.hitstop = 0 # the combo's time-freeze (R-055) would slow the clock
+	s.shots = [] # and so would the Thunderflare's blast
 	F.run(s, 1.0)
-	assert_true(absf(s.player.energy - minf(100.0, 84 + 18 * (1 + F.DT))) < 0.1, "regen 18/s: %s" % s.player.energy)
+	assert_true(absf(s.player.energy - 68.0) < 0.1, "regen 18/s: %s" % s.player.energy)
 	s.player.energy = 5
 	var ev := F.cast(s, ["earth", "earth"], Vector2(0, -10))
 	assert_eq(F.of_type(ev, "noEnergy").size(), 1, "too poor to cast")
@@ -46,11 +49,12 @@ func test_cooldowns_shared_and_per_shape() -> void:
 	assert_eq(s.areas.size(), 1, "Hoarfrost Field placed")
 	assert_true(absf(s.player.cd["cast"] - 0.45) < 0.02, "shared cooldown min(2.2, 0.45)")
 	assert_true(absf(s.player.shape_cd["area"] - 2.2) < 0.02, "areas recharge on their own")
-	F.run(s, 0.5)
+	F.run(s, 0.7) # 0.45 s of game time, plus the first-cast time-freeze (R-055)
 	var ev := F.cast(s, ["lightning", "water"], Vector2(0, -6))
 	assert_eq(F.of_type(ev, "cooldown").size(), 1, "another area is refused")
 	assert_eq(s.areas.size(), 1)
 	s.player.queue = []
+	s.player.cd["cast"] = 0
 	F.cast(s, ["arcane"], Vector2(0, -6))
 	assert_eq(s.shots.size(), 1, "a bolt still casts")
 	assert_true(absf(s.player.cd["cast"] - 0.3) < 0.02, "bolt cooldown 0.3")

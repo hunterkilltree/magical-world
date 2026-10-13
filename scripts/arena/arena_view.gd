@@ -9,6 +9,7 @@ const EnemyModel := preload("res://scripts/arena/enemy_model.gd")
 const ArenaSim := preload("res://scripts/core/arena_sim.gd")
 const SpellBook := preload("res://scripts/core/spell_book.gd")
 const Roster := preload("res://scripts/core/wizard_roster.gd")
+const VfxDirector := preload("res://scripts/vfx/vfx_director.gd")
 
 const TAGS := {
 	"steam": ["STEAM", "#e8eef4"], "freeze": ["FROZEN", "#a8ecff"], "shatter": ["SHATTER", "#ffffff"],
@@ -41,6 +42,7 @@ const STYLE := {
 const RED := Color("#ff3b3b")
 
 var camera: Camera3D
+var director: VfxDirector # the VFX handoff's spectacle layer
 var env: Environment
 var shake := 0.0
 var t := 0.0
@@ -87,7 +89,7 @@ func setup() -> void:
 	env.ambient_light_color = Color("#a49ce0")
 	env.ambient_light_energy = 0.38
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.95
+	env.tonemap_exposure = 1.1
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color("#1a1530")
@@ -96,6 +98,8 @@ func setup() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.8
 	env.glow_bloom = 0.1
+	env.glow_hdr_threshold = 1.0
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 	we.environment = env
 	add_child(we)
 	var moon := DirectionalLight3D.new()
@@ -115,6 +119,9 @@ func setup() -> void:
 	_quad_glow.size = Vector2(1, 1)
 	_build_arena()
 	_build_reticle()
+	director = VfxDirector.new()
+	add_child(director)
+	director.setup(self)
 
 
 # ---------------------------------------------------------------- arena
@@ -322,6 +329,7 @@ func reset(sim: ArenaSim) -> void:
 		if is_instance_valid(tr["node"]):
 			tr["node"].queue_free()
 	transients.clear()
+	director.reset()
 	if wizard == null or wizard_id != sim.player.wizard:
 		set_wizard(sim.player.wizard)
 	cam_target = Vector3(sim.player.pos.x, 0, sim.player.pos.y)
@@ -481,27 +489,13 @@ func ring_fx(at: Vector2, r: float, color: Color, dur := 0.4) -> void:
 		m.albedo_color.a = 0.85 * (1 - k))
 
 
+# Fractal re-striking bolt through ground points (the VFX director's bolt). Low bolts are quiet.
 func lightning(pts: Array, color: Color, y0 := 1.15, y1 := 1.0) -> void:
-	var g := K.group(self)
-	var core := K.flat(Color("#fff6d0"), 1.0, true)
-	var halo := K.flat(color, 0.55, true)
-	for i in pts.size() - 1:
-		var a := Vector3(pts[i].x, y0 if i == 0 else y1, pts[i].y)
-		var b := Vector3(pts[i + 1].x, y1, pts[i + 1].y)
-		var path := [a]
-		var dir := b - a
-		var side := Vector3(-dir.z, 0, dir.x).normalized()
-		for k in range(1, 7):
-			var envl := sin(k / 7.0 * PI)
-			path.append(a.lerp(b, k / 7.0) + side * randf_range(-0.35, 0.35) * envl + Vector3(0, randf_range(-0.17, 0.17) * envl, 0))
-		path.append(b)
-		for k in path.size() - 1:
-			_segment(g, path[k], path[k + 1], 0.05, core)
-			_segment(g, path[k], path[k + 1], 0.16, halo)
-		burst("lightning", b, 6, 4.0)
-	_transient(g, 0.2, func(k: float):
-		core.albedo_color.a = (1 - k) * (1.0 if randf() > 0.25 else 0.3)
-		halo.albedo_color.a = 0.55 * (1 - k))
+	var quiet := y1 < 0.5
+	var p3 := []
+	for i in pts.size():
+		p3.append(Vector3(pts[i].x, y0 if i == 0 else y1, pts[i].y))
+	director.bolt(p3, color, {"quiet": quiet, "w": 0.11 if quiet else 0.22, "life": 0.14 if quiet else 0.26})
 
 
 # A straight ray of light: a bright core and a wide halo that fade out.
@@ -547,11 +541,12 @@ func _el_color(el: String) -> Color:
 # Turns this tick's sim events into effects.
 func consume(events: Array, sim: ArenaSim) -> void:
 	for e in events:
+		director.on_event(e, sim)
 		match e["type"]:
 			"cone":
 				var d: Vector2 = e["dir"]
 				for el in e["els"]:
-					var p := _particles(_style(el), 40)
+					var p := _particles(_style(el), 14)
 					p.one_shot = true
 					p.explosiveness = 0.8
 					p.position = ground(e["pos"] + d * 0.6, 1.0)
@@ -566,16 +561,10 @@ func consume(events: Array, sim: ArenaSim) -> void:
 					_transient(p, 0.6, Callable())
 			"explode":
 				var col: Color = e["color"]
-				var m := K.flat(col, 0.9, true)
-				var sph := K.put(self, K.sphere(1.0, 20, 12), m, ground(e["pos"], 0.6), null, null, false)
 				var r: float = e["r"]
-				_transient(sph, 0.5, func(k: float):
-					sph.scale = Vector3.ONE * r * (0.25 + 0.75 * _ease(k * 1.6))
-					m.albedo_color.a = 0.9 * pow(1 - k, 2))
 				ring_fx(e["pos"], r, col, 0.5)
 				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 0.6), 30, 6.0, 0.5)
-				burst("smoke", ground(e["pos"], 0.8), 10, 2.0, r * 0.6)
+					burst(_style(el), ground(e["pos"], 0.6), 12, 6.0, 0.5)
 				shake = minf(1.2, shake + (0.55 if e["big"] else 0.28))
 			"impact":
 				var col: Color = e.get("color", Color.WHITE)
@@ -583,7 +572,7 @@ func consume(events: Array, sim: ArenaSim) -> void:
 					burst("hex", ground(e["pos"], 1.1), 14, 3.0)
 				else:
 					for el in e["els"]:
-						burst(_style(el), ground(e["pos"], 1.0), 10, 3.0)
+						burst(_style(el), ground(e["pos"], 1.0), 6, 3.0)
 					if e.get("kind", "") == "boulder":
 						burst("earth", ground(e["pos"], 0.6), 16, 4.0)
 						shake = minf(1.0, shake + 0.12)
@@ -691,6 +680,16 @@ func render(sim: ArenaSim, dt: float, aim_point: Vector2) -> void:
 	for b in braziers:
 		b["light"].light_energy = 1.6 * (0.82 + sin(t * 13 + b["local"].x) * 0.08 + randf() * 0.12)
 	_update_camera(sim, dt)
+	director.update(dt, sim, tip_pos())
+
+
+# The wizard's staff tip in world space (where spells leave from), or null without a wizard.
+func tip_pos():
+	if wizard == null:
+		return null
+	if wizard.tip and wizard.tip.is_inside_tree():
+		return wizard.tip.global_position
+	return wizard.position + Vector3(0, 1.6, 0)
 
 
 func _update_camera(sim: ArenaSim, dt: float) -> void:
@@ -704,7 +703,8 @@ func _update_camera(sim: ArenaSim, dt: float) -> void:
 	var side := Vector3(cos(ang), 0, -sin(ang)) * 2.3 * menu_blend
 	shake *= exp(-9 * dt)
 	var jitter := Vector3(randf() - 0.5, (randf() - 0.5) * 0.6, randf() - 0.5) * shake * 0.5
-	camera.position = cam_target + off + side + jitter
+	camera.position = cam_target + off + side + jitter + director.kick
+	camera.fov = 40.0 + director.fov
 	camera.look_at(Vector3(cam_target.x + side.x, 0.8 + menu_blend * 0.4, cam_target.z + side.z), Vector3.UP)
 	for pl in pillar_views:
 		var dz: float = pl["p"].pos.y - p.pos.y

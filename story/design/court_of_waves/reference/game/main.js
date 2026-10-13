@@ -4,6 +4,7 @@ import { createView } from './render.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
 import { WIZARDS } from '../wizard-rig.js';
+import { createAudio } from './audio.js';
 
 const canvas = document.getElementById('game');
 const overlay = document.getElementById('overlay');
@@ -11,6 +12,8 @@ const params = new URLSearchParams(location.search);
 let wizardId = WIZARDS.some((w) => w.id === params.get('w')) ? params.get('w') : 'ember_pyromancer';
 
 const view = createView(canvas, overlay);
+const audio = createAudio();
+['pointerdown', 'keydown'].forEach((t) => window.addEventListener(t, () => audio.init(), { capture: true }));
 const input = createInput(canvas);
 let game = createGame(wizardId);
 view.reset(game);
@@ -37,8 +40,10 @@ const hud = createHud({
   onPause() { if (game.mode === 'play') game.mode = 'paused'; },
   onRestart() { newGame('play'); },
   onMenu() { newGame('menu'); },
-  onElement(el) { input.push('el:' + el); }
+  onElement(el) { input.push('el:' + el); },
+  onMute() { hud.setMuted(audio.toggle()); }
 });
+hud.setMuted(audio.muted);
 
 const STEP = 1 / 60;
 let acc = 0, last = performance.now();
@@ -49,7 +54,8 @@ function frame(now) {
   const f = input.read();
   if (f.actions.includes('restart') && (game.mode === 'dead' || game.mode === 'paused')) newGame('play');
   if (game.mode === 'menu' && f.actions.includes('cast')) f.actions = [];
-  let actions = f.actions.filter((a) => a !== 'restart');
+  if (f.actions.includes('mute')) hud.setMuted(audio.toggle());
+  let actions = f.actions.filter((a) => a !== 'restart' && a !== 'mute');
   const aim = view.screenToGround(f.ndc.x, f.ndc.y);
   const events = [];
   acc += dt;
@@ -60,6 +66,7 @@ function frame(now) {
   }
   if (actions.length) input.requeue(actions);
   view.consume(events, game);
+  audio.play(events, game);
   view.render(game, game.mode === 'paused' ? 0 : dt);
   hud.update(game, events, dt);
 }

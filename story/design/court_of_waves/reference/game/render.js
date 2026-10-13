@@ -9,6 +9,7 @@ import { buildArena, buildEnemy, buildWall } from './models.js';
 import { ELEMENTS, resolveSpell } from './spells.js';
 import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
+import { createWow } from './wow.js';
 
 const cols = (...h) => h.map((x) => new THREE.Color(x));
 const STYLE = {
@@ -150,6 +151,10 @@ export function createView(canvas, overlay) {
   const aim = { x: 0, z: -1 };
   const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitV = new THREE.Vector3();
   const _v = new THREE.Vector3();
+  const callouts = [];
+  const callout = (x, z, name, color, kicker) => { callouts.push({ x, z, name, color, kicker, t: 0 }); if (callouts.length > 3) callouts.shift(); };
+  const wow = createWow({ scene, camera, composer, glow: fx.glow, puff: (...a) => puff(...a), burst: (...a) => burst(...a),
+    lightning: (...a) => lightning(...a), ringFx: (...a) => ringFx(...a), flash, callout, shake: (k) => { shake = Math.min(1.4, shake + k); } });
 
   // reticle + previews
   const reticle = new THREE.Group();
@@ -205,31 +210,8 @@ export function createView(canvas, overlay) {
   }
 
   function lightning(pts, color, y0 = 1.15, y1 = 1.0) {
-    const g = new THREE.Group();
-    const core = addMat(0xfff6d0, 2.4, 1), halo = addMat(color, 1.6, 0.55);
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = new THREE.Vector3(pts[i][0], i === 0 ? y0 : y1, pts[i][1]), b = new THREE.Vector3(pts[i + 1][0], y1, pts[i + 1][1]);
-      const n = 7, path = [a];
-      const dir = b.clone().sub(a), side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
-      for (let k = 1; k < n; k++) {
-        const p = a.clone().lerp(b, k / n), env = Math.sin((k / n) * Math.PI);
-        p.addScaledVector(side, (Math.random() - 0.5) * 0.7 * env); p.y += (Math.random() - 0.5) * 0.35 * env;
-        path.push(p);
-      }
-      path.push(b);
-      for (let k = 0; k < path.length - 1; k++) {
-        const L = path[k].distanceTo(path[k + 1]);
-        [[core, 0.05], [halo, 0.16]].forEach(([m, w]) => {
-          const s = new THREE.Mesh(UNIT_BOX, m);
-          s.position.copy(path[k]).lerp(path[k + 1], 0.5);
-          s.lookAt(path[k + 1]);
-          s.scale.set(w, w, L);
-          g.add(s);
-        });
-      }
-      for (let k = 0; k < 6; k++) puff('lightning', b.x, b.y, b.z, (Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6);
-    }
-    transient(g, 0.2, (k) => { core.opacity = (1 - k) * (Math.random() > 0.25 ? 1 : 0.3); halo.opacity = 0.55 * (1 - k); });
+    const quiet = y1 < 0.5;
+    wow.vfx.bolt(pts.map((p, i) => new THREE.Vector3(p[0], i === 0 ? y0 : y1, p[1])), color, { quiet, w: quiet ? 0.11 : 0.22, life: quiet ? 0.14 : 0.26 });
   }
 
   function ringFx(x, z, r, color, dur = 0.4, y = 0.06) {
@@ -284,6 +266,8 @@ export function createView(canvas, overlay) {
     if (!pv || pv.w.id !== game.player.wizard) setWizard(game.player.wizard);
     camTarget.set(game.player.x, 0, game.player.z);
     shake = 0;
+    wow.reset();
+    callouts.length = 0;
   }
 
   function screenToGround(nx, ny) {
@@ -300,6 +284,7 @@ export function createView(canvas, overlay) {
 
   function consume(events, game) {
     for (const e of events) {
+      wow.onEvent(e, game);
       switch (e.type) {
         case 'cast': {
           const tp = tipPos();
@@ -310,7 +295,7 @@ export function createView(canvas, overlay) {
         case 'cone': {
           const half = (e.arc * Math.PI) / 360, base = Math.atan2(e.dx, e.dz), steam = e.els.includes('fire') && e.els.includes('water');
           const styles = steam ? ['steam', 'steam', 'fire'] : e.els.map(elStyle);
-          for (const st of styles) for (let i = 0; i < 40; i++) {
+          for (const st of styles) for (let i = 0; i < 14; i++) {
             const a = base + (Math.random() * 2 - 1) * half, sp = e.range * (2.4 + Math.random() * 1.6);
             puff(st, e.x + Math.sin(a) * 0.6, 1.0 + Math.random() * 0.3, e.z + Math.cos(a) * 0.6, Math.sin(a) * sp, (Math.random() - 0.3) * 1.5, Math.cos(a) * sp,
               { life: (e.range / sp) * (1.0 + Math.random() * 0.5), drag: 0.6, grav: st === 'water' ? 3 : STYLE[st].grav * 0.3, size: st === 'steam' ? 0.9 : 1.3 });
@@ -319,20 +304,20 @@ export function createView(canvas, overlay) {
         }
         case 'chain': lightning(e.pts, e.color); flash(e.pts[e.pts.length - 1][0], e.pts[e.pts.length - 1][1], 0xf4e15c, 30); break;
         case 'explode': {
-          const m = addMat(e.color, 2.2, 0.9), m2 = flatMat(e.color, 0.8);
+          const m = addMat(e.color, 1.2, 0.55), m2 = flatMat(e.color, 0.8);
           const sph = new THREE.Mesh(SPHERE, m), ring = new THREE.Mesh(RING, m2);
           sph.position.set(e.x, 0.7, e.z); ring.position.set(e.x, 0.06, e.z);
-          const g = new THREE.Group(); g.add(sph, ring);
-          transient(g, 0.5, (k) => { sph.scale.setScalar(e.r * (0.25 + 0.75 * ease(k * 1.6))); m.opacity = 0.9 * (1 - k) ** 2; ring.scale.setScalar(e.r * (0.3 + 0.9 * ease(k))); m2.opacity = 0.8 * (1 - k); });
-          for (const el of e.els) burst(elStyle(el), e.x, 0.8, e.z, 36, e.r * 4.5, { up: 0.8, size: 1.4 });
-          burst('smoke', e.x, 0.6, e.z, 14, e.r * 1.4, { spread: e.r * 0.6 });
-          flash(e.x, e.z, e.color, e.big ? 90 : 45);
+          const g = new THREE.Group(); g.add(ring);
+          transient(g, 0.5, (k) => { sph.scale.setScalar(e.r * (0.25 + 0.6 * ease(k * 1.6))); m.opacity = 0.55 * (1 - k) ** 3; ring.scale.setScalar(e.r * (0.3 + 0.9 * ease(k))); m2.opacity = 0.8 * (1 - k); });
+          for (const el of e.els) burst(elStyle(el), e.x, 0.8, e.z, 12, e.r * 4.5, { up: 0.8, size: 1.2 });
+          
+          flash(e.x, e.z, e.color, e.big ? 60 : 35);
           shake = Math.min(1.2, shake + (e.big ? 0.55 : 0.28));
           break;
         }
         case 'impact':
           if (e.enemy) { burst('hex', e.x, 1.1, e.z, 14, 3); break; }
-          for (const el of e.els) burst(elStyle(el), e.x, 1.0, e.z, 14, 3.2);
+          for (const el of e.els) burst(elStyle(el), e.x, 1.0, e.z, 6, 3.2);
           if (e.kind === 'boulder') { burst('earth', e.x, 0.6, e.z, 16, 4); shake = Math.min(1, shake + 0.12); }
           flash(e.x, e.z, e.color, 18);
           break;
@@ -549,7 +534,7 @@ export function createView(canvas, overlay) {
       v.obj.position.set(b.x, y, b.z);
       if (b.kind === 'boulder') { v.obj.rotation.x += dt * 9; v.obj.rotation.z += dt * 4; }
       const els = b.kind === 'orb' ? ['hex'] : b.els;
-      for (const el of els) for (let i = rate(b.kind === 'boulder' ? 30 : 60, dt); i--;) {
+      for (const el of els) for (let i = rate(b.kind === 'boulder' ? 14 : 24, dt); i--;) {
         puff(el === 'hex' ? 'hex' : elStyle(el), b.x + (Math.random() - 0.5) * b.r, y + (Math.random() - 0.5) * b.r, b.z + (Math.random() - 0.5) * b.r,
           -b.vx * 0.05 + (Math.random() - 0.5), (Math.random() - 0.5), -b.vz * 0.05 + (Math.random() - 0.5), { size: 0.8, life: 0.3 });
       }
@@ -775,8 +760,10 @@ export function createView(canvas, overlay) {
     // in the menu, slide the framing so the wizard sits left of the panel
     const side = new THREE.Vector3(Math.cos(ang), 0, -Math.sin(ang)).multiplyScalar(2.3 * menuBlend);
     shake *= Math.exp(-9 * dt);
-    camera.position.copy(camTarget).add(off).add(side).add(new THREE.Vector3((Math.random() - 0.5) * shake * 0.5, (Math.random() - 0.5) * shake * 0.3, (Math.random() - 0.5) * shake * 0.5));
+    camera.position.copy(camTarget).add(off).add(side).add(new THREE.Vector3((Math.random() - 0.5) * shake * 0.5, (Math.random() - 0.5) * shake * 0.3, (Math.random() - 0.5) * shake * 0.5)).add(wow.kick);
     camera.lookAt(camTarget.x + side.x, 0.8 + menuBlend * 0.4, camTarget.z + side.z);
+    camera.fov = 40 + wow.fov;
+    camera.updateProjectionMatrix();
 
     for (const pl of arena.pillars) {
       const dz = pl.p.z - p.z, dx = Math.abs(pl.p.x - p.x);
@@ -785,6 +772,7 @@ export function createView(canvas, overlay) {
       pl.mat.depthWrite = pl.mat.opacity > 0.95;
     }
 
+    wow.update(dt, s, pv ? tipPos() : null);
     composer.render();
     drawOverlay(s, dt);
   }
@@ -838,6 +826,30 @@ export function createView(canvas, overlay) {
       ctx.fillStyle = tx.color;
       ctx.fillText(tx.text, sc[0], sc[1]);
     }
+    for (let i = callouts.length - 1; i >= 0; i--) {
+      const c = callouts[i], life = c.kicker ? 2.1 : 1.3;
+      c.t += dt;
+      if (c.t > life) { callouts.splice(i, 1); continue; }
+      const sc = project(c.x, 3.1 + c.t * 0.3, c.z);
+      if (!sc) continue;
+      const pop = c.t < 0.14 ? 1.4 - (c.t / 0.14) * 0.4 : 1;
+      ctx.globalAlpha = Math.max(0, Math.min(1, (life - c.t) / 0.35, c.t / 0.05));
+      ctx.lineWidth = 6 * d;
+      ctx.strokeStyle = 'rgba(14,10,24,.9)';
+      if (c.kicker) {
+        ctx.font = `700 ${13 * d}px 'Space Grotesk', sans-serif`;
+        ctx.letterSpacing = `${3 * d}px`;
+        ctx.strokeText(c.kicker, sc[0], sc[1] - 34 * d * pop);
+        ctx.fillStyle = '#f0c84a';
+        ctx.fillText(c.kicker, sc[0], sc[1] - 34 * d * pop);
+      }
+      ctx.font = `700 ${(c.kicker ? 36 : 27) * d * pop}px 'Space Grotesk', sans-serif`;
+      ctx.letterSpacing = `${1.5 * d}px`;
+      ctx.strokeText(c.name.toUpperCase(), sc[0], sc[1]);
+      ctx.fillStyle = c.color;
+      ctx.fillText(c.name.toUpperCase(), sc[0], sc[1]);
+    }
+    ctx.letterSpacing = '0px';
     ctx.globalAlpha = 1;
   }
 

@@ -93,7 +93,7 @@ func test_crystal_walls_reflect_orbs() -> void:
 	b.life = 3
 	b.dmg = 12
 	s.shots.append(b)
-	var ev := F.run(s, 1.0)
+	var ev := F.run(s, 1.6) # longer: casting Crystal Garden freezes time briefly (R-055)
 	assert_true(F.tags(ev).has("reflected"), "REFLECTED")
 	assert_true(hex.hp < hex.max_hp, "the hex hits its own caster")
 	assert_eq(s.player.hp, 100.0)

@@ -386,12 +386,18 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 	if cmode == "aim" and sp["cd"] > 0.45:
 		p.shape_cd[shape] = sp["cd"]
 		p.shape_max[shape] = sp["cd"]
-	if not p.queue.is_empty():
+	var from_queue := not p.queue.is_empty()
+	var is_new: bool = not stats["found"].has(sp["key"])
+	var distinct: int = sp["counts"].size()
+	if from_queue:
 		p.last = p.queue.duplicate()
 	p.queue = []
 	p.cast_t = 0.3
 	stats["casts"] += 1
 	stats["found"][sp["key"]] = true
+	# A combo freezes time for a beat: longer the first time it is ever cast (VFX handoff, section 1).
+	if from_queue and distinct >= 2:
+		hitstop = maxf(hitstop, 0.16 if is_new else 0.035)
 	var aim: Vector2 = inp.get("aim", p.pos + p.f)
 	var av := aim - p.pos
 	var aim_dist := av.length()
@@ -399,7 +405,7 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 		p.f = av / aim_dist
 	var d := p.f
 	_ev("cast", {"mode": cmode, "shape": shape, "name": sp["name"], "key": sp["key"], "els": sp["els"],
-		"color": sp["color"], "pos": p.pos, "dir": d})
+		"color": sp["color"], "pos": p.pos, "dir": d, "from_queue": from_queue, "is_new": is_new, "distinct": distinct})
 	if sp["counts"].has("lightning") and p.st.wet > 0 and cmode != "self":
 		_hurt(p, 7 * sp["counts"]["lightning"], "lightning", {"self": true, "reason": "Cast lightning while wet"})
 		p.st.shock = maxf(p.st.shock, 0.35)
@@ -502,7 +508,7 @@ func _cast_chain(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
 		var end := p.pos + d * minf(rng_, aim_dist)
 		pts.append(end)
 		_env_at(end, 0.9, sp["els"], false)
-	_ev("chain", {"pts": pts, "els": sp["els"], "color": sp["color"]})
+	_ev("chain", {"pts": pts, "els": sp["els"], "color": sp["color"], "key": sp["key"]})
 
 
 # An instant line: everything within width/2 of it is hit; a pillar stops it.
@@ -544,7 +550,7 @@ func _cast_wall(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
 	for i in n:
 		var o := (i - (n - 1) / 2.0) * 0.95
 		_add_wall(c + Vector2(-d.y, d.x) * o, sp)
-	_ev("wall", {"pos": c, "mat": sp["def"].get("mat", "stone")})
+	_ev("wall", {"pos": c, "mat": sp["def"].get("mat", "stone"), "key": sp["key"], "dir": d, "n": n})
 
 
 func _chain_walk(sp: Dictionary, cur: Body, jumps: int, pts: Array, k: float, hit: Dictionary) -> void:
@@ -601,6 +607,7 @@ func _spawn_area(sp: Dictionary, at: Vector2) -> Area:
 	a.scatter = float(def.get("scatter", 0.0))
 	a.center = at
 	areas.append(a)
+	_ev("area", {"pos": at, "r": a.r, "life": a.life, "delay": a.delay, "key": a.key, "els": a.els, "color": a.color})
 	return a
 
 
@@ -635,7 +642,7 @@ func _nova(sp: Dictionary) -> void:
 	var shape: String = def["shape"]
 	var nova_r: float = TUNING["nova_r"]
 	var r := float(def.get("radius", 3.0)) if shape == "area" else 2.2 if shape == "wall" else nova_r
-	_ev("nova", {"pos": p.pos, "r": r, "els": sp["els"], "color": sp["color"], "shape": shape})
+	_ev("nova", {"pos": p.pos, "r": r, "els": sp["els"], "color": sp["color"], "shape": shape, "key": sp["key"]})
 	if shape == "wall":
 		for i in 9:
 			var a := i / 9.0 * TAU
@@ -893,6 +900,7 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 	if tags.has("shatter"):
 		st.frozen = 0
 		st.chill = 0
+		hitstop = maxf(hitstop, 0.08)
 	if cursed:
 		dmg *= 1.25
 	if pl.get("shock", 0) > 0 and st.frozen <= 0:
@@ -943,7 +951,7 @@ func _explode(at: Vector2, R: float, pl: Dictionary, o := {}) -> void:
 			_wall_hit(w, pl, 0.8)
 	_env_at(at, R, pl["els"], true)
 	_ev("explode", {"pos": at, "r": R, "els": o.get("els", pl["els"]), "color": o.get("color", Color("#ffa040")),
-		"big": o.get("big", false)})
+		"big": o.get("big", false), "key": o.get("key", "")})
 	if o.get("big", false):
 		hitstop = maxf(hitstop, 0.05)
 
@@ -1614,7 +1622,7 @@ func _impact(b: Shot, target: Body) -> void:
 	var d: Dictionary = sp["def"]
 	var R := float(d.get("explode", d.get("splash", 0.0)))
 	if R > 0:
-		_explode(b.pos, R, sp["payload"], {"self_mul": 0.45 if d.has("explode") else 0.3, "big": d.has("explode"),
+		_explode(b.pos, R, sp["payload"], {"self_mul": 0.45 if d.has("explode") else 0.3, "big": d.has("explode"), "key": sp["key"],
 			"color": sp["color"], "els": sp["els"]})
 	else:
 		_env_at(b.pos, 0.5, sp["els"], b.kind == "boulder")
@@ -1638,7 +1646,7 @@ func _impact(b: Shot, target: Body) -> void:
 		var l: Dictionary = d["leaves"]
 		_spawn_area(SpellBook.make_spell(["fire"], {"name": "burning ground", "shape": "area", "radius": l["radius"],
 			"life": l["life"], "tick": l["tick"], "mult": l["mult"], "hitsAll": true}, 1.0, "burning"), b.pos)
-	_ev("impact", {"pos": b.pos, "els": sp["els"], "color": sp["color"], "kind": b.kind, "r": R})
+	_ev("impact", {"pos": b.pos, "els": sp["els"], "color": sp["color"], "kind": b.kind, "r": R, "key": sp["key"]})
 
 
 # ---------------------------------------------------------------- areas & walls
@@ -1648,7 +1656,7 @@ func _update_areas(dt: float) -> void:
 		if a.delay > 0:
 			a.delay -= dt
 			if a.delay <= 0 and a.burst:
-				_explode(a.pos, a.r, a.sp["payload"], {"self_mul": 0.6 if a.hits_all else 0.0, "big": true,
+				_explode(a.pos, a.r, a.sp["payload"], {"self_mul": 0.6 if a.hits_all else 0.0, "big": true, "key": a.key,
 					"color": a.color, "els": a.els, "reason": "Stood under your own " + a.name})
 				if a.repeat > 0:
 					a.repeat -= 1
