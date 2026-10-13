@@ -69,6 +69,12 @@ a random or auto-generated name.
   is in `_apply_payload`, keep it that way), `spell_book` (data/spells.json: queue of 3, fire/ice cancel, resolve order,
   payloads, cost, colour), `enemy_types` (data/enemies.json, `wave_roster(n, rng)`), `wizard_roster` (data/wizards.json:
   the six wizards' looks; cosmetic only), `controls` (InputMap install, event -> sim action).
+- Ten elements (R-050 to R-054): the handoff's six plus nature/wind/light/dark from the original Grauhold Reach list
+  (keys 7, 8, 9, 0). The handoff's own spell numbers are untouched; the new elements, combos (74 in all; every pair and
+  double has one) and enemy resists for them are our own tuning, not playtested. Combo keys that add status to a
+  payload are listed in `SpellBook.DEF_PAYLOAD`; area extras (`heal`, `swallow`, `repeat`/`interval`/`scatter`,
+  `leaves`), wall extras (`regen`, `reflect`) and the `beam` shape live in `arena_sim.gd`. Adding a spell is one
+  `combos` entry in `data/spells.json`; `test_r050` fails if a legal pair or double has none.
 - `scripts/arena/`: the 3D view, which only reads the sim. `arena_view` (court, props, entity sync, telegraphs, particles,
   lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
   y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),

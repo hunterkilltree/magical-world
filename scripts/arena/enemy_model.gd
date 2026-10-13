@@ -165,6 +165,20 @@ func tint(f: float, frozen: bool, burning: bool, chill: float, t: float) -> void
 
 static func build_wall(parent: Node3D, mat_kind: String, seed_value: float) -> Node3D:
 	var g := K.group(parent)
+	if mat_kind == "wood":
+		var bark := K.mat(0x5a3c22, 0.9, 0.0, null, 1.0, "wall_bark")
+		var leaf := K.mat(0x3f7a2e, 0.9, 0.0, 0x2a5a1e, 0.2, "wall_leaf")
+		K.put(g, K.cyl(0.18, 0.26, 1.5, 7), bark, [0, 0.75, 0], [0.05, seed_value, 0.08])
+		K.put(g, K.poly(0.5, 12), leaf, [0, 1.55, 0], [0.2, seed_value, 0], [1.1, 0.8, 1.1])
+		K.put(g, K.poly(0.3, 12), leaf, [0.25, 1.15, 0.1], [seed_value, 0.3, 0])
+		return g
+	if mat_kind == "crystal":
+		var m := K.mat(0xfff6d8, 0.1, 0.1, 0xfff1a8, 0.8, "wall_crystal")
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.albedo_color.a = 0.8
+		for i in 3:
+			K.put(g, K.poly(0.22 + i * 0.05, 8), m, [(i - 1) * 0.25, 0.5 + i * 0.12, 0], [0.2 * i, seed_value + i, 0.15], [0.7, 2.6 - i * 0.4, 0.7])
+		return g
 	if mat_kind == "ice":
 		var m := K.mat(0xbfefff, 0.12, 0.05, 0x3aa0ff, 0.4, "wall_ice")
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

@@ -20,7 +20,7 @@ const PANEL := Color(0.086, 0.07, 0.145, 0.86)
 const STATUS := [
 	["burn", "Burning", "#ff6a2b"], ["wet", "Wet", "#3d9bff"], ["chill", "Chilled", "#a8ecff"], ["frozen", "Frozen", "#ffffff"],
 	["shock", "Shocked", "#f4e15c"], ["slow", "Mired", "#b3793f"], ["stoneskin", "Stoneskin", "#b3793f"], ["ward", "Ward", "#d04bff"],
-	["haste", "Haste", "#f4e15c"],
+	["haste", "Haste", "#f4e15c"], ["root", "Rooted", "#5cc84a"], ["regen", "Regen", "#5cc84a"],
 ]
 
 var view # ArenaView, for health bars over enemies
@@ -200,8 +200,8 @@ func _build_hud() -> void:
 	bc.anchor_right = 0.5
 	bc.anchor_top = 1.0
 	bc.anchor_bottom = 1.0
-	bc.offset_left = -330
-	bc.offset_right = 330
+	bc.offset_left = -420
+	bc.offset_right = 420
 	bc.offset_top = -190
 	bc.offset_bottom = -12
 	bc.alignment = BoxContainer.ALIGNMENT_END
@@ -210,7 +210,7 @@ func _build_hud() -> void:
 	var pv := HBoxContainer.new()
 	pv.alignment = BoxContainer.ALIGNMENT_CENTER
 	pv.add_theme_constant_override("separation", 12)
-	shape_label = _label("Queue elements - 1-6", 13, DIM)
+	shape_label = _label("Queue elements - 1-0", 13, DIM)
 	spell_label = _label("-", 22)
 	cost_label = _label("", 13, DIM)
 	pv.add_child(shape_label)
@@ -244,8 +244,8 @@ func _build_hud() -> void:
 		var b := Button.new()
 		b.text = "%s  %s" % [E["key"], E["name"]]
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(98, 34)
-		b.add_theme_font_size_override("font_size", 13)
+		b.custom_minimum_size = Vector2(76, 34)
+		b.add_theme_font_size_override("font_size", 12)
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(SpellBook.color(el), 0.22)
 		sb.border_color = SpellBook.color(el)
@@ -473,8 +473,10 @@ func update(s: ArenaSim, events: Array, dt: float) -> void:
 				say("Queue holds %d elements - cast or clear (X)" % SpellBook.max_queue())
 			"cancel":
 				say("%s and %s cancel out" % [SpellBook.element(e["a"])["name"], SpellBook.element(e["b"])["name"]])
+			"heal":
+				pass
 			"fizzle":
-				say("Queue an element first (1-6)")
+				say("Queue an element first (1-0)")
 			"cooldown":
 				say("%s spells recharging - %.1fs" % [SpellBook.shape(e["shape"])["label"], e["t"]])
 	toast_t -= dt
@@ -503,7 +505,7 @@ func update(s: ArenaSim, events: Array, dt: float) -> void:
 		sl["style"].border_color = SpellBook.color(el) if el != "" else Color(1, 1, 1, 0.18)
 	var queued := not p.queue.is_empty()
 	var sp := SpellBook.resolve(p.queue if queued else p.last)
-	shape_label.text = (SpellBook.shape(sp["def"]["shape"])["label"] if queued else "Recast - hold click") if not sp.is_empty() else "Queue elements - 1-6"
+	shape_label.text = (SpellBook.shape(sp["def"]["shape"])["label"] if queued else "Recast - hold click") if not sp.is_empty() else "Queue elements - 1-0"
 	spell_label.text = sp["name"] if not sp.is_empty() else "-"
 	spell_label.add_theme_color_override("font_color", sp["color"] if not sp.is_empty() else INK)
 	spell_label.modulate.a = 1.0 if queued else 0.55
@@ -628,5 +630,11 @@ func _draw_overlay() -> void:
 			pips.append(Color("#f4e15c"))
 		if e.st.slow > 0:
 			pips.append(Color("#b3793f"))
+		if e.st.root > 0:
+			pips.append(Color("#5cc84a"))
+		if e.st.blind > 0:
+			pips.append(Color("#fff1a8"))
+		if e.st.curse > 0:
+			pips.append(Color("#6a35b8"))
 		for i in pips.size():
 			overlay.draw_circle(Vector2(x + 3 + i * 8, sc.y + 11), 3, pips[i])

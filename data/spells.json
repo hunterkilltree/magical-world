@@ -2,7 +2,9 @@
   "max_queue": 3,
   "cancels": {
     "fire": "ice",
-    "ice": "fire"
+    "ice": "fire",
+    "light": "dark",
+    "dark": "light"
   },
   "elements": {
     "fire": {
@@ -81,6 +83,57 @@
       "self": {
         "ward": 25
       }
+    },
+    "nature": {
+      "key": "7",
+      "name": "Nature",
+      "color": 6080586,
+      "hit": {
+        "dmg": 4,
+        "root": 0.8
+      },
+      "self": {
+        "regen": 4
+      }
+    },
+    "wind": {
+      "key": "8",
+      "name": "Wind",
+      "color": 12576988,
+      "hit": {
+        "dmg": 3,
+        "knock": 6,
+        "gust": 1
+      },
+      "self": {
+        "haste": 2,
+        "gust": 1
+      }
+    },
+    "light": {
+      "key": "9",
+      "name": "Light",
+      "color": 16773544,
+      "hit": {
+        "dmg": 8,
+        "blind": 1.5
+      },
+      "self": {
+        "heal": 15
+      }
+    },
+    "dark": {
+      "key": "0",
+      "name": "Dark",
+      "color": 6960568,
+      "hit": {
+        "dmg": 10,
+        "curse": 3,
+        "drain": 0.15
+      },
+      "self": {
+        "sacrifice": 10
+      }
     }
   },
   "shapes": {
@@ -113,6 +166,11 @@
       "label": "Barrier",
       "cost": 1.5,
       "cd": 3
+    },
+    "beam": {
+      "label": "Beam",
+      "cost": 1.3,
+      "cd": 0.6
     }
   },
   "combos": {
@@ -323,6 +381,507 @@
       "burst": true,
       "hitsAll": true,
       "desc": "Marks the ground; a star lands a second later."
+    },
+    "nature": {
+      "name": "Bramble Lash",
+      "shape": "cone",
+      "range": 4.5,
+      "arc": 50,
+      "mult": 1.2,
+      "desc": "Thorned lash that roots what it catches."
+    },
+    "wind": {
+      "name": "Gust",
+      "shape": "cone",
+      "range": 6,
+      "arc": 60,
+      "mult": 1,
+      "knock": 14,
+      "desc": "A shove of air. Fans flames, chills the wet."
+    },
+    "light": {
+      "name": "Sunbeam",
+      "shape": "beam",
+      "range": 10,
+      "width": 0.5,
+      "mult": 1.2,
+      "desc": "A thin ray of light that blinds everything along it."
+    },
+    "dark": {
+      "name": "Shadow Bolt",
+      "shape": "bolt",
+      "speed": 20,
+      "mult": 1.2,
+      "radius": 0.25,
+      "desc": "Curses its target and drains a little life back to you."
+    },
+    "fire+fire": {
+      "name": "Supernova",
+      "shape": "area",
+      "radius": 3.6,
+      "delay": 0.7,
+      "life": 0.01,
+      "mult": 2.2,
+      "burst": true,
+      "hitsAll": true,
+      "leaves": {
+        "radius": 3.0,
+        "life": 5,
+        "tick": 0.5,
+        "mult": 0.3
+      },
+      "desc": "A sun drops where you aim, then leaves a sea of fire."
+    },
+    "water+water": {
+      "name": "Tsunami",
+      "shape": "cone",
+      "range": 7.5,
+      "arc": 85,
+      "mult": 0.8,
+      "knock": 20,
+      "desc": "A wall of water that sweeps the court clear."
+    },
+    "ice+ice": {
+      "name": "Glacier Prison",
+      "shape": "area",
+      "radius": 3,
+      "delay": 0.4,
+      "life": 0.01,
+      "mult": 0.8,
+      "burst": true,
+      "freeze": 3.0,
+      "desc": "Permafrost erupts and encases everything inside."
+    },
+    "lightning+lightning": {
+      "name": "Thunderstorm",
+      "shape": "area",
+      "radius": 3.6,
+      "life": 4,
+      "tick": 0.35,
+      "mult": 0.7,
+      "hitsAll": true,
+      "desc": "A storm cell that strikes anyone below it, you included."
+    },
+    "nature+nature": {
+      "name": "World Tree",
+      "shape": "area",
+      "radius": 3.2,
+      "life": 6,
+      "tick": 0.5,
+      "mult": 0.2,
+      "heal": 5,
+      "desc": "Yggdrasil's sprout: roots your foes, heals you while you stand under it."
+    },
+    "wind+wind": {
+      "name": "Cyclone",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 3,
+      "tick": 0.4,
+      "pull": 11,
+      "mult": 0.4,
+      "desc": "A spinning column that drags the horde together."
+    },
+    "light+light": {
+      "name": "Divine Judgement",
+      "shape": "beam",
+      "range": 14,
+      "width": 0.9,
+      "mult": 2.2,
+      "desc": "A holy lance across the whole court."
+    },
+    "dark+dark": {
+      "name": "Black Hole",
+      "shape": "area",
+      "radius": 3.8,
+      "life": 3.2,
+      "tick": 0.4,
+      "pull": 16,
+      "mult": 0.5,
+      "swallow": true,
+      "desc": "A singularity that eats enemy shots and drags enemies in."
+    },
+    "arcane+arcane": {
+      "name": "Arcane Barrage",
+      "shape": "bolt",
+      "count": 7,
+      "spread": 5,
+      "speed": 24,
+      "mult": 0.8,
+      "radius": 0.18,
+      "desc": "Seven bolts in a tight fan."
+    },
+    "fire+nature": {
+      "name": "Wildfire",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 4.5,
+      "tick": 0.5,
+      "mult": 0.45,
+      "hitsAll": true,
+      "desc": "Grass bursts up and into flame. Lights the brush."
+    },
+    "fire+wind": {
+      "name": "Fire Tornado",
+      "shape": "area",
+      "radius": 2.6,
+      "life": 3.5,
+      "tick": 0.35,
+      "pull": 6,
+      "mult": 0.6,
+      "desc": "A burning vortex that pulls enemies into the flames."
+    },
+    "fire+light": {
+      "name": "Solar Flare",
+      "shape": "area",
+      "radius": 3.4,
+      "delay": 0.25,
+      "life": 0.01,
+      "burst": true,
+      "mult": 1.2,
+      "desc": "A coronal flash that burns and blinds."
+    },
+    "dark+fire": {
+      "name": "Hellfire",
+      "shape": "bolt",
+      "speed": 17,
+      "explode": 2.0,
+      "radius": 0.3,
+      "mult": 1.3,
+      "trueDamage": true,
+      "desc": "Black flame that ignores every resistance."
+    },
+    "nature+water": {
+      "name": "Living Vines",
+      "shape": "area",
+      "radius": 3,
+      "life": 4,
+      "tick": 0.5,
+      "mult": 0.2,
+      "root": 2.5,
+      "desc": "Vines burst from the ground and bind whatever stands there."
+    },
+    "water+wind": {
+      "name": "Whirlpool",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 3.5,
+      "tick": 0.45,
+      "pull": 9,
+      "mult": 0.3,
+      "desc": "A swirling pool that soaks and drags."
+    },
+    "light+water": {
+      "name": "Rainbow Mist",
+      "shape": "area",
+      "radius": 3,
+      "life": 6,
+      "tick": 0.5,
+      "mult": 0.0,
+      "heal": 4,
+      "desc": "Iridescent mist that heals you and blinds them."
+    },
+    "dark+water": {
+      "name": "Abyss Water",
+      "shape": "beam",
+      "range": 9,
+      "width": 0.7,
+      "mult": 1.0,
+      "desc": "A torrent from the deep that curses and drains."
+    },
+    "earth+nature": {
+      "name": "Forest Fortress",
+      "shape": "wall",
+      "segments": 5,
+      "hp": 170,
+      "life": 12,
+      "mat": "wood",
+      "regen": 6,
+      "desc": "A living wooden wall that heals itself."
+    },
+    "earth+wind": {
+      "name": "Sandstorm",
+      "shape": "area",
+      "radius": 3.6,
+      "life": 4,
+      "tick": 0.5,
+      "mult": 0.35,
+      "blind": 1.0,
+      "desc": "Blinding grit: nothing inside can start an attack."
+    },
+    "earth+light": {
+      "name": "Crystal Garden",
+      "shape": "wall",
+      "segments": 5,
+      "hp": 110,
+      "life": 9,
+      "mat": "crystal",
+      "reflect": true,
+      "desc": "Prismatic crystals that throw hexes back at the caster."
+    },
+    "dark+earth": {
+      "name": "Graveyard",
+      "shape": "area",
+      "radius": 3,
+      "delay": 0.5,
+      "life": 0.01,
+      "burst": true,
+      "mult": 1.4,
+      "root": 2.0,
+      "desc": "The ground opens and holds them in their graves."
+    },
+    "lightning+nature": {
+      "name": "Static Bramble",
+      "shape": "chain",
+      "range": 8,
+      "jumps": 3,
+      "mult": 0.9,
+      "root": 1.2,
+      "desc": "An arc that sprouts thorns around every target."
+    },
+    "lightning+wind": {
+      "name": "Tempest",
+      "shape": "chain",
+      "range": 10,
+      "jumps": 6,
+      "mult": 0.8,
+      "desc": "A long storm arc that leaps through six enemies."
+    },
+    "light+lightning": {
+      "name": "Photon Railgun",
+      "shape": "beam",
+      "range": 16,
+      "width": 0.5,
+      "mult": 1.8,
+      "desc": "A light-speed ray through everything in a line."
+    },
+    "dark+lightning": {
+      "name": "Void Lightning",
+      "shape": "chain",
+      "range": 8,
+      "jumps": 3,
+      "mult": 1.0,
+      "desc": "Black lightning: curses and drains each target."
+    },
+    "ice+nature": {
+      "name": "Frostbloom",
+      "shape": "area",
+      "radius": 3,
+      "life": 4,
+      "tick": 0.5,
+      "mult": 0.35,
+      "desc": "Frozen flowers that root and chill."
+    },
+    "ice+wind": {
+      "name": "Blizzard",
+      "shape": "cone",
+      "range": 6.5,
+      "arc": 70,
+      "mult": 0.9,
+      "desc": "Driving snow. Freezes soaked enemies outright."
+    },
+    "ice+light": {
+      "name": "Aurora Lance",
+      "shape": "beam",
+      "range": 12,
+      "width": 0.6,
+      "mult": 1.2,
+      "desc": "A cold, blinding beam of polar light."
+    },
+    "dark+ice": {
+      "name": "Black Ice",
+      "shape": "area",
+      "radius": 3.2,
+      "life": 5,
+      "tick": 0.6,
+      "mult": 0.3,
+      "slow": 2,
+      "desc": "A slick of cursed ice that mires everything on it."
+    },
+    "nature+wind": {
+      "name": "Pollen Gale",
+      "shape": "cone",
+      "range": 6,
+      "arc": 60,
+      "mult": 0.6,
+      "knock": 8,
+      "desc": "A cloud of seeds that roots where it lands."
+    },
+    "light+nature": {
+      "name": "Sunbloom",
+      "shape": "area",
+      "radius": 3,
+      "life": 5,
+      "tick": 0.5,
+      "mult": 0.3,
+      "heal": 3,
+      "desc": "Sunlit flowers: heal you, blind them."
+    },
+    "dark+nature": {
+      "name": "Death Forest",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 5,
+      "tick": 0.5,
+      "mult": 0.45,
+      "desc": "Cursed woods that drain the life from anything inside."
+    },
+    "arcane+nature": {
+      "name": "Wild Magic",
+      "shape": "bolt",
+      "count": 4,
+      "spread": 12,
+      "speed": 20,
+      "mult": 0.8,
+      "desc": "Four seeds of raw magic that root on hit."
+    },
+    "light+wind": {
+      "name": "Dawn Gust",
+      "shape": "cone",
+      "range": 6,
+      "arc": 65,
+      "mult": 0.9,
+      "knock": 12,
+      "desc": "A blinding morning wind."
+    },
+    "dark+wind": {
+      "name": "Shadow Storm",
+      "shape": "area",
+      "radius": 3.6,
+      "life": 3.5,
+      "tick": 0.4,
+      "pull": 3,
+      "mult": 0.5,
+      "desc": "A dark tempest that curses all caught in it."
+    },
+    "arcane+wind": {
+      "name": "Arcane Gale",
+      "shape": "cone",
+      "range": 6.5,
+      "arc": 55,
+      "mult": 1.0,
+      "knock": 16,
+      "desc": "A blast of charged air."
+    },
+    "arcane+light": {
+      "name": "Radiant Orb",
+      "shape": "boulder",
+      "speed": 12,
+      "explode": 2.4,
+      "mult": 1.5,
+      "desc": "A slow sphere of light that bursts and blinds."
+    },
+    "arcane+dark": {
+      "name": "Hex Orb",
+      "shape": "bolt",
+      "speed": 15,
+      "explode": 2.0,
+      "radius": 0.32,
+      "mult": 1.3,
+      "desc": "An exploding curse."
+    },
+    "fire+lightning+wind": {
+      "name": "Firestorm",
+      "shape": "area",
+      "radius": 4,
+      "life": 4,
+      "tick": 0.35,
+      "pull": 5,
+      "mult": 0.8,
+      "hitsAll": true,
+      "desc": "Fire, wind and lightning become one storm. Keep out of it."
+    },
+    "earth+fire+lightning": {
+      "name": "Meteor Shower",
+      "shape": "area",
+      "radius": 2.6,
+      "delay": 0.8,
+      "life": 0.01,
+      "burst": true,
+      "repeat": 4,
+      "interval": 0.35,
+      "scatter": 2.5,
+      "mult": 1.4,
+      "hitsAll": true,
+      "desc": "Four burning stones fall around the mark."
+    },
+    "ice+water+wind": {
+      "name": "Absolute Zero",
+      "shape": "area",
+      "radius": 4.8,
+      "delay": 0.3,
+      "life": 0.01,
+      "burst": true,
+      "freeze": 3.5,
+      "mult": 0.6,
+      "hitsAll": true,
+      "desc": "Everything near the mark freezes solid. Everything."
+    },
+    "arcane+light+lightning": {
+      "name": "Heaven's Lance",
+      "shape": "beam",
+      "range": 18,
+      "width": 1.2,
+      "mult": 3.0,
+      "desc": "The sky opens in a line."
+    },
+    "arcane+dark+water": {
+      "name": "Maelstrom",
+      "shape": "area",
+      "radius": 4.2,
+      "life": 4,
+      "tick": 0.4,
+      "pull": 18,
+      "swallow": true,
+      "mult": 0.6,
+      "desc": "A whirlpool into the void. Swallows shots."
+    },
+    "light+nature+water": {
+      "name": "World Bloom",
+      "shape": "area",
+      "radius": 3.8,
+      "life": 7,
+      "tick": 0.5,
+      "heal": 7,
+      "mult": 0.3,
+      "desc": "The court flowers: a long, strong heal for you."
+    },
+    "earth+nature+water": {
+      "name": "Ancient Grove",
+      "shape": "wall",
+      "segments": 7,
+      "hp": 220,
+      "life": 14,
+      "mat": "wood",
+      "regen": 10,
+      "desc": "A line of old trees that keeps growing back."
+    },
+    "dark+earth+nature": {
+      "name": "Necropolis",
+      "shape": "area",
+      "radius": 3.8,
+      "delay": 0.6,
+      "life": 0.01,
+      "burst": true,
+      "mult": 1.8,
+      "root": 3,
+      "desc": "The dead rise and drag the living down."
+    },
+    "fire+nature+wind": {
+      "name": "Inferno Gale",
+      "shape": "cone",
+      "range": 7,
+      "arc": 75,
+      "mult": 2.0,
+      "desc": "A wildfire carried on the wind."
+    },
+    "dark+lightning+wind": {
+      "name": "Night Tempest",
+      "shape": "chain",
+      "range": 11,
+      "jumps": 8,
+      "mult": 1.0,
+      "desc": "A cursed storm arc through eight enemies."
     }
   }
 }

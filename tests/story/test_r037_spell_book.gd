@@ -6,9 +6,9 @@ const F := preload("res://tests/support/arena_fixture.gd")
 
 func test_the_data_loads() -> void:
 	assert_eq(SpellBook.max_queue(), 3, "queue size")
-	assert_eq(SpellBook.data()["elements"].size(), 6, "elements")
-	assert_eq(SpellBook.data()["shapes"].size(), 6, "shapes")
-	assert_eq(SpellBook.grimoire().size(), 22, "combos")
+	assert_eq(SpellBook.data()["elements"].size(), 10, "elements")
+	assert_eq(SpellBook.data()["shapes"].size(), 7, "shapes")
+	assert_eq(SpellBook.grimoire().size(), 74, "combos")
 	for el in SpellBook.ORDER:
 		assert_true(not SpellBook.element(el).is_empty(), el)
 
@@ -33,13 +33,20 @@ func test_an_exact_key_with_repeats_wins() -> void:
 
 
 func test_repeats_add_thirty_percent() -> void:
-	var sp := SpellBook.resolve(["fire", "fire"])
-	assert_eq(sp["name"], "Flame Gout")
+	var sp := SpellBook.resolve(["fire", "lightning", "fire"])
+	assert_eq(sp["name"], "Thunderflare")
 	assert_true(is_equal_approx(sp["power"], 1.3), "power")
 	var pl: Dictionary = sp["payload"]
-	assert_true(is_equal_approx(pl["parts"]["fire"], 6 * 2 * 1.5 * 1.3), "fire damage %s" % pl["parts"]["fire"])
+	assert_true(is_equal_approx(pl["parts"]["fire"], 6 * 2 * 1.3 * 1.3), "fire damage %s" % pl["parts"]["fire"])
 	assert_true(is_equal_approx(pl["burn"], 3.9), "burn seconds")
 	assert_true(is_equal_approx(pl["burnDps"], 13.0), "burn dps")
+
+
+func test_three_of_a_kind_powers_up_the_double() -> void:
+	var sp := SpellBook.resolve(["fire", "fire", "fire"])
+	assert_eq(sp["name"], "Supernova")
+	assert_true(is_equal_approx(sp["power"], 1.3), "power")
+	assert_eq(SpellBook.resolve(["fire", "fire"])["power"], 1.0)
 
 
 func test_order_does_not_matter() -> void:

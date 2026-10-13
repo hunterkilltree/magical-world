@@ -1,5 +1,5 @@
 # Renders the main scene in a given state and saves a PNG. Needs a display (a desktop, or xvfb-run).
-# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|dead|pause|live> <out.png> [wizard_id]
+# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|dead|pause|live> <out.png> [wizard_id]
 # `live` starts a run and lets the real engine loop (input, physics, waves) go for five seconds.
 extends SceneTree
 
@@ -49,6 +49,27 @@ func _initialize() -> void:
 			if what == "pause":
 				main.sim.stats["found"] = {"lightning+water": true, "earth+earth": true, "fire+lightning": true}
 				main.tick(dt, {"actions": ["pause"]})
+		elif what == "combos":
+			# The new elements at work: a Black Hole pulling thralls, a living wall, a crystal wall,
+			# a Photon Railgun and Meteor Shower falling.
+			p.pos = Vector2(0, 3)
+			for at in [Vector2(-5, -2), Vector2(-3.5, -3), Vector2(-4.5, -0.5), Vector2(4, -3), Vector2(6, -1)]:
+				main.sim.spawn("thrall", at).atk_cd = 99
+			main.sim.spawn("bulwark", Vector2(1, -5)).atk_cd = 99
+			var casts := [[["dark", "dark"], Vector2(-4, -2)], [["earth", "nature"], Vector2(0, -2)],
+				[["earth", "fire", "lightning"], Vector2(5, -2)], [["light", "lightning"], Vector2(5, -2)]]
+			for c in casts:
+				main.sim.player.cd["cast"] = 0
+				main.sim.player.shape_cd = {}
+				main.sim.player.energy = 100
+				var acts := []
+				for el in c[0]:
+					acts.append("el:" + el)
+				acts.append("cast")
+				main.tick(dt, {"aim": c[1], "actions": acts})
+				for i in 12:
+					main.tick(dt, {"aim": c[1]})
+			main.tick(dt, {"aim": Vector2(5, -2), "actions": ["el:nature", "el:water", "el:light"]})
 		elif what == "dead":
 			p.hp = 0
 			for i in 90:

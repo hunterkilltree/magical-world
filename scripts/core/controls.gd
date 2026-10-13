@@ -1,5 +1,6 @@
 # Key and mouse bindings, installed into the InputMap at start-up (README "Input Map"):
-# WASD/arrows move, the mouse aims, 1-6 queue fire/water/ice/lightning/earth/arcane, left click
+# WASD/arrows move, the mouse aims, 1-9 and 0 queue fire/water/ice/lightning/earth/arcane/nature/wind/
+# light/dark, left click
 # casts (hold to recast), right click or E casts around you, F on yourself, Space or Shift
 # dodges, X or Backspace clears, Esc or P pauses, R restarts.
 extends RefCounted
@@ -7,6 +8,7 @@ extends RefCounted
 const ELEMENT_KEYS := {
 	"fire": [KEY_1, KEY_KP_1], "water": [KEY_2, KEY_KP_2], "ice": [KEY_3, KEY_KP_3],
 	"lightning": [KEY_4, KEY_KP_4], "earth": [KEY_5, KEY_KP_5], "arcane": [KEY_6, KEY_KP_6],
+	"nature": [KEY_7, KEY_KP_7], "wind": [KEY_8, KEY_KP_8], "light": [KEY_9, KEY_KP_9], "dark": [KEY_0, KEY_KP_0],
 }
 const KEYS := {
 	"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
@@ -17,7 +19,7 @@ const KEYS := {
 const MOUSE := {"cast": MOUSE_BUTTON_LEFT, "cast_area": MOUSE_BUTTON_RIGHT}
 # What the HUD lists, in order.
 const HELP := [
-	["W A S D", "Move"], ["Mouse", "Aim"], ["1 - 6", "Queue an element (up to 3)"],
+	["W A S D", "Move"], ["Mouse", "Aim"], ["1 - 0", "Queue an element (up to 3)"],
 	["Left click", "Cast at cursor, hold to recast"], ["Right click / E", "Cast as an area around you"],
 	["F", "Cast on yourself"], ["Space", "Dodge roll (brief invulnerability)"], ["X", "Clear queue"],
 	["Esc", "Pause"], ["R", "Restart (paused or fallen)"],
