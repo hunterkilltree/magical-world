@@ -14,6 +14,9 @@ const TAGS := {
 	"steam": ["STEAM", "#e8eef4"], "freeze": ["FROZEN", "#a8ecff"], "shatter": ["SHATTER", "#ffffff"],
 	"conduct": ["CONDUCTED x2", "#f4e15c"], "thaw": ["THAW", "#ffb070"], "blocked": ["BLOCKED", "#e0c060"],
 	"interrupt": ["INTERRUPTED", "#ffffff"], "evade": ["EVADE", "#c4b5fd"],
+	"entangled": ["ENTANGLED", "#5cc84a"], "kindled": ["KINDLED", "#ff8a3a"], "fanned": ["FANNED", "#ffb070"],
+	"windchill": ["WINDCHILL", "#bfe8dc"], "purged": ["PURGED x1.5", "#fff1a8"], "swallowed": ["SWALLOWED", "#b08ae8"],
+	"reflected": ["REFLECTED", "#fff1a8"], "regrown": ["REGROWN", "#5cc84a"],
 }
 # Particle looks per element / effect: colours, lifetime, size, gravity (negative rises), additive glow.
 const STYLE := {
@@ -29,6 +32,11 @@ const STYLE := {
 	"spark": {"cols": ["#ffffff", "#ffe2a0"], "life": 0.25, "size": 0.1, "grav": 9.0, "glow": true},
 	"blood": {"cols": ["#4a1f1f", "#2e1414"], "life": 0.55, "size": 0.12, "grav": 14.0, "glow": false},
 	"rune": {"cols": ["#ff5050", "#ff2a2a", "#ff8a6a"], "life": 0.75, "size": 0.18, "grav": -2.0, "glow": true},
+	"nature": {"cols": ["#b6f08a", "#5cc84a", "#2f8a2a"], "life": 0.8, "size": 0.18, "grav": 3.0, "glow": false},
+	"wind": {"cols": ["#ffffff", "#dff5ee", "#bfe8dc"], "life": 0.5, "size": 0.2, "grav": -0.5, "glow": false},
+	"light": {"cols": ["#ffffff", "#fff8d0", "#fff1a8"], "life": 0.5, "size": 0.22, "grav": -1.5, "glow": true},
+	"dark": {"cols": ["#b08ae8", "#6a35b8", "#2a1450"], "life": 0.7, "size": 0.24, "grav": -0.8, "glow": false},
+	"heal": {"cols": ["#e8ffd8", "#7dff8a", "#3ccf5a"], "life": 0.8, "size": 0.18, "grav": -2.0, "glow": true},
 }
 const RED := Color("#ff3b3b")
 
@@ -496,6 +504,28 @@ func lightning(pts: Array, color: Color, y0 := 1.15, y1 := 1.0) -> void:
 		halo.albedo_color.a = 0.55 * (1 - k))
 
 
+# A straight ray of light: a bright core and a wide halo that fade out.
+func beam_fx(from: Vector2, to: Vector2, width: float, color: Color, els: Array) -> void:
+	var g := K.group(self)
+	var core := K.flat(Color(1, 1, 1), 1.0, true)
+	var halo := K.flat(color, 0.6, true)
+	var a := ground(from, 1.1)
+	var b := ground(to, 1.1)
+	_segment(g, a, b, maxf(0.08, width * 0.35), core)
+	_segment(g, a, b, maxf(0.3, width * 1.2), halo)
+	for el in els:
+		burst(_style(el), b, 14, 4.0)
+		var k := 0.0
+		while k < 1.0:
+			burst(_style(el), a.lerp(b, k), 2, 1.5)
+			k += 0.2
+	shake = minf(1.0, shake + 0.15 * width)
+	_transient(g, 0.35, func(k: float):
+		core.albedo_color.a = 1.0 - k
+		halo.albedo_color.a = 0.6 * (1.0 - k)
+		g.scale = Vector3(1, 1 - k * 0.6, 1))
+
+
 func _segment(parent: Node3D, a: Vector3, b: Vector3, w: float, m: Material) -> void:
 	var L := a.distance_to(b)
 	if L < 1e-3:
@@ -561,6 +591,11 @@ func consume(events: Array, sim: ArenaSim) -> void:
 				burst("spark", ground(e["pos"], 1.1), 14, 4.0)
 			"chain":
 				lightning(e["pts"], e["color"])
+			"beam":
+				beam_fx(e["from"], e["to"], e["width"], e["color"], e["els"])
+			"heal":
+				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44)
+				burst("heal", ground(e["pos"], 1.0), 6, 1.5, 0.8, 1.0)
 			"hit":
 				var col := _el_color(e["el"])
 				text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
@@ -759,6 +794,8 @@ func _sync_enemies(sim: ArenaSim, dt: float) -> void:
 			v = {"model": model, "ice": ice, "spawn_ring": spawn_ring, "tele": tele["group"], "tele_d": tele,
 				"phase": randf() * 6, "yaw": e.face, "arm": 0.0,
 				"burn": _emitter(model, "fire", 30, Vector3(0.25, model.height * 0.35, 0.25), model.height * 0.4),
+				"root": _emitter(model, "nature", 20, Vector3(model.ice_r * 0.6, 0.05, model.ice_r * 0.6), 0.05),
+				"curse": _emitter(model, "dark", 16, Vector3(0.3, model.height * 0.4, 0.3), model.height * 0.4),
 				"shock": _emitter(model, "lightning", 30, Vector3(0.3, model.height * 0.4, 0.3), model.height * 0.4)}
 			enemy_views[e.id] = v
 		_update_enemy_view(v, e, dt, sim)
@@ -834,6 +871,8 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 	v["ice"].visible = frozen
 	v["burn"].emitting = st.burn > 0 and e.state != "spawn"
 	v["shock"].emitting = st.shock > 0
+	v["root"].emitting = st.root > 0
+	v["curse"].emitting = st.curse > 0 or st.blind > 0
 	# telegraphs
 	var T: Dictionary = v["tele_d"]
 	var g: Node3D = T["group"]

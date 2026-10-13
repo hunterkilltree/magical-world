@@ -22,7 +22,7 @@ Open the project in Godot and run it (F5). Pick one of the six wizards and enter
 |-------|--------|
 | W A S D | Move |
 | Mouse | Aim |
-| 1 - 6 | Queue fire, water, ice, lightning, earth, arcane (up to three; fire and ice cancel) |
+| 1 - 0 | Queue fire, water, ice, lightning, earth, arcane, nature, wind, light, dark (up to three; fire and ice, light and dark cancel) |
 | Left click | Cast at the cursor (hold to recast the last spell) |
 | Right click / E | Cast as an area around you |
 | F | Cast on yourself |
@@ -31,8 +31,13 @@ Open the project in Godot and run it (F5). Pick one of the six wizards and enter
 | Esc | Pause (shows the grimoire of spells you have found) |
 | R | Restart when paused or fallen |
 
+74 spells: every pair and double of the ten elements has one (Supernova, Tsunami, Black Hole,
+World Tree, Photon Railgun, Wildfire, Fire Tornado...), plus ten three-element spells (Meteor
+Shower, Absolute Zero, Heaven's Lance, Maelstrom...). Three of a kind powers up the double.
 Elements react: soak enemies, then hit them with lightning for double damage; freeze them and
-shatter them with earth; light the dry brush; blow up the rune barrels. Careless casting hurts you.
+shatter them with earth; root wet enemies with nature and burn them hotter; fan flames with wind;
+curse with dark and purge with light; light the dry brush; blow up the rune barrels. Careless
+casting hurts you.
 
 ## Harness
 

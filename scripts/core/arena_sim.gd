@@ -42,6 +42,11 @@ class Status:
 	var ward := 0.0
 	var ward_t := 0.0
 	var haste := 0.0
+	var root := 0.0 # cannot move
+	var blind := 0.0 # cannot start an attack
+	var curse := 0.0 # takes x1.25 damage
+	var regen := 0.0 # heals regen_hp per second while > 0 (player)
+	var regen_hp := 0.0
 
 
 # The player and every enemy. Player-only fields sit unused on enemies.
@@ -124,6 +129,12 @@ class Area:
 	var key := ""
 	var name := ""
 	var sp := {}
+	var heal := 0.0 # heals the player standing inside, per tick
+	var swallow := false # eats enemy shots inside
+	var repeat := 0 # more bursts still to fall (Meteor Shower)
+	var interval := 0.0
+	var scatter := 0.0
+	var center := Vector2.ZERO
 
 
 class Wall:
@@ -137,6 +148,8 @@ class Wall:
 	var mat := "stone"
 	var chill := false
 	var touch_t := 0.0
+	var regen := 0.0 # living walls grow back (hp/s)
+	var reflect := false # crystal walls throw enemy shots back
 
 
 # Pillars, puddles (water/charged/frozen), brush (dry/burning/ash) and rune barrels.
@@ -492,6 +505,34 @@ func _cast_chain(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
 	_ev("chain", {"pts": pts, "els": sp["els"], "color": sp["color"]})
 
 
+# An instant line: everything within width/2 of it is hit; a pillar stops it.
+func _cast_beam(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
+	var def: Dictionary = sp["def"]
+	var a := p.pos + d * 0.5
+	var L := float(def.get("range", 10.0))
+	var half := float(def.get("width", 0.5)) / 2.0
+	for o in pillars:
+		var t_: float = (o.pos - a).dot(d)
+		if t_ > 0 and t_ < L and absf((o.pos - a).cross(d)) < o.r:
+			L = t_ - sqrt(maxf(0.0, o.r * o.r - pow((o.pos - a).cross(d), 2)))
+	var b := a + d * L
+	for e in live():
+		var t_: float = (e.pos - a).dot(d)
+		if t_ < -e.r or t_ > L + e.r:
+			continue
+		if absf((e.pos - a).cross(d)) < half + e.r:
+			_apply_payload(e, sp["payload"], {"k": d, "scale": 1.0})
+	for w in walls:
+		var t_: float = (w.pos - a).dot(d)
+		if t_ > 0 and t_ < L and absf((w.pos - a).cross(d)) < half + w.r:
+			_wall_hit(w, sp["payload"], 0.5)
+	var k := 0.0
+	while k <= L:
+		_env_at(a + d * k, half + 0.2, sp["els"], false)
+		k += 1.0
+	_ev("beam", {"from": a, "to": b, "width": half * 2, "els": sp["els"], "color": sp["color"], "key": sp["key"]})
+
+
 func _cast_area(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
 	var L := minf(aim_dist, float(sp["def"].get("range", TUNING["aim_range"])))
 	_spawn_area(sp, p.pos + d * L)
@@ -553,6 +594,12 @@ func _spawn_area(sp: Dictionary, at: Vector2) -> Area:
 	a.key = sp["key"]
 	a.name = sp["name"]
 	a.sp = sp
+	a.heal = float(def.get("heal", 0.0))
+	a.swallow = bool(def.get("swallow", false))
+	a.repeat = int(def.get("repeat", 1)) - 1
+	a.interval = float(def.get("interval", 0.3))
+	a.scatter = float(def.get("scatter", 0.0))
+	a.center = at
 	areas.append(a)
 	return a
 
@@ -573,6 +620,8 @@ func _add_wall(at: Vector2, sp: Dictionary) -> void:
 	w.max_life = w.life
 	w.mat = def.get("mat", "stone")
 	w.chill = bool(def.get("touchChill", false))
+	w.regen = float(def.get("regen", 0.0))
+	w.reflect = bool(def.get("reflect", false))
 	walls.append(w)
 	for e in live():
 		_push_out(e, w)
@@ -645,7 +694,34 @@ func _self_cast(sp: Dictionary) -> void:
 			st.frozen = 0
 		if f.has("wet"):
 			st.wet = maxf(st.wet, f["wet"])
+		if f.has("regen"):
+			st.regen = 4.0
+			st.regen_hp = f["regen"] * n
+		if f.has("gust"):
+			for e in live():
+				var L: float = e.pos.distance_to(p.pos)
+				if L < 2.6 + e.r:
+					e.kvel += (e.pos - p.pos) / (L if L > 0 else 1.0) * 10.0 * n / e.mass
+		if f.has("heal"):
+			heal(f["heal"] * n, "Light")
+		if f.has("sacrifice"):
+			_hurt(p, f["sacrifice"] * n, "dark", {"self": true, "reason": "Dark pact"})
+			p.energy = minf(p.max_energy, p.energy + 50.0 * n)
 	_ev("selfcast", {"els": sp["els"], "color": sp["color"], "pos": p.pos})
+
+
+# Heals the player (capped at max health) and reports it.
+func heal(amount: float, source := "") -> float:
+	var p := player
+	if not p.alive or amount <= 0:
+		return 0.0
+	var h := minf(amount, p.max_hp - p.hp)
+	if h <= 0:
+		return 0.0
+	p.hp += h
+	stats["healed"] = stats.get("healed", 0.0) + h
+	_ev("heal", {"pos": p.pos, "amt": h, "source": source})
+	return h
 
 
 func _dodge(inp: Dictionary) -> void:
@@ -746,6 +822,9 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 		else:
 			st.burn = maxf(st.burn, pl["burn"])
 			st.burn_dps = maxf(st.burn_dps, pl["burnDps"])
+			if st.root > 0:
+				st.burn_dps *= 1.5 # rooted in brambles: they catch
+				tags.append("kindled")
 	if pl.get("chill", 0) > 0:
 		if st.burn > 0:
 			st.burn = 0
@@ -761,11 +840,46 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 				tags.append("freeze")
 		else:
 			st.frozen = maxf(st.frozen, 0.6)
+	if pl.get("root", 0) > 0 and st.frozen <= 0:
+		if was_wet:
+			st.root = maxf(st.root, maxf(2.0, pl["root"]))
+			tags.append("entangled")
+		else:
+			st.root = maxf(st.root, pl["root"])
+	if pl.get("gust", 0) > 0:
+		if st.burn > 0 and not is_p:
+			for o in live():
+				if o != b and o.pos.distance_to(b.pos) < 2.5 + o.r and o.st.burn <= 0 and o.st.wet <= 0:
+					o.st.burn = st.burn
+					o.st.burn_dps = st.burn_dps
+			tags.append("fanned")
+		elif was_wet and st.frozen <= 0:
+			st.chill += pl["gust"]
+			st.chill_t = 2.5
+			tags.append("windchill")
+			if st.chill >= 3:
+				_freeze(b, 1.8)
+				tags.append("freeze")
+	if pl.get("freeze", 0) > 0:
+		_freeze(b, pl["freeze"])
+		tags.append("freeze")
+	if pl.get("blind", 0) > 0 and not is_p:
+		st.blind = maxf(st.blind, pl["blind"])
+	var purged := false
+	if pl["parts"].has("light") and st.curse > 0:
+		st.curse = 0
+		purged = true
+		tags.append("purged")
+	var cursed := st.curse > 0
+	if pl.get("curse", 0) > 0:
+		st.curse = maxf(st.curse, pl["curse"])
 	var dmg := 0.0
 	var top: String = pl["els"][0] if not pl["els"].is_empty() else ""
 	var top_v := -1.0
 	for el in pl["parts"]:
-		var d: float = pl["parts"][el] * k * float(b.resist.get(el, 1.0))
+		var d: float = pl["parts"][el] * k * (1.0 if pl.get("trueDamage", false) else float(b.resist.get(el, 1.0)))
+		if el == "light" and purged:
+			d *= 1.5
 		if el == "lightning" and was_wet:
 			d *= 2
 			tags.append("conduct")
@@ -779,6 +893,8 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 	if tags.has("shatter"):
 		st.frozen = 0
 		st.chill = 0
+	if cursed:
+		dmg *= 1.25
 	if pl.get("shock", 0) > 0 and st.frozen <= 0:
 		st.shock = maxf(st.shock, pl["shock"] * (2 if was_wet else 1))
 	if pl.get("slow", 0) > 0:
@@ -789,13 +905,22 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 	if kn > 0 and c.has("k"):
 		b.kvel += c["k"] * kn / b.mass
 	if dmg > 0.05:
-		_hurt(b, dmg, top, {"self": is_p, "reason": c.get("reason", ""), "dot": c.get("area", false)})
+		var dealt := _hurt(b, dmg, top, {"self": is_p, "reason": c.get("reason", ""), "dot": c.get("area", false)})
+		if not is_p and pl.get("drain", 0) > 0 and pl["parts"].has("dark") and dealt > 0:
+			heal(dealt * pl["drain"] * pl["parts"]["dark"] / maxf(0.001, _sum_parts(pl)), "Drain")
 	var seen := {}
 	for tag in tags:
 		if not seen.has(tag):
 			seen[tag] = true
 			_ev("tag", {"tag": tag, "pos": b.pos, "id": b.id})
 	return dmg
+
+
+func _sum_parts(pl: Dictionary) -> float:
+	var t := 0.0
+	for el in pl["parts"]:
+		t += pl["parts"][el]
+	return t
 
 
 # A blast of radius R. o: {self_mul, big, color, els, reason}.
@@ -873,6 +998,16 @@ func _env_hit(o: Prop, els: Array, blast: bool) -> void:
 			o.fuse = 0.15 if blast else 0.05
 		return
 	if o.type == "brush":
+		if els.has("wind") and o.state == "burning":
+			for other in brush:
+				if other.state == "dry" and other.pos.distance_to(o.pos) < other.r + o.r + 4.0:
+					_ignite(other)
+			return
+		if els.has("nature") and o.state == "ash":
+			o.state = "dry"
+			o.t = 0
+			_ev("tag", {"tag": "regrown", "pos": o.pos})
+			return
 		if (els.has("water") or els.has("ice")) and o.state == "burning":
 			o.state = "dry"
 			o.t = 0
@@ -993,6 +1128,13 @@ func _tick_status(b: Body, dt: float) -> void:
 	st.slow = maxf(0.0, st.slow - dt)
 	st.stoneskin = maxf(0.0, st.stoneskin - dt)
 	st.haste = maxf(0.0, st.haste - dt)
+	st.root = maxf(0.0, st.root - dt)
+	st.blind = maxf(0.0, st.blind - dt)
+	st.curse = maxf(0.0, st.curse - dt)
+	if st.regen > 0:
+		st.regen -= dt
+		if b == player:
+			b.hp = minf(b.max_hp, b.hp + st.regen_hp * dt)
 	if st.ward > 0:
 		st.ward_t -= dt
 		if st.ward_t <= 0:
@@ -1015,6 +1157,8 @@ func _update_player(inp: Dictionary, dt: float) -> void:
 	if p.dodge > 0:
 		p.dodge -= dt
 		p.vel = p.dd * TUNING["dodge_speed"]
+	elif st.root > 0:
+		p.vel *= 0.5
 	elif not stunned:
 		var spd: float = TUNING["speed"] * slow_mul(st) * (1.4 if st.haste > 0 else 1.0)
 		var target := mv.normalized() * spd if mv != Vector2.ZERO else Vector2.ZERO
@@ -1330,7 +1474,11 @@ func _update_enemy(e: Body, dt: float) -> void:
 		e.vel *= 0.8
 	else:
 		e.state_t -= dt
+		if st.blind > 0 and e.state == "chase":
+			e.atk_cd = maxf(e.atk_cd, 0.2) # blinded: cannot line up an attack
 		call("_ai_" + e.kind, e, dt, c)
+	if st.root > 0:
+		e.vel = Vector2.ZERO
 	_move(e, dt)
 
 
@@ -1403,6 +1551,17 @@ func _shot_step(b: Shot) -> bool:
 	if b.owner == "enemy":
 		for w in walls:
 			if b.pos.distance_to(w.pos) < b.r + w.r:
+				if w.reflect:
+					# Thrown back as the player's own shot.
+					b.owner = "player"
+					b.kind = "bolt"
+					b.vel = -b.vel * 1.4
+					b.life = 2.0
+					b.sp = SpellBook.make_spell(["light"], {"name": "Reflected hex", "shape": "bolt", "mult": b.dmg / 8.0 * 1.5})
+					b.color = b.sp["color"]
+					b.els = b.sp["els"]
+					_ev("tag", {"tag": "reflected", "pos": b.pos})
+					return true
 				w.hp -= b.dmg * 1.5
 				_impact(b, null)
 				return false
@@ -1491,9 +1650,27 @@ func _update_areas(dt: float) -> void:
 			if a.delay <= 0 and a.burst:
 				_explode(a.pos, a.r, a.sp["payload"], {"self_mul": 0.6 if a.hits_all else 0.0, "big": true,
 					"color": a.color, "els": a.els, "reason": "Stood under your own " + a.name})
+				if a.repeat > 0:
+					a.repeat -= 1
+					a.delay = a.interval
+					a.delay_max = a.interval
+					a.pos = a.center + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * a.scatter
+					continue
 				a.life = 0
+				if a.sp["def"].has("leaves"):
+					var l: Dictionary = a.sp["def"]["leaves"]
+					_spawn_area(SpellBook.make_spell(["fire"], {"name": "sea of fire", "shape": "area", "radius": l["radius"],
+						"life": l["life"], "tick": l["tick"], "mult": l["mult"], "hitsAll": true}, 1.0, "burning"), a.center)
 			continue
 		a.life -= dt
+		if a.swallow:
+			var kept := []
+			for b in shots:
+				if b.owner == "enemy" and b.pos.distance_to(a.pos) < a.r:
+					_ev("tag", {"tag": "swallowed", "pos": b.pos})
+				else:
+					kept.append(b)
+			shots = kept
 		if a.pull > 0:
 			for e in live():
 				var v: Vector2 = a.pos - e.pos
@@ -1510,6 +1687,8 @@ func _update_areas(dt: float) -> void:
 					_apply_payload(e, pl, {"area": true})
 			if a.hits_all and p.alive and p.pos.distance_to(a.pos) < a.r:
 				_apply_payload(p, pl, {"area": true, "reason": "Standing in your own " + a.name})
+			if a.heal > 0 and p.pos.distance_to(a.pos) < a.r:
+				heal(a.heal, a.name)
 			_env_at(a.pos, a.r * 0.8, a.els, false)
 	var keep := []
 	for a in areas:
@@ -1521,6 +1700,8 @@ func _update_areas(dt: float) -> void:
 func _update_walls(dt: float) -> void:
 	for w in walls:
 		w.life -= dt
+		if w.regen > 0:
+			w.hp = minf(w.max_hp, w.hp + w.regen * dt)
 		if w.chill:
 			w.touch_t -= dt
 			if w.touch_t <= 0:

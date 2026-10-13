@@ -1,14 +1,17 @@
 # The spell book (data/spells.json): six elements, six shapes, and the combos that turn a
 # queue of up to three elements into one spell. Port of the prototype's spells.js.
 #
-# Resolve order: the exact key with repeats (earth+earth), else the distinct elements'
-# key with +30% power per repeat, else (three distinct, no entry) the highest-ranked
-# pair with the third element riding along at x1.15. Fire and ice cancel when queued.
+# Resolve order: the exact key with repeats (earth+earth), else a repeated pair that covers
+# every element (fire, fire, fire is Supernova at +30%), else the distinct elements' key with
+# +30% power per repeat, else (three distinct, no entry) the highest-ranked pair with the third
+# element riding along at x1.15. Fire and ice, and light and dark, cancel when queued.
 extends RefCounted
 
 const DATA_PATH := "res://data/spells.json"
-const ORDER := ["fire", "water", "ice", "lightning", "earth", "arcane"]
-const RANK := ["wall", "area", "boulder", "chain", "bolt", "cone"]
+const ORDER := ["fire", "water", "ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"]
+const RANK := ["wall", "area", "beam", "boulder", "chain", "bolt", "cone"]
+# Combo keys that pass straight into the payload (status effects a spell adds on top of its elements).
+const DEF_PAYLOAD := ["slow", "root", "blind", "freeze", "trueDamage"]
 
 static var _data: Dictionary = {}
 static var _book: Dictionary = {} # sorted "a+b" key -> combo def
@@ -92,7 +95,8 @@ static func mix_color(counts: Dictionary) -> Color:
 
 
 # A spell: {key, def, name, els (sorted), counts, power, payload, cost, cd, color}.
-# The payload is what a hit carries: {parts: {el: damage}, knock, els, burn, burnDps, wet, chill, shock, slow}.
+# The payload is what a hit carries: {parts: {el: damage}, knock, els, burn, burnDps, wet, chill, shock,
+# root, gust, blind, curse, drain, slow, freeze, trueDamage}.
 static func make_spell(els: Array, def: Dictionary, power := 1.0, key := "", spell_name := "") -> Dictionary:
 	var sorted_els := els.duplicate()
 	sorted_els.sort()
@@ -121,8 +125,18 @@ static func make_spell(els: Array, def: Dictionary, power := 1.0, key := "", spe
 			pl["chill"] = float(h["chill"] * n)
 		if h.has("shock"):
 			pl["shock"] = float(h["shock"])
-	if def.has("slow"):
-		pl["slow"] = float(def["slow"])
+		if h.has("root"):
+			pl["root"] = h["root"] * (1.0 + 0.3 * (n - 1))
+		if h.has("gust"):
+			pl["gust"] = float(n)
+		if h.has("blind"):
+			pl["blind"] = float(h["blind"])
+		if h.has("curse"):
+			pl["curse"] = float(h["curse"])
+			pl["drain"] = float(h["drain"])
+	for k in DEF_PAYLOAD:
+		if def.has(k):
+			pl[k] = def[k] if k == "trueDamage" else maxf(float(def[k]), pl.get(k, 0.0))
 	var sh := shape(def.get("shape", "bolt"))
 	return {
 		"key": key, "def": def, "name": spell_name, "els": sorted_els, "counts": counts, "power": power,
@@ -146,6 +160,9 @@ static func resolve(queue: Array) -> Dictionary:
 	var b := book()
 	if b.has(exact):
 		return make_spell(els, b[exact], 1.0, exact)
+	if els.size() == 3 and distinct.size() == 1 and b.has(els[0] + "+" + els[0]):
+		var pair: String = els[0] + "+" + els[0]
+		return make_spell(els, b[pair], 1.3, pair)
 	if b.has(dkey):
 		return make_spell(els, b[dkey], 1.0 + 0.3 * (els.size() - distinct.size()), dkey)
 	var best := ""

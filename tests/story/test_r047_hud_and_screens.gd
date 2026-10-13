@@ -1,6 +1,7 @@
 extends "res://harness/test_case.gd"
 
 const M := preload("res://tests/support/main_fixture.gd")
+const SpellBook := preload("res://scripts/core/spell_book.gd")
 
 var main
 
@@ -60,7 +61,7 @@ func test_pause_shows_the_grimoire() -> void:
 	M.frames(main, 1, {"actions": ["pause"]})
 	assert_eq(main.sim.mode, "paused")
 	assert_true(main.hud.pause_screen.visible)
-	assert_eq(main.hud.found_label.text.strip_edges(), "1 / 22 cast")
+	assert_eq(main.hud.found_label.text.strip_edges(), "1 / %d cast" % SpellBook.grimoire().size())
 	main.hud.resume_pressed.emit()
 	assert_eq(main.sim.mode, "play")
 

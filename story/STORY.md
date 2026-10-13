@@ -45,10 +45,12 @@ to `active` and write its test first. A retired requirement is `superseded`
 
 ### R-037 [done] The spell book turns a queue into a spell
 Core. `data/spells.json` loads as is. The queue holds three elements; a fourth
-is refused, and queuing fire removes a queued ice (and the other way round)
-instead of adding. Resolve order: the exact key with repeats (earth+earth is
-Stone Rampart), else the distinct elements' key with +30% power per repeat
-(fire, fire is a Flame Gout at x1.3), else for three distinct elements with no
+is refused, and queuing fire removes a queued ice (and the other way round;
+light and dark cancel the same way, R-050) instead of adding. Resolve order: the
+exact key with repeats (earth+earth is Stone Rampart), else three of a kind
+powers up its double at x1.3 (fire, fire, fire is Supernova), else the distinct
+elements' key with +30% power per repeat (fire, lightning, fire is a
+Thunderflare at x1.3), else for three distinct elements with no
 entry the highest-ranked pair (wall > area > boulder > chain > bolt > cone)
 with the third element riding along at x1.15 ("Molten Core + Water"). Cost is
 elements x 8 x the shape's cost; the spell's colour mixes its elements' colours.
@@ -156,6 +158,54 @@ colour.
 Core. `tests/support/arena_bot.gd` plays through ArenaSim with the real rules
 (kiting, mixing elements, dodging telegraphs) and clears wave 3, so the game
 stays playable as the code changes.
+
+## Your original elements
+
+The handoff's six elements are joined by the four from the original Grauhold
+Reach spell list (nature, wind, light, dark), and the original recipes come
+back by name. Numbers for the handoff's own spells are unchanged.
+
+### R-050 [done] Ten elements and a combo for every mix
+Core. Nature (7), wind (8), light (9) and dark (0) join fire, water, ice,
+lightning, earth and arcane. Light and dark cancel like fire and ice. Every
+legal pair and every double has its own spell (Supernova, Tsunami, Glacier
+Prison, Thunderstorm, World Tree, Cyclone, Divine Judgement, Black Hole,
+Arcane Barrage, Wildfire, Fire Tornado, Solar Flare, Hellfire, Living Vines,
+Whirlpool, Rainbow Mist, Photon Railgun, Sandstorm, Crystal Garden, Graveyard,
+...), and ten named three-element spells (Firestorm, Meteor Shower, Absolute
+Zero, Heaven's Lance, Maelstrom, World Bloom, Ancient Grove, Necropolis,
+Inferno Gale, Night Tempest): 74 in all. Nature roots, wind shoves, light
+blinds (blinded enemies cannot start an attack), dark curses (+25% damage
+taken) and drains life back to you.
+
+### R-051 [done] The new elements react
+Core. In the same one function: nature on a wet target roots it for at least
+2 s (ENTANGLED); fire on a rooted target burns 50% hotter (KINDLED); wind on a
+burning enemy spreads the fire to dry enemies within 2.5 m (FANNED), and on a
+wet one adds a chill stack (WINDCHILL); light on a cursed target lifts the curse
+and hits x1.5 (PURGED); some spells freeze outright (Glacier Prison, Absolute
+Zero); Hellfire ignores resistances. Thralls take x1.3 light and x0.7 dark,
+bulwarks x0.4 wind and x1.2 nature, hexcallers x1.5 light and x0.5 dark. Wind
+spreads burning brush 4 m further; nature regrows ash.
+
+### R-052 [done] New spell shapes and effects
+Core. A beam is an instant line that hits everything within its width and is
+stopped by a pillar. Healing areas heal you while you stand in them (World
+Tree, Rainbow Mist, Sunbloom, World Bloom). Black Hole and Maelstrom swallow
+enemy shots. Meteor Shower drops four blasts around the mark; Supernova leaves
+a sea of fire. Wooden walls grow back; crystal walls throw hexcaller orbs back
+at the enemies as your own shot.
+
+### R-053 [done] New self-casts
+Core. On yourself: nature regenerates 4 health a second for 4 s, wind hastes
+you and shoves enemies within 2.6 m away, light heals 15, and dark costs 10
+health for 50 energy (a dark pact).
+
+### R-054 [done] The HUD and view show the new elements
+Core. The element row has ten keys (1 to 0), each in its element's colour; the
+grimoire lists all 74 spells; Rooted and Regen show as statuses; rooted, blinded
+and cursed show as pips under enemy health bars; beams draw as a bright ray,
+heals as green numbers, and wood and crystal walls have their own look.
 
 ## Retired: the Grauhold Reach campaign
 
