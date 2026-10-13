@@ -3,14 +3,20 @@ config_version=5
 
 [application]
 
-config/name="Magical World"
+config/name="Court of Waves"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.3")
 
 [display]
 
-window/size/viewport_width=832
-window/size/viewport_height=700
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=60
 
 [rendering]
 

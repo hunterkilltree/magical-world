@@ -1,70 +1,64 @@
-# Renders the main scene in a given state and saves a PNG. Needs a display (e.g. xvfb-run).
-# Usage: xvfb-run -a godot --path . --script res://harness/screenshot.gd -- <menu|overworld|zone:<id>> <out.png> [wizard_id] [cast]
+# Renders the main scene in a given state and saves a PNG. Needs a display (a desktop, or xvfb-run).
+# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|dead|pause|live> <out.png> [wizard_id]
+# `live` starts a run and lets the real engine loop (input, physics, waves) go for five seconds.
 extends SceneTree
 
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var what: String = args[0] if args.size() > 0 else "menu"
-	var out: String = args[1] if args.size() > 1 else "/tmp/shot.png"
-	if what == "queue5":
-		# The element-queue bar on its own, all five slots filled (its design size).
-		var bg := ColorRect.new()
-		bg.color = Color("#2b3a2a")
-		bg.size = Vector2(832, 700)
-		root.add_child(bg)
-		var bar = load("res://ui/element_queue.tscn").instantiate()
-		root.add_child(bar)
-		bar.setup()
-		for e in ["Fire", "Lightning", "Ice", "Nature", "Dark"]:
-			bar.add_element(e)
-		for i in 30:
-			await process_frame
-		var shot := root.get_texture().get_image()
-		shot.save_png(out)
-		print("saved ", out, " ", shot.get_size())
-		quit(0)
-		return
+	var out: String = args[1] if args.size() > 1 else "user://shot.png"
 	var main = load("res://scenes/main.tscn").instantiate()
-	main.save_path = "user://screenshot_save.json"
 	root.add_child(main)
 	main.start()
-	if what == "ending":
-		main.new_game()
-		main.show_ending()
+	if args.size() > 2 and args[2] != "":
+		main.hud._on_pick(args[2])
+	await process_frame
+	var dt := 1.0 / 60.0
+	if what == "live":
+		main.begin()
+		for i in 300:
+			await process_frame
 	elif what != "menu":
-		main.new_game()
-		if args.size() > 2 and args[2] != "":
-			main.session.select_wizard(args[2])
-		if what.begins_with("zone:"):
-			var zone := what.substr(5)
-			main.session.campaign.restore(["tundra", "pine", "keep", "volcano", "bog"])
-			main.enter_zone(zone)
-			for i in 20:
-				main.tick(0.016, Vector2.ZERO)
-			if args.size() > 3 and args[3] == "demo":
-				# A mid-fight scene: a beam just fired through two beefy thralls, an infused combo queued.
-				var p = main.play
-				p.wizard.position = p.grid.cell_center(Vector2i(8, 14))
-				p.wizard.facing = Vector2.RIGHT
-				for i in p.enemies.size():
-					p.enemies[i].health.max_health = 5000
-					p.enemies[i].health.current = 5000
-					p.enemies[i].position = p.wizard.position + Vector2(130 + i * 100, -8 + i * 14)
-				p.queue_element("fire")
-				p.queue_element("lightning")
-				p.cast()
-				for el in ["fire", "ice", "fire", "fire"]:
-					p.queue_element(el)
-				main.tick(0.1, Vector2.ZERO)
-			if args.size() > 3 and args[3] == "cast":
-				main.play.queue_element("fire")
-				main.play.queue_element("fire")
-				main.play.cast()
-				main.tick(0.05, Vector2.ZERO)
-	for i in 3:
+		main.new_game("play")
+		main.sim.wave_t = 1e9
+		var p = main.sim.player
+		if what == "demo" or what == "pause":
+			# A mid-fight moment: a thrall winding up, a bulwark slamming, a hexcaller charging,
+			# a storm pool, a stone wall, a burning brush patch and a Thunderflare in flight.
+			p.pos = Vector2(0, 2)
+			var th = main.sim.spawn("thrall", Vector2(-2.2, 0.2))
+			var bw = main.sim.spawn("bulwark", Vector2(3.4, -1.0))
+			var hx = main.sim.spawn("hexcaller", Vector2(-1, -7))
+			for e in [th, bw, hx]:
+				e.atk_cd = 0
+			th.st.wet = 3
+			bw.st.chill = 2
+			main.sim._env_hit(main.sim.brush[0], ["fire"], false)
+			for i in 30:
+				main.tick(dt, {"aim": Vector2(0, -6)})
+			main.tick(dt, {"aim": Vector2(1.5, -5), "actions": ["el:lightning", "el:water", "nova"]})
+			main.tick(dt, {"aim": Vector2(0, -6), "actions": ["el:earth", "el:earth", "cast"]})
+			for i in 30:
+				main.tick(dt, {"aim": Vector2(0, -6)})
+			main.sim.player.cd["cast"] = 0
+			main.tick(dt, {"aim": Vector2(-1, -7), "actions": ["el:fire", "el:lightning", "cast"]})
+			main.tick(dt, {"aim": Vector2(-1, -7), "actions": ["el:arcane", "el:ice"]})
+			for i in 6:
+				main.tick(dt, {"aim": Vector2(-1, -7)})
+			if what == "pause":
+				main.sim.stats["found"] = {"lightning+water": true, "earth+earth": true, "fire+lightning": true}
+				main.tick(dt, {"actions": ["pause"]})
+		elif what == "dead":
+			p.hp = 0
+			for i in 90:
+				main.tick(dt)
+		else:
+			for i in 60:
+				main.tick(dt, {"move": Vector2(0.3, -1), "aim": Vector2(2, -6)})
+	for i in 8:
 		await process_frame
-	var img := root.get_texture().get_image()
-	img.save_png(out)
-	print("saved ", out, " ", img.get_size())
+	var shot := root.get_texture().get_image()
+	shot.save_png(out)
+	print("saved ", out, " ", shot.get_size())
 	quit(0)

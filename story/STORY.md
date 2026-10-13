@@ -1,75 +1,33 @@
-# Grauhold Reach
+# Court of Waves
 
-Design reference lives in `story/design/` (Three.js mockups: zone maps, overworld,
-wizards, weapons). Game data extracted from it lives in `data/`
-(`zones.json`, `overworld.json`, `spells.json`). 2D top-down view; the zone grids
-are tile maps (26 x 18).
+An elemental arena game in the style of Magicka, set in the Court of Grauhold Reach.
+The design reference is the playable prototype handed off in
+`story/design/court_of_waves/` (`Court of Waves - playable.html`, its `README.md`,
+and the readable source in `reference/`, mainly `reference/game/sim.js`). Its
+tuning tables are `data/spells.json` and `data/enemies.json`; the six wizards
+are `data/wizards.json`. **The gameplay numbers are final (from playtesting):
+use the data files, do not retune by feel.** Visuals are placeholders built from
+basic shapes; match readability (a colour per element, telegraph shapes,
+silhouettes), not the meshes.
 
 ## Core pillar (most important)
 
-**Grauhold Reach is a top-down action RPG (Top-Down ARPG) whose defining
-mechanic is combining elements to create spells.** Everything else (zones,
-bosses, story, UI) exists to serve that loop: queue elements, see the
-resulting spell, cast it, and live with the consequences. When a design or
+**The defining mechanic is combining elements to create spells.** Queue up to
+three of six elements, cast, and the mix decides the spell's shape and effect.
+Elements react with each other, with enemies and with the arena (puddles, dry
+brush, rune barrels), and careless casting hurts the caster. When a design or
 implementation choice competes with this, the element-combining spell system
 wins.
 
-Reference plan: a semi-2D / 2.5D game in the style of Magicka 2, built as a
-Godot 4 prototype.
-
-| Component | Godot 4 implementation | Role |
-|-----------|------------------------|------|
-| Camera | A `Camera2D` attached to the player, with Y-sort tuned to give 2.5D depth. | The player looks down at the world from an angled top-down view. |
-| Movement & collision | `CharacterBody2D` for both the player and enemies. | Move with the mouse (click-to-move) or the WASD keys. |
-| Element system | An array or queue holding up to 5 elements. | Stores the element keys the player just pressed. |
-
-(The current build uses a two-element queue and arrow-key movement; the table
-is the target the prototype grows toward.)
-
 ## Premise
 
-Grauhold Reach is a single landmass of six linked zones. Its keep fell to the
-**Hollow Warden**, a void necromancer who drew the crystal light out of the
-Sunken Verrglass and poured the dark into the land. Everything beyond the
-Hvítmark shore now answers to him: raiders on the ice, ambushers in the pines,
-a bound Colossus in the cinder wastes.
+The Hollow Warden's thralls rise from the court's four gates in endless waves.
+You are one of six wizards (Aldric, Brann, Vela, Morrow, Kessa or the Hollow
+Warden's own shade), carrying the Staff of the Cracked Rune. There is no
+winning, only how long you last: the wave you reach, your kills and your score.
 
-You are a wizard carrying the **Staff of the Cracked Rune**. Its rune split the
-night the Reach fell, and it can only mend by casting: two elements woven
-together, in the right order. Each zone's boss is a crack in the Warden's hold.
-Break all three and you can go down to the Verrglass and end him.
-
-Tone: grim but wry, Norse-flavoured. Spell chaos is part of the fun; combos
-can and will backfire on the caster.
-
-## Chapters (one per zone)
-
-| # | Zone | Objective | Boss |
-|---|------|-----------|------|
-| 1 | Hvítmark Tundra | Cross the shelf, hold the north bridge until the gate opens. | none |
-| 2 | Ashvold Pinewood | Reach the north-east cache without being flanked. | none |
-| 3 | Grauhold Keep | Breach the gatehouse, take the inner court, kill the Warden. | Warden of the Keep |
-| 4 | Eldrhólt Wastes | Cross three cinder islands, break the Colossus. | Cinder Colossus |
-| 5 | Mirefen Bog | Follow the causeways to the sunken barge, get out before dark. | none |
-| 6 | Sunken Verrglass | Descend the crystal throat to the hollow. The way out is the way in. | Verrglass Hollow (the Hollow Warden) |
-
-Campaign routes (`data/overworld.json`): tundra-pine, pine-keep, keep-volcano,
-pine-bog, bog-keep, bog-cavern. The cavern is reached only through the bog.
-
-Story beats:
-
-1. **Landing.** The party lands on the south shelf. Thralls hold the ice bridge.
-   Lesson: fire and ice trade blows; thin ice breaks under weight.
-2. **The pines.** A woodcutter's cache holds the first rune fragment. Burning the
-   log pile opens the short way, and announces you to the wood.
-3. **The keep falls back.** The Warden of the Keep, the Hollow Warden's captain,
-   dies in the boss court and drops the second fragment. The hub is yours.
-4. **The cinder wastes.** A bound fire spirit guards the third fragment. The
-   Colossus is not evil, only chained; breaking it frees the lava channels.
-5. **The bog.** Slow ground, dead stands, a sunken barge carrying the Warden's
-   supply of void-glass. Take it, and the way to the cavern opens.
-6. **The Verrglass.** The Hollow Warden waits on the crystal dais. The Cracked
-   Rune, mended with all three fragments, is the only thing that hurts him.
+Tone: grim but wry. Spell chaos is part of the fun; combos can and will
+backfire on the caster.
 
 ## Requirements
 
@@ -80,220 +38,161 @@ Format (parsed by `harness/run.sh reqs`):
 Status is `planned` (no test needed yet), `active` (being built; must have a
 test) or `done` (must have a passing test). Each active/done requirement needs
 `tests/story/test_rNNN_<name>.gd`. To start work on a requirement, change it
-to `active` and write its test first. `active` also marks a requirement whose
-test exists but has not yet been confirmed passing in real Godot.
+to `active` and write its test first. A retired requirement is `superseded`
+(the harness ignores it).
 
-### R-001 [done] The wizard moves in any direction
-Chapter 1. Movement input produces a velocity of exactly 200 px/s in that
-direction; diagonals are not faster; no input means no movement.
+## The spell system
 
-### R-002 [done] Zone data is valid
-Data. `data/zones.json` holds the six zones in order (tundra, pine, keep,
-volcano, bog, cavern), each a 26 x 18 grid of known tile characters with an
-entry and an enemy spawn; boss pads exist only in keep, volcano and cavern.
+### R-035 [done] The spell book turns a queue into a spell
+Core. `data/spells.json` loads as is. The queue holds three elements; a fourth
+is refused, and queuing fire removes a queued ice (and the other way round)
+instead of adding. Resolve order: the exact key with repeats (earth+earth is
+Stone Rampart), else the distinct elements' key with +30% power per repeat
+(fire, fire is a Flame Gout at x1.3), else for three distinct elements with no
+entry the highest-ranked pair (wall > area > boulder > chain > bolt > cone)
+with the third element riding along at x1.15 ("Molten Core + Water"). Cost is
+elements x 8 x the shape's cost; the spell's colour mixes its elements' colours.
+Each element adds its hit to the payload (fire burn, water wet + knockback, ice
+chill, lightning shock, earth heavy damage + knockback, arcane raw damage),
+scaled by the combo's multiplier.
 
-### R-003 [done] Spell data is valid
-Data. `data/spells.json` has unique spell ids, ordered recipes unique across
-spells, every recipe element in the nine-element list, and every spell type in
-{aoe, beam, projectile, vortex, barrier, summon, buff}.
+### R-036 [done] Elements react in one place
+Core. Every hit goes through one function, in this order. Water puts out
+burning (STEAM) and soaks. Fire on a wet target dries it (STEAM), on a frozen
+one thaws it, otherwise burns for 3 s. Ice on a burning target puts it out, on
+a wet one freezes it for 2.4 s, otherwise adds a chill stack (-16% speed each;
+three stacks freeze for 1.8 s). Damage per element is scaled by the enemy's
+`resist`; lightning on a wet target does double (CONDUCTED); earth on a frozen
+target does x2.2 and breaks the freeze (SHATTER). Frozen or shocked enemies
+lose their windup (INTERRUPTED).
 
-### R-004 [done] A zone grid becomes a playable level
-Chapter 1. Loading a zone gives a grid with collision (blocker, void and cover
-tiles are never walkable; the wizard cannot walk into them), places the party
-at the entry tiles, and exposes enemy spawns, loot, gates and boss pads on
-their tiles.
+### R-037 [done] The wizard moves, dodges and spends energy
+Core. WASD moves at 5.4 m/s inside the walkable radius (14.1 m); the wizard
+faces the cursor. Energy is 100 and regenerates 18/s; a spell costs its cost.
+Casts share a cooldown of min(the shape's cooldown, 0.45 s); areas (2.2 s)
+and walls (3 s) also recharge on their own timer. Holding the cast button
+recasts the last spell once the queue is empty. Space dodges for 0.26 s at
+13.5 m/s (cooldown 1 s): no direct hit lands during it, damage over time still
+does. Health is 100; at 0 the run ends.
 
-### R-005 [done] Elements queue and combine into spells
-Chapter 1. The wizard queues up to five elements (R-032). The first two form
-the recipe in `spells.json`; order matters when both orders are recipes (water
-+ earth = Mud Prison, earth + water = Mountain Rise), otherwise the reversed
-pair is used (nature + water = Living Vines). Casting resolves the recipe (e.g.
-fire + ice = Thermal Shock) and clears the queue. A pair with no recipe either
-way falls back to a plain bolt of the first element.
+### R-038 [done] Six spell shapes
+Core. A cone (Spray) hits everything in its arc at once, weaker at the edge; a
+bolt flies, can come in a fan and pierce; a chain arcs instantly to the
+nearest enemy ahead, then jumps on (x0.85 each jump); a boulder flies heavy,
+splashes or explodes on impact (Molten Core leaves burning ground, Lodestone
+discharges into three enemies); an area sits on the ground ticking (Undertow
+pulls, Starfall lands a second later); a wall (Barrier) raises segments that
+block enemies and their shots but not yours, and break when their health runs
+out (fire melts an ice wall three times as fast).
 
-### R-006 [done] Spells deal damage with cooldowns
-Chapter 1. An aoe spell damages every enemy within its radius once per cast;
-a spell cannot be recast until its cooldown has elapsed, and no two casts may
-be closer than 0.8 s (global cooldown).
+### R-039 [done] Casting around you and on yourself
+Core. Right click (or E) casts the queue around you for x1.3 energy (3 s
+cooldown): areas centre on you, walls ring you, anything else blasts 3.4 m with
+extra knockback. F casts on yourself for x0.5 energy (1.4 s cooldown): fire
+thaws, water cleanses and soaks, ice cools and chills, lightning hastes and
+zaps you, earth gives stoneskin (half damage), arcane a ward that soaks 25.
 
-### R-007 [done] The wizard has health and can fall
-Chapter 1. Health starts at 100, never goes below 0, and a `died` signal fires
-exactly once at 0.
+### R-040 [done] Careless casting hurts you
+Core. Your own explosions catch you (x0.45 for explosive bolts, x0.3 for
+splash), a point-blank explosive cast around you hits you for x0.25, Starfall
+for x0.6 if you stand under it, freezing fields and storm pools hit you when you
+stand in them, and casting lightning while wet does 7 damage and shocks you.
+The HUD names the cause.
 
-### R-008 [done] Enemies spawn at E tiles and chase
-Chapter 1. Each enemy spawn tile spawns a thrall that moves toward the nearest
-living wizard within sight range and damages it on contact with a cooldown.
+## Enemies and waves
 
-### R-009 [done] Terrain hazards act on whoever stands in them
-Chapter 1-5. `~` tiles apply the zone's hazard: thin ice breaks under weight,
-lava and void pools damage over time, bramble and mire slow movement. `,` rough
-tiles slow movement by a fixed factor.
+### R-041 [done] Three enemies with readable attacks
+Core. `data/enemies.json`. The Grave Thrall chases, winds up 0.5 s, lunges for
+10 and recovers, and claws walls in its way. The Iron Bulwark is slow, its 65
+degree front shield blocks bolts (boulders get through; it drops while frozen,
+shocked or winding up), and it slams a 2.2 m disc for 22 that breaks walls. The
+Hexcaller keeps 6.5 to 9.5 m away, strafes, charges 0.85 s and fires a slow orb
+that can be dodged and is blocked by walls.
 
-### R-010 [done] Chokepoint gates open on objective
-Chapter 1. `G` tiles block passage until the zone's gate condition is met
-(zone 1: hold the north bridge for a set time); then they open permanently.
+### R-042 [done] Endless waves
+Core. Wave n brings 3 + 1.5n thralls, hexcallers from wave 2 and bulwarks from
+wave 3 (the counts in `enemies.json`'s `waves_preview`), with health x(1 +
+0.12(n-1)) and up to +25% speed. They rise for 0.9 s at the three gates
+farthest from you. Clearing a wave heals 35%, refills energy, restores the
+barrels and gives a 3.5 s break. Each kill scores the enemy's score x(1 +
+0.25(wave-1)).
 
-### R-011 [done] Destructible tiles break
-Chapter 2. A `D` tile takes damage and is removed when destroyed; fire damage
-destroys log piles and dead stands outright and opens their lane.
+### R-043 [done] The arena reacts
+Core. Puddles wet anyone standing in them; lightning charges a puddle for 2.6 s
+(5 damage every 0.45 s), ice freezes it for 10 s (chilling anyone on it), fire
+thaws it. Dry brush catches from fire or burning bodies, burns 5 s, spreads to
+nearby brush after 1.2 s and stays ash for 25 s; water or ice puts it out. Rune
+barrels detonate from fire, lightning, arcane or a blast (2.8 m, x0.7 to you).
 
-### R-012 [done] Loot caches grant a rune fragment or item
-Chapter 2. A `C` tile can be opened once; it adds its item to the party's
-inventory and is marked looted for the rest of the run.
+## Presentation
 
-### R-013 [done] Zone 1 can be completed end to end
-Chapter 1. A scripted run from entry, through both gates and the cache, to the
-north exit marks Hvítmark Tundra complete.
+### R-044 [done] The arena is a 3D scene
+Core. The main scene is 3D: the round court with its pillars, puddles, brush,
+barrels and gates; the chosen wizard built from `data/wizards.json` and walking
+with the roster's gait; the three enemy silhouettes; bolts, boulders, orbs,
+areas and walls. A perspective camera (FOV 40) sits at (0, 13.5, 12.5) from the
+player, follows them and leans 15% toward the cursor; the mouse aims by a ray
+onto the ground. Pillars between the camera and the player fade.
 
-### R-014 [done] Zones 2 to 6 can be completed
-Chapters 2-6. Each zone has a scripted run test to its exit or boss, built one
-zone at a time in chapter order, in `tests/story/test_r014_zone_runs.gd`:
-pine (loot the north-east cache), keep (reach the court, kill the Warden),
-volcano (cross the lava, break the Colossus), bog (loot the barge, return to the
-landing before dark), cavern (reach the boss dais; the Hollow Warden itself is
-R-019). The keep grid was patched (see `data/zones.json`, row 12, columns 11-12)
-because the court was sealed in the original design.
+### R-045 [done] HUD, menu, pause and death screens
+Core. The menu picks one of the six wizards and starts. The HUD shows health
+and energy, the three queue slots, the spell the queue will cast (shape, name
+in its colour, cost), the element keys 1 to 6, cooldown tiles (cast, area,
+self, dodge), your statuses, and wave / left / kills / score; toasts explain
+refusals (queue full, cancel, no energy, recharging, self-inflicted). Esc
+pauses and shows the grimoire (spells found so far); the death screen shows the
+wave reached, kills, score, damage dealt, self-inflicted damage and spells
+found. R restarts when paused or fallen.
 
-### R-015 [done] Bosses fight in phases and end their zone
-Chapters 3, 4, 6. A `B` pad spawns the zone's boss with health and at least two
-phases; defeating it completes the zone and drops its rune fragment (keep and
-volcano drop fragments 2 and 3; the final boss in the cavern drops none).
-Boss data lives in `data/bosses.json`.
+### R-046 [done] Game feel
+Core. Every enemy attack has a red ground telegraph (thrall wedge, bulwark
+disc, hexcaller aim line). Hits flash enemies for 0.14 s; damage numbers are
+coloured by element (orange for self-damage); big explosions slow time to x0.2
+for 50 ms and shake the screen; status pips sit under enemy health bars; aim
+previews show the cone wedge, area ring and wall strip in the queued spell's
+colour.
 
-### R-016 [done] The campaign follows the route graph
-Overworld. Completing a zone unlocks its connected zones per
-`data/overworld.json`; the cavern stays locked until the bog is complete.
+### R-047 [done] A bot clears the first waves
+Core. `tests/support/arena_bot.gd` plays through ArenaSim with the real rules
+(kiting, mixing elements, dodging telegraphs) and clears wave 3, so the game
+stays playable as the code changes.
 
-### R-017 [done] Progress saves and loads
-Overworld. Completed zones, looted caches and rune fragments survive a quit
-and reload.
+## Retired: the Grauhold Reach campaign
 
-### R-018 [done] Six wizards with different affinities
-Selection. Each of the six wizards (`data/wizards.json`: Aldric, Brann, Vela,
-Morrow, Kessa, and the Hollow Warden's shade, unlocked by finishing the game)
-deals +30% damage with spells that contain one of its elements; together the
-six affinities cover all nine elements exactly once. The overworld lets you
-cycle wizards, the choice is saved, and the wizard's colour is drawn in play.
+The six-zone grid campaign was replaced by Court of Waves. Its requirements are
+kept here for history; their code and tests were removed.
 
-### R-019 [done] Ending
-Chapter 6. The three rune fragments come from the pine cache (1), the Warden of
-the Keep (2) and the Cinder Colossus (3). Defeating the Hollow Warden (the
-cavern boss, `final` in `data/bosses.json`) while holding all three mends the
-Cracked Rune (`cracked_rune_mended` joins the inventory) and plays the ending;
-without all three he cannot be damaged.
-
-### R-020 [done] Non-area spell types
-Chapters 1-6. Beyond aoe (R-006), every spell in `data/spells.json` works:
-projectile (nearest target in range, 50% splash), beam (pierces everything along
-the wizard's facing), vortex (pulls targets in, then damages), summon (damages
-and roots for its duration; bosses cannot be rooted; death_forest also steals
-30% of the damage as health), barrier (a shield for the wizard worth its
-`damage`, lasting its `duration`), buff (rainbow_mist regenerates, crystal_garden
-shields, world_tree makes the wizard invulnerable). Wizard affinity (R-018)
-scales the `damage` of every type.
-
-## Playable flow
-
-Wiring the finished systems into the running game. The logic lives in
-`scripts/core/` (testable headlessly); `scripts/main.gd` is a thin view.
-
-### R-021 [done] A game session ties campaign, save and zones together
-Flow. A new game starts at Hvítmark Tundra with nothing. Only unlocked zones can
-be entered. Completing a zone autosaves; continuing restores completed zones,
-looted caches and the inventory, and a looted cache stays looted when the zone
-is re-entered. Finishing the game is remembered (the mended rune is saved).
-
-### R-022 [done] A zone plays out end to end
-Flow. Entering a zone puts the wizard on the entry, thralls on the enemy spawns
-and the boss on its pad. Each tick runs movement, terrain, gates, enemies, the
-boss, the dark timer and the objective. Stepping on a cache opens it. Spells
-cast from the element queue hit enemies and the boss, and fire spells burn
-destructible tiles in their radius. A zone ends complete, dead or failed.
-
-### R-023 [done] The main scene is a playable menu, overworld, zone and ending
-Flow. Menu (New Game, Continue), an overworld listing the six zones with their
-locked, open and complete state, the zone view with a HUD, a result banner
-after each zone, and an ending screen after the Hollow Warden falls.
-
-
-
-### R-024 [done] Gates open when the thralls are cleared
-Flow. In every zone without a hold rule (all but the tundra), the gates stay
-shut until every thrall in the zone is dead, then open for good. The tundra
-keeps its hold-the-bridge rule: killing thralls does not open its gates.
-
-### R-025 [done] Casting gives visible feedback
-Flow. Each cast leaves an effect at the wizard (the spell's radius, coloured by
-its first element) that fades over 0.4 s; failed casts leave none.
-
-### R-026 [done] The whole game is beatable
-Flow. A scripted bot plays the six zones in order through `GameSession` and
-`ZonePlay` (walking, fighting thralls with spells, killing the three bosses),
-finishes with the ending, and the finished save can be continued with the
-shade unlocked. If this fails, the game has a balance or logic hole.
-
-## Magicka-style presentation
-
-Reference: a Magicka screenshot (element orbs at the bottom-left with letter keys,
-queued orbs on the wizard, floating damage numbers, beams as glowing streaks,
-raised ruined walls). The game stays 2D top-down; these adapt the interface and feel.
-
-### R-027 [done] An element bar and letter keys
-Presentation. The nine elements are bound to letter keys (Q W E R T / A S D F in
-element order) as well as 1-9. The zone HUD shows the nine orbs in two rows with
-their letters, five queue slots, a preview of the spell the queue will cast (its
-name, and whether it is ready or how long until it is), and the wizard's weapon.
-Queued elements also orbit the wizard.
-
-### R-028 [done] Floating damage numbers
-Presentation. A cast shows the damage dealt as a number over each target; damage
-the wizard takes shows in red and health gained from a cast in green. Numbers
-rise and fade within a second.
-
-### R-029 [done] Beams look like beams
-Presentation. Beam spells leave a streak along the wizard's facing for their
-length and width; every other spell leaves its circle.
-
-### R-030 [done] Raised walls and lived-in tiles
-Presentation. Wall and boulder tiles are drawn raised, with a front face where
-nothing solid stands below; floor tiles vary slightly and have slab edges;
-characters have a shadow, thralls and bosses a health bar, and the wizard a hat
-and a staff pointing the way they face.
-
-### R-031 [done] A bottom-centre element queue bar
-Presentation. `ui/element_queue.tscn` is a CanvasLayer holding the exact tree
-`UIBottomCenter` (MarginContainer, bottom-centre anchors, bottom padding) >
-`BackgroundFrame` (TextureRect) > `SlotContainer` (centred HBoxContainer) >
-`Slot1`..`Slot5` (TextureRect, circular frame) > `ElementIcon` (TextureRect,
-ignore texture size, keep aspect centred). Its script keeps up to five queued
-elements in a `PackedStringArray`, `add_element(name)` fills the next empty slot
-with that element's icon and pops the slot (scale 1.0 to 1.2 and back with a
-Tween), and `clear_queue()` empties every slot. Element names map to texture
-paths (Fire, Water, Earth, Nature, Lightning, Ice, Wind, Light, Dark). The game
-mirrors its five-element queue into this bar, all five slots shown.
-
-## Core pillar: combining elements
-
-Bringing the build closer to the core pillar (top of this file): more freedom in
-how elements combine, and Magicka-style mouse controls.
-
-### R-032 [done] Up to five elements combine into one spell
-Core. The queue holds five elements; a sixth is refused. The first two pick the
-spell (R-005); every element after them is an infusion. Each infusion adds 25%
-to the spell's damage (shields and heals included) and 0.5 s to its cooldown;
-an infusion of an element already in the recipe also widens the radius by 15%.
-So fire, fire, fire is a bigger, slower Supernova, and fire, ice, fire, fire is
-a Thermal Shock with two infusions. The preview names the spell with its
-infusion count ("Supernova +1"). Queued orbs spread evenly round the wizard.
-
-### R-033 [done] Click to move, aim with the mouse
-Core. Left-clicking in a zone walks the wizard to that point (stopping when it
-arrives or is blocked); the arrow keys take over and cancel the walk. The
-wizard faces the mouse cursor, so beams fire where you point; right-click aims
-and casts. (WASD is not used for movement: those keys queue elements, R-027.)
-
-### R-034 [done] Characters are drawn in depth order
-Core. The zone world is Y-sorted for a 2.5D look: whoever stands lower on the
-screen is drawn in front. The level is drawn beneath every character and spell
-effects above them.
-
+- R-001 [superseded] The wizard moves in any direction
+- R-002 [superseded] Zone data is valid
+- R-003 [superseded] Spell data is valid
+- R-004 [superseded] A zone grid becomes a playable level
+- R-005 [superseded] Elements queue and combine into spells
+- R-006 [superseded] Spells deal damage with cooldowns
+- R-007 [superseded] The wizard has health and can fall
+- R-008 [superseded] Enemies spawn at E tiles and chase
+- R-009 [superseded] Terrain hazards act on whoever stands in them
+- R-010 [superseded] Chokepoint gates open on objective
+- R-011 [superseded] Destructible tiles break
+- R-012 [superseded] Loot caches grant a rune fragment or item
+- R-013 [superseded] Zone 1 can be completed end to end
+- R-014 [superseded] Zones 2 to 6 can be completed
+- R-015 [superseded] Bosses fight in phases and end their zone
+- R-016 [superseded] The campaign follows the route graph
+- R-017 [superseded] Progress saves and loads
+- R-018 [superseded] Six wizards with different affinities
+- R-019 [superseded] Ending
+- R-020 [superseded] Non-area spell types
+- R-021 [superseded] A game session ties campaign, save and zones together
+- R-022 [superseded] A zone plays out end to end
+- R-023 [superseded] The main scene is a playable menu, overworld, zone and ending
+- R-024 [superseded] Gates open when the thralls are cleared
+- R-025 [superseded] Casting gives visible feedback
+- R-026 [superseded] The whole game is beatable
+- R-027 [superseded] An element bar and letter keys
+- R-028 [superseded] Floating damage numbers
+- R-029 [superseded] Beams look like beams
+- R-030 [superseded] Raised walls and lived-in tiles
+- R-031 [superseded] A bottom-centre element queue bar
+- R-032 [superseded] Up to five elements combine into one spell
+- R-033 [superseded] Click to move, aim with the mouse
+- R-034 [superseded] Characters are drawn in depth order

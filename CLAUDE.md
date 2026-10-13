@@ -37,10 +37,13 @@ Each `test_*` method gets a fresh instance; `before_each()` runs first and
 
 ## Story-driven workflow
 
-The game is Grauhold Reach (2D top-down). Most important: it is a top-down ARPG whose core mechanic is combining
-elements to create spells (see "Core pillar" in `story/STORY.md`). It follows `story/STORY.md`; design mockups are in
-`story/design/` (reference only), game data in `data/*.json` (extracted from them). Requirements are `### R-NNN [status] Title`
-entries (`planned` -> `active` -> `done`).
+The game is Court of Waves (3D, Magicka-style elemental arena: endless waves in a round court). Most important: its
+core mechanic is combining elements to create spells (see "Core pillar" in `story/STORY.md`). It follows `story/STORY.md`;
+the design reference is the playable prototype handed off in `story/design/court_of_waves/` (play
+`Court of Waves - playable.html`; rules in `reference/game/sim.js`). Game data is `data/*.json`; the gameplay numbers in
+`spells.json` / `enemies.json` are final from playtesting, so do not retune them by feel. Older mockups in `story/design/`
+(zones, overworld, weapons) belong to the retired Grauhold Reach campaign. Requirements are `### R-NNN [status] Title`
+entries (`planned` -> `active` -> `done`; retired ones are `superseded` and ignored by the harness).
 
 1. Pick the next `planned` requirement (lowest ID) and set it to `active`.
 2. Write `tests/story/test_rNNN_<name>.gd` first; it should fail.
@@ -60,40 +63,32 @@ a random or auto-generated name.
 
 ## Code layout
 
-- `scripts/core/`: pure game logic (RefCounted/Node2D, no scene tree needed) so it is testable headlessly:
-  `zone_grid` (tiles, gates, loot, terrain), `element_queue`/`spell_book`/`caster` (all seven spell types; see its header), `health`, `enemy`, `boss` (data/bosses.json; the final boss needs the three rune fragments to be damageable and triggers the ending), `campaign` (route graph), `save_game` (JSON save: completed zones, looted caches, inventory), `mover`, `zone_run`, `zone_play` (one zone in play: wizard, thralls, boss, objective, spells, gates, cast effects), `wizard_roster` (data/wizards.json), `controls` (key bindings), `draw_util` (shadows, health bars), `health` (shield/regen/invulnerability), `game_session` (campaign + save + zone entry).
-- `scripts/main.gd` is a thin view: menu -> overworld -> zone -> result -> ... -> ending. Controls: arrows or left-click move,
-  the wizard faces the mouse, Q W E R T / A S D F (or 1-9) queue up to five elements, Space or right-click casts, Esc leaves a zone, Enter continues after a result. `scripts/level.gd` draws a grid.
-  Save file: `user://savegame.json` (autosaved when a zone completes).
-- `harness/run.sh shot WHAT OUT` renders a real frame under Xvfb (WHAT = menu | overworld | zone:<id>); look at it
-  after UI changes. `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
+- `scripts/core/`: pure game logic (RefCounted, no scene tree) so it is testable headlessly:
+  `arena_sim` (the whole fight, a line-for-line port of the prototype's sim.js: `step(input, dt)` at a fixed 60 Hz returns
+  events; positions are `Vector2(x, z)` on the ground; facing angle `face` points along `(sin, cos)`; every element reaction
+  is in `_apply_payload`, keep it that way), `spell_book` (data/spells.json: queue of 3, fire/ice cancel, resolve order,
+  payloads, cost, colour), `enemy_types` (data/enemies.json, `wave_roster(n, rng)`), `wizard_roster` (data/wizards.json:
+  the six wizards' looks; cosmetic only), `controls` (InputMap install, event -> sim action).
+- `scripts/arena/`: the 3D view, which only reads the sim. `arena_view` (court, props, entity sync, telegraphs, particles,
+  lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
+  y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),
+  `enemy_model` (thrall/bulwark/hexcaller silhouettes, walls, hit/freeze/burn tint), `hud` (CanvasLayer: bars, queue
+  slots, spell preview, cooldown tiles, statuses, toasts, enemy health bars + pips, menu/pause grimoire/death screens),
+  `mesh_kit` (primitives that follow three.js conventions: torus in XY, circle facing +Z, XYZ Euler order).
+- `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
+  renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.
+  Controls: WASD move, mouse aims, 1-6 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,
+  Esc pause, R restart.
+- `harness/run.sh shot WHAT OUT [WIZARD]` renders a real frame (WHAT = menu | play | demo | pause | dead | live; uses
+  xvfb-run when present, else the desktop). Look at it after visual changes. `live` runs the real engine loop for 5 s.
+  `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
 - Nodes added to the root during a `--script` run get `_ready` late; scenes under test expose `start()` instead.
 - Avoid lambdas that capture an object which owns the signal's emitter (reference cycle -> leak warnings at exit).
-- Data patch: the design's `keep` court was sealed (the boss pad was unreachable). `data/zones.json` row 12,
-  columns 11-12 were opened (`#` -> `.`) beside the court gate; `story/design/` still shows the original.
-- Pine note: the north-east cache is reachable in 30 steps whether or not the log pile (`D`) is burned, so
-  "burn it or go the long way" is not reflected in the grid; the pine gates are not needed for the objective.
-- `tests/support/bot.gd` + `test_r026_whole_game.gd`: a bot (playing Brann) beats all six zones and the ending
-  through GameSession/ZonePlay, kiting bosses and using shield/regen/invulnerability spells. It keeps the game
-  provably beatable (about 10 s keep, 20 s volcano, 40 s final boss at last run). Balance knobs: boss health and
-  damage in `data/bosses.json` (6000 / 10000 / 18000 hp), the 0.8 s global cooldown in `caster.gd`. Without the
-  global cooldown the bot burst 4000 damage in a second. Boss tests use the boss's own max health, so retuning
-  needs no test edits; re-run the bot test to check the game is still beatable. Not playtested by a human.
-- Presentation (Magicka-inspired, R-027 to R-030): `scripts/hud.gd` (element bar, queue slots, spell preview), `effects_view.gd`
-  (circles, beams, floating numbers), `level.gd` (raised walls, tile variation). The logic they show (popups, effects,
-  `queue_preview`, `cooldown_left`) lives in ZonePlay/Caster and is unit-tested; check the look with `run.sh shot ... demo`.
-- Element queue bar (R-031): `ui/element_queue.tscn` + `ui/element_queue.gd` (CanvasLayer > UIBottomCenter > BackgroundFrame >
-  SlotContainer > Slot1..5 > ElementIcon). `add_element("Fire")`, `clear_queue()`, `sync_queue([...])`; main mirrors the game's
-  five-element queue into it. Textures are generated placeholders: `python3 tools/make_ui_placeholders.py`
-  (replace the PNGs in `ui/` with real art; keep the paths). The window is 832x700: the 576 px map is pinned to the top and the
-  bottom strip is the spell UI, so nothing covers the spawn tiles.
-- Element combining (R-032): `ElementQueue.spell_for(elements)` is the one place a queue becomes a spell: the first two
-  elements pick the recipe (exact order, else reversed, else a bolt of the first); elements 3-5 are infusions (+25% damage
-  and +0.5 s cooldown each, +15% radius when the element is in the recipe). It returns a copy; cooldowns key on the base id.
-  The bot only casts pairs, so infusions are extra power for a human player on top of the proven-beatable baseline.
-- Mouse (R-033): `ZonePlay.move_to(point)` / `aim_at(point)`; `main.handle_zone_mouse(event, point)` routes clicks. The world
-  node is Y-sorted (R-034): level `z_index -1`, effects `+1`. Movement stays grid-based (`Mover`), not CharacterBody2D.
+- `tests/support/arena_fixture.gd` (quiet sim, ticking helpers), `main_fixture.gd` (the real main scene in play mode),
+  `arena_bot.gd` + `test_r047_bot_clears_waves.gd`: a bot (kite, Torrent then Arc, Thunderflare at range, dodge
+  telegraphs, avoid puddles when it would cast lightning) clears wave 3 in about 53 s of game time with no self-damage
+  (seed 11). Re-run it after any rules change. Not playtested by a human.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
 - `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
   milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects
-  (any folder containing a `project.godot`). It is deliberately independent of the Grauhold Reach code (different spell model).
+  (any folder containing a `project.godot`). It is deliberately independent of the Court of Waves code (different spell model).
