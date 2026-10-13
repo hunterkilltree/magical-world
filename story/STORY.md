@@ -43,7 +43,7 @@ to `active` and write its test first. A retired requirement is `superseded`
 
 ## The spell system
 
-### R-035 [done] The spell book turns a queue into a spell
+### R-037 [done] The spell book turns a queue into a spell
 Core. `data/spells.json` loads as is. The queue holds three elements; a fourth
 is refused, and queuing fire removes a queued ice (and the other way round)
 instead of adding. Resolve order: the exact key with repeats (earth+earth is
@@ -56,7 +56,7 @@ Each element adds its hit to the payload (fire burn, water wet + knockback, ice
 chill, lightning shock, earth heavy damage + knockback, arcane raw damage),
 scaled by the combo's multiplier.
 
-### R-036 [done] Elements react in one place
+### R-038 [done] Elements react in one place
 Core. Every hit goes through one function, in this order. Water puts out
 burning (STEAM) and soaks. Fire on a wet target dries it (STEAM), on a frozen
 one thaws it, otherwise burns for 3 s. Ice on a burning target puts it out, on
@@ -66,7 +66,7 @@ three stacks freeze for 1.8 s). Damage per element is scaled by the enemy's
 target does x2.2 and breaks the freeze (SHATTER). Frozen or shocked enemies
 lose their windup (INTERRUPTED).
 
-### R-037 [done] The wizard moves, dodges and spends energy
+### R-039 [done] The wizard moves, dodges and spends energy
 Core. WASD moves at 5.4 m/s inside the walkable radius (14.1 m); the wizard
 faces the cursor. Energy is 100 and regenerates 18/s; a spell costs its cost.
 Casts share a cooldown of min(the shape's cooldown, 0.45 s); areas (2.2 s)
@@ -75,7 +75,7 @@ recasts the last spell once the queue is empty. Space dodges for 0.26 s at
 13.5 m/s (cooldown 1 s): no direct hit lands during it, damage over time still
 does. Health is 100; at 0 the run ends.
 
-### R-038 [done] Six spell shapes
+### R-040 [done] Six spell shapes
 Core. A cone (Spray) hits everything in its arc at once, weaker at the edge; a
 bolt flies, can come in a fan and pierce; a chain arcs instantly to the
 nearest enemy ahead, then jumps on (x0.85 each jump); a boulder flies heavy,
@@ -85,14 +85,14 @@ pulls, Starfall lands a second later); a wall (Barrier) raises segments that
 block enemies and their shots but not yours, and break when their health runs
 out (fire melts an ice wall three times as fast).
 
-### R-039 [done] Casting around you and on yourself
+### R-041 [done] Casting around you and on yourself
 Core. Right click (or E) casts the queue around you for x1.3 energy (3 s
 cooldown): areas centre on you, walls ring you, anything else blasts 3.4 m with
 extra knockback. F casts on yourself for x0.5 energy (1.4 s cooldown): fire
 thaws, water cleanses and soaks, ice cools and chills, lightning hastes and
 zaps you, earth gives stoneskin (half damage), arcane a ward that soaks 25.
 
-### R-040 [done] Careless casting hurts you
+### R-042 [done] Careless casting hurts you
 Core. Your own explosions catch you (x0.45 for explosive bolts, x0.3 for
 splash), a point-blank explosive cast around you hits you for x0.25, Starfall
 for x0.6 if you stand under it, freezing fields and storm pools hit you when you
@@ -101,7 +101,7 @@ The HUD names the cause.
 
 ## Enemies and waves
 
-### R-041 [done] Three enemies with readable attacks
+### R-043 [done] Three enemies with readable attacks
 Core. `data/enemies.json`. The Grave Thrall chases, winds up 0.5 s, lunges for
 10 and recovers, and claws walls in its way. The Iron Bulwark is slow, its 65
 degree front shield blocks bolts (boulders get through; it drops while frozen,
@@ -109,7 +109,7 @@ shocked or winding up), and it slams a 2.2 m disc for 22 that breaks walls. The
 Hexcaller keeps 6.5 to 9.5 m away, strafes, charges 0.85 s and fires a slow orb
 that can be dodged and is blocked by walls.
 
-### R-042 [done] Endless waves
+### R-044 [done] Endless waves
 Core. Wave n brings 3 + 1.5n thralls, hexcallers from wave 2 and bulwarks from
 wave 3 (the counts in `enemies.json`'s `waves_preview`), with health x(1 +
 0.12(n-1)) and up to +25% speed. They rise for 0.9 s at the three gates
@@ -117,7 +117,7 @@ farthest from you. Clearing a wave heals 35%, refills energy, restores the
 barrels and gives a 3.5 s break. Each kill scores the enemy's score x(1 +
 0.25(wave-1)).
 
-### R-043 [done] The arena reacts
+### R-045 [done] The arena reacts
 Core. Puddles wet anyone standing in them; lightning charges a puddle for 2.6 s
 (5 damage every 0.45 s), ice freezes it for 10 s (chilling anyone on it), fire
 thaws it. Dry brush catches from fire or burning bodies, burns 5 s, spreads to
@@ -126,7 +126,7 @@ barrels detonate from fire, lightning, arcane or a blast (2.8 m, x0.7 to you).
 
 ## Presentation
 
-### R-044 [done] The arena is a 3D scene
+### R-046 [done] The arena is a 3D scene
 Core. The main scene is 3D: the round court with its pillars, puddles, brush,
 barrels and gates; the chosen wizard built from `data/wizards.json` and walking
 with the roster's gait; the three enemy silhouettes; bolts, boulders, orbs,
@@ -134,7 +134,7 @@ areas and walls. A perspective camera (FOV 40) sits at (0, 13.5, 12.5) from the
 player, follows them and leans 15% toward the cursor; the mouse aims by a ray
 onto the ground. Pillars between the camera and the player fade.
 
-### R-045 [done] HUD, menu, pause and death screens
+### R-047 [done] HUD, menu, pause and death screens
 Core. The menu picks one of the six wizards and starts. The HUD shows health
 and energy, the three queue slots, the spell the queue will cast (shape, name
 in its colour, cost), the element keys 1 to 6, cooldown tiles (cast, area,
@@ -144,7 +144,7 @@ pauses and shows the grimoire (spells found so far); the death screen shows the
 wave reached, kills, score, damage dealt, self-inflicted damage and spells
 found. R restarts when paused or fallen.
 
-### R-046 [done] Game feel
+### R-048 [done] Game feel
 Core. Every enemy attack has a red ground telegraph (thrall wedge, bulwark
 disc, hexcaller aim line). Hits flash enemies for 0.14 s; damage numbers are
 coloured by element (orange for self-damage); big explosions slow time to x0.2
@@ -152,7 +152,7 @@ for 50 ms and shake the screen; status pips sit under enemy health bars; aim
 previews show the cone wedge, area ring and wall strip in the queued spell's
 colour.
 
-### R-047 [done] A bot clears the first waves
+### R-049 [done] A bot clears the first waves
 Core. `tests/support/arena_bot.gd` plays through ArenaSim with the real rules
 (kiting, mixing elements, dodging telegraphs) and clears wave 3, so the game
 stays playable as the code changes.
@@ -196,3 +196,5 @@ kept here for history; their code and tests were removed.
 - R-032 [superseded] Up to five elements combine into one spell
 - R-033 [superseded] Click to move, aim with the mouse
 - R-034 [superseded] Characters are drawn in depth order
+- R-035 [superseded] Zones are the design's 3D dioramas under a Magicka-style camera
+- R-036 [superseded] The wizards are the design's 3D models

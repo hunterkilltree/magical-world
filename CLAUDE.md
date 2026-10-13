@@ -82,10 +82,12 @@ a random or auto-generated name.
 - `harness/run.sh shot WHAT OUT [WIZARD]` renders a real frame (WHAT = menu | play | demo | pause | dead | live; uses
   xvfb-run when present, else the desktop). Look at it after visual changes. `live` runs the real engine loop for 5 s.
   `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).
+- Rendering is Compatibility: glow bleeds over the whole frame and tonemap white is ignored, so keep lights and
+  emission low enough that nothing clips. Headless runs have a 64x64 viewport, so never assume window-size pixels in tests.
 - Nodes added to the root during a `--script` run get `_ready` late; scenes under test expose `start()` instead.
 - Avoid lambdas that capture an object which owns the signal's emitter (reference cycle -> leak warnings at exit).
 - `tests/support/arena_fixture.gd` (quiet sim, ticking helpers), `main_fixture.gd` (the real main scene in play mode),
-  `arena_bot.gd` + `test_r047_bot_clears_waves.gd`: a bot (kite, Torrent then Arc, Thunderflare at range, dodge
+  `arena_bot.gd` + `test_r049_bot_clears_waves.gd`: a bot (kite, Torrent then Arc, Thunderflare at range, dodge
   telegraphs, avoid puddles when it would cast lightning) clears wave 3 in about 53 s of game time with no self-damage
   (seed 11). Re-run it after any rules change. Not playtested by a human.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
