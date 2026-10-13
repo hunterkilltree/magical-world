@@ -1,479 +1,328 @@
 {
- "elements": [
-  "fire",
-  "water",
-  "earth",
-  "nature",
-  "lightning",
-  "ice",
-  "wind",
-  "light",
-  "dark"
- ],
- "spells": [
-  {
-   "id": "supernova",
-   "name": "Supernova",
-   "recipe": [
-    "fire",
-    "fire"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 850,
-   "radius": 180,
-   "duration": 10,
-   "cooldown": 8,
-   "description": "Multi-stage massive explosion creating a fiery sea that lingers for 10 seconds.",
-   "effect": "Inflicts Severe Burning for 10s"
+  "max_queue": 3,
+  "cancels": {
+    "fire": "ice",
+    "ice": "fire"
   },
-  {
-   "id": "steam_bomb",
-   "name": "Steam Bomb",
-   "recipe": [
-    "fire",
-    "water"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 100,
-   "radius": 220,
-   "duration": 8,
-   "cooldown": 5,
-   "description": "A massive burst of scalding brownish-amber steam spreading over a vast radius.",
-   "effect": "Scalding steam fog obscuring wide area"
+  "elements": {
+    "fire": {
+      "key": "1",
+      "name": "Fire",
+      "color": 16738859,
+      "hit": {
+        "dmg": 6,
+        "burn": 3,
+        "burnDps": 5
+      },
+      "self": {
+        "burn": 2,
+        "thaw": 1
+      }
+    },
+    "water": {
+      "key": "2",
+      "name": "Water",
+      "color": 4037631,
+      "hit": {
+        "dmg": 0,
+        "knock": 4,
+        "wet": 4
+      },
+      "self": {
+        "cleanse": 1,
+        "wet": 5
+      }
+    },
+    "ice": {
+      "key": "3",
+      "name": "Ice",
+      "color": 11070719,
+      "hit": {
+        "dmg": 5,
+        "chill": 1
+      },
+      "self": {
+        "cool": 1,
+        "chill": 1
+      }
+    },
+    "lightning": {
+      "key": "4",
+      "name": "Lightning",
+      "color": 16048476,
+      "hit": {
+        "dmg": 9,
+        "shock": 0.25
+      },
+      "self": {
+        "haste": 3,
+        "zap": 6
+      }
+    },
+    "earth": {
+      "key": "5",
+      "name": "Earth",
+      "color": 11761983,
+      "hit": {
+        "dmg": 12,
+        "knock": 3
+      },
+      "self": {
+        "stoneskin": 4
+      }
+    },
+    "arcane": {
+      "key": "6",
+      "name": "Arcane",
+      "color": 13650943,
+      "hit": {
+        "dmg": 11
+      },
+      "self": {
+        "ward": 25
+      }
+    }
   },
-  {
-   "id": "wildfire",
-   "name": "Wildfire",
-   "recipe": [
-    "fire",
-    "nature"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 560,
-   "radius": 200,
-   "duration": 8,
-   "cooldown": 7,
-   "description": "Grass patches sprout across the ground, instantly bursting into a roaring inferno.",
-   "effect": "Sprouts grass that ignites into clustered infernos"
+  "shapes": {
+    "cone": {
+      "label": "Spray",
+      "cost": 1,
+      "cd": 0.45
+    },
+    "bolt": {
+      "label": "Bolt",
+      "cost": 1,
+      "cd": 0.3
+    },
+    "chain": {
+      "label": "Chain",
+      "cost": 1.2,
+      "cd": 0.5
+    },
+    "boulder": {
+      "label": "Heavy",
+      "cost": 1.4,
+      "cd": 0.85
+    },
+    "area": {
+      "label": "Area",
+      "cost": 1.6,
+      "cd": 2.2
+    },
+    "wall": {
+      "label": "Barrier",
+      "cost": 1.5,
+      "cd": 3
+    }
   },
-  {
-   "id": "magma_burst",
-   "name": "Magma Burst",
-   "recipe": [
-    "fire",
-    "earth"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 620,
-   "radius": 140,
-   "duration": 7,
-   "cooldown": 6,
-   "description": "Melts earth into molten magma, slowing enemies and burning them to ashes.",
-   "effect": "Creates slow magma pool"
-  },
-  {
-   "id": "fire_tornado",
-   "name": "Fire Tornado",
-   "recipe": [
-    "fire",
-    "wind"
-   ],
-   "category": "fire",
-   "type": "vortex",
-   "damage": 700,
-   "radius": 150,
-   "duration": 5,
-   "cooldown": 8,
-   "description": "Flaming vortex pulling enemies toward its center while immolating them.",
-   "effect": "Vortex pull effect"
-  },
-  {
-   "id": "plasma_spear",
-   "name": "Plasma Spear",
-   "recipe": [
-    "fire",
-    "lightning"
-   ],
-   "category": "fire",
-   "type": "beam",
-   "damage": 920,
-   "radius": 40,
-   "duration": 1.5,
-   "cooldown": 6,
-   "description": "Ultra-high voltage plasma ray piercing multiple lined-up targets instantly.",
-   "effect": "Armor piercing beam"
-  },
-  {
-   "id": "hellfire",
-   "name": "Hellfire",
-   "recipe": [
-    "fire",
-    "dark"
-   ],
-   "category": "fire",
-   "type": "projectile",
-   "damage": 880,
-   "radius": 90,
-   "duration": 4,
-   "cooldown": 7,
-   "description": "Dark arcane flames bypassing all elemental resistance of monsters.",
-   "effect": "Bypasses magic defense"
-  },
-  {
-   "id": "solar_flare",
-   "name": "Solar Flare",
-   "recipe": [
-    "fire",
-    "light"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 500,
-   "radius": 220,
-   "duration": 4,
-   "cooldown": 9,
-   "description": "Blinding coronal flare causing temporary blindness and stun.",
-   "effect": "Blinds & Stuns for 3.5s"
-  },
-  {
-   "id": "thermal_shock",
-   "name": "Thermal Shock",
-   "recipe": [
-    "fire",
-    "ice"
-   ],
-   "category": "fire",
-   "type": "aoe",
-   "damage": 980,
-   "radius": 130,
-   "duration": 2,
-   "cooldown": 8,
-   "description": "Instantly freezes targets then erupts in violent explosion from thermal flux.",
-   "effect": "Shatter Bonus Crit Damage"
-  },
-  {
-   "id": "tsunami",
-   "name": "Tsunami",
-   "recipe": [
-    "water",
-    "water"
-   ],
-   "category": "water",
-   "type": "aoe",
-   "damage": 480,
-   "radius": 240,
-   "duration": 3,
-   "cooldown": 7,
-   "description": "Gigantic wave sweeping away projectiles and knocking back monster hordes.",
-   "effect": "Massive knockback + projectile reflect"
-  },
-  {
-   "id": "whirlpool",
-   "name": "Whirlpool",
-   "recipe": [
-    "water",
-    "wind"
-   ],
-   "category": "water",
-   "type": "vortex",
-   "damage": 520,
-   "radius": 170,
-   "duration": 6,
-   "cooldown": 7,
-   "description": "Swirling water vortex pulling all surrounding enemies into its center.",
-   "effect": "Continuous suction + Wet status"
-  },
-  {
-   "id": "living_vines",
-   "name": "Living Vines",
-   "recipe": [
-    "water",
-    "nature"
-   ],
-   "category": "water",
-   "type": "summon",
-   "damage": 380,
-   "radius": 130,
-   "duration": 5,
-   "cooldown": 6,
-   "description": "Giant magical vines growing rapidly to bind and immobilize targets.",
-   "effect": "Root / Immobilize for 5s"
-  },
-  {
-   "id": "mud_prison",
-   "name": "Mud Prison",
-   "recipe": [
-    "water",
-    "earth"
-   ],
-   "category": "water",
-   "type": "aoe",
-   "damage": 350,
-   "radius": 150,
-   "duration": 7,
-   "cooldown": 6,
-   "description": "Thick mire erupting underneath, severely slowing and trapping enemies.",
-   "effect": "80% Movement Slow"
-  },
-  {
-   "id": "thunder_pool",
-   "name": "Thunder Pool",
-   "recipe": [
-    "water",
-    "lightning"
-   ],
-   "category": "water",
-   "type": "aoe",
-   "damage": 750,
-   "radius": 180,
-   "duration": 5,
-   "cooldown": 6,
-   "description": "Electrically charged pool conducting chain lightning across the surface.",
-   "effect": "Chain lightning propagation"
-  },
-  {
-   "id": "abyss_water",
-   "name": "Abyss Water",
-   "recipe": [
-    "water",
-    "dark"
-   ],
-   "category": "water",
-   "type": "beam",
-   "damage": 640,
-   "radius": 80,
-   "duration": 4,
-   "cooldown": 7,
-   "description": "Deep abyss torrent draining target magic power and inflicting weakness.",
-   "effect": "Mana drain & attack reduction"
-  },
-  {
-   "id": "rainbow_mist",
-   "name": "Rainbow Mist",
-   "recipe": [
-    "water",
-    "light"
-   ],
-   "category": "water",
-   "type": "buff",
-   "damage": 0,
-   "radius": 160,
-   "duration": 8,
-   "cooldown": 10,
-   "description": "Enchanted iridescent mist continuously regenerating wizard life force.",
-   "effect": "+120 Health Regen per sec"
-  },
-  {
-   "id": "glacier_prison",
-   "name": "Glacier Prison",
-   "recipe": [
-    "water",
-    "ice"
-   ],
-   "category": "water",
-   "type": "summon",
-   "damage": 510,
-   "radius": 150,
-   "duration": 6,
-   "cooldown": 8,
-   "description": "Eternal permafrost pillar encasing all enemies in solid crystal ice.",
-   "effect": "Absolute Freeze for 6s"
-  },
-  {
-   "id": "mountain_rise",
-   "name": "Mountain Rise",
-   "recipe": [
-    "earth",
-    "water"
-   ],
-   "category": "earth",
-   "type": "barrier",
-   "damage": 300,
-   "radius": 120,
-   "duration": 8,
-   "cooldown": 6,
-   "description": "Erects massive stone barrier stopping enemy projectiles and blocking paths.",
-   "effect": "Solid bulletproof wall"
-  },
-  {
-   "id": "forest_fortress",
-   "name": "Forest Fortress",
-   "recipe": [
-    "earth",
-    "nature"
-   ],
-   "category": "earth",
-   "type": "barrier",
-   "damage": 200,
-   "radius": 140,
-   "duration": 10,
-   "cooldown": 12,
-   "description": "Dense ancient wooden citadel shielding allies and absorbing damage.",
-   "effect": "+75% Armor Shield"
-  },
-  {
-   "id": "magnetic_field",
-   "name": "Magnetic Field",
-   "recipe": [
-    "earth",
-    "lightning"
-   ],
-   "category": "earth",
-   "type": "barrier",
-   "damage": 410,
-   "radius": 170,
-   "duration": 6,
-   "cooldown": 8,
-   "description": "Pulsing magnetic zone repelling metallic projectiles and disarming foes.",
-   "effect": "Deflects 100% projectiles"
-  },
-  {
-   "id": "graveyard",
-   "name": "Graveyard",
-   "recipe": [
-    "earth",
-    "dark"
-   ],
-   "category": "earth",
-   "type": "summon",
-   "damage": 690,
-   "radius": 110,
-   "duration": 5,
-   "cooldown": 9,
-   "description": "Drags targets into dark shadow graves, trapping them under dark soil.",
-   "effect": "Buries targets & silences spells"
-  },
-  {
-   "id": "crystal_garden",
-   "name": "Crystal Garden",
-   "recipe": [
-    "earth",
-    "light"
-   ],
-   "category": "earth",
-   "type": "buff",
-   "damage": 350,
-   "radius": 130,
-   "duration": 7,
-   "cooldown": 9,
-   "description": "Prismatic crystal clusters reflecting incoming damage back at attackers.",
-   "effect": "Reflects 50% damage back"
-  },
-  {
-   "id": "sandstorm",
-   "name": "Sandstorm",
-   "recipe": [
-    "earth",
-    "wind"
-   ],
-   "category": "earth",
-   "type": "vortex",
-   "damage": 480,
-   "radius": 190,
-   "duration": 6,
-   "cooldown": 7,
-   "description": "Blinding desert gale obscuring vision and dealing continuous abrasion.",
-   "effect": "-60% Enemy Accuracy"
-  },
-  {
-   "id": "divine_judgement",
-   "name": "Divine Judgement",
-   "recipe": [
-    "light",
-    "light"
-   ],
-   "category": "light_dark",
-   "type": "beam",
-   "damage": 1200,
-   "radius": 100,
-   "duration": 2,
-   "cooldown": 12,
-   "description": "Holy beam smiting down from the heavens, obliterating dark beings.",
-   "effect": "Smite burst + Pure Holy status"
-  },
-  {
-   "id": "photon_railgun",
-   "name": "Photon Railgun",
-   "recipe": [
-    "light",
-    "lightning"
-   ],
-   "category": "light_dark",
-   "type": "beam",
-   "damage": 1100,
-   "radius": 35,
-   "duration": 0.8,
-   "cooldown": 8,
-   "description": "Instant light-speed photon ray piercing through entire battlefields.",
-   "effect": "Instantaneous hit scan"
-  },
-  {
-   "id": "black_hole",
-   "name": "Black Hole",
-   "recipe": [
-    "dark",
-    "dark"
-   ],
-   "category": "light_dark",
-   "type": "vortex",
-   "damage": 1400,
-   "radius": 200,
-   "duration": 6,
-   "cooldown": 15,
-   "description": "Singularity swallowing all nearby projectiles, debris, and monsters.",
-   "effect": "Absorbs all entity projectiles"
-  },
-  {
-   "id": "shadow_storm",
-   "name": "Shadow Storm",
-   "recipe": [
-    "dark",
-    "wind"
-   ],
-   "category": "light_dark",
-   "type": "aoe",
-   "damage": 720,
-   "radius": 170,
-   "duration": 5,
-   "cooldown": 7,
-   "description": "Dark tempest disorienting monsters and dealing chaotic dark damage.",
-   "effect": "Turns monsters against each other"
-  },
-  {
-   "id": "death_forest",
-   "name": "Death Forest",
-   "recipe": [
-    "dark",
-    "nature"
-   ],
-   "category": "light_dark",
-   "type": "summon",
-   "damage": 650,
-   "radius": 180,
-   "duration": 8,
-   "cooldown": 9,
-   "description": "Cursed necrotic woods draining health from monsters continuously.",
-   "effect": "Lifesteal 30% to Wizard"
-  },
-  {
-   "id": "world_tree",
-   "name": "World Tree",
-   "recipe": [
-    "nature",
-    "nature"
-   ],
-   "category": "light_dark",
-   "type": "buff",
-   "damage": 0,
-   "radius": 250,
-   "duration": 12,
-   "cooldown": 20,
-   "description": "Mythical Yggdrasil sprout bestowing revive blessing and full heal.",
-   "effect": "Full invulnerability & revive charge"
+  "combos": {
+    "fire": {
+      "name": "Flame Gout",
+      "shape": "cone",
+      "range": 4.6,
+      "arc": 55,
+      "mult": 1.5,
+      "desc": "Short gout of flame. Sets targets burning."
+    },
+    "water": {
+      "name": "Torrent",
+      "shape": "cone",
+      "range": 5.6,
+      "arc": 40,
+      "mult": 1,
+      "knock": 10,
+      "desc": "Pressure jet — shoves enemies back and soaks them."
+    },
+    "ice": {
+      "name": "Ice Shards",
+      "shape": "bolt",
+      "count": 3,
+      "spread": 9,
+      "speed": 22,
+      "mult": 0.9,
+      "radius": 0.18,
+      "desc": "Three fast shards. Three chill stacks freeze."
+    },
+    "lightning": {
+      "name": "Arc",
+      "shape": "chain",
+      "range": 7.5,
+      "jumps": 2,
+      "mult": 1.1,
+      "desc": "Instant arc, jumps to two more. Double on wet targets."
+    },
+    "earth": {
+      "name": "Hurled Stone",
+      "shape": "boulder",
+      "speed": 11,
+      "mult": 2,
+      "splash": 1.3,
+      "knock": 8,
+      "desc": "Heavy rock. Shatters frozen enemies for double."
+    },
+    "arcane": {
+      "name": "Arcane Bolt",
+      "shape": "bolt",
+      "speed": 26,
+      "mult": 1.4,
+      "pierce": 1,
+      "radius": 0.22,
+      "desc": "Fast bolt of raw energy that pierces one target."
+    },
+    "earth+earth": {
+      "name": "Stone Rampart",
+      "shape": "wall",
+      "segments": 5,
+      "hp": 140,
+      "life": 10,
+      "mat": "stone",
+      "desc": "Stone wall. Blocks enemies and their shots; yours pass."
+    },
+    "fire+lightning": {
+      "name": "Thunderflare",
+      "shape": "bolt",
+      "speed": 18,
+      "mult": 1.3,
+      "explode": 2.6,
+      "radius": 0.3,
+      "desc": "Explosive bolt. Do not fire it point-blank."
+    },
+    "ice+water": {
+      "name": "Hoarfrost Field",
+      "shape": "area",
+      "radius": 3,
+      "life": 3,
+      "tick": 0.5,
+      "mult": 0.5,
+      "hitsAll": true,
+      "desc": "Freezes everything inside it — you included."
+    },
+    "earth+fire": {
+      "name": "Molten Core",
+      "shape": "boulder",
+      "speed": 10,
+      "mult": 1.7,
+      "splash": 1.8,
+      "leaves": {
+        "radius": 1.8,
+        "life": 3.5,
+        "tick": 0.5,
+        "mult": 0.25
+      },
+      "desc": "Molten boulder that leaves burning ground."
+    },
+    "lightning+water": {
+      "name": "Storm Pool",
+      "shape": "area",
+      "radius": 2.8,
+      "life": 3.5,
+      "tick": 0.45,
+      "mult": 0.6,
+      "hitsAll": true,
+      "desc": "Electrified pool. Shocks anyone standing in it."
+    },
+    "earth+ice": {
+      "name": "Rime Bulwark",
+      "shape": "wall",
+      "segments": 6,
+      "hp": 80,
+      "life": 9,
+      "mat": "ice",
+      "touchChill": true,
+      "desc": "Ice wall that chills attackers. Fire melts it."
+    },
+    "arcane+fire": {
+      "name": "Hexfire Comet",
+      "shape": "bolt",
+      "speed": 16,
+      "mult": 1.2,
+      "explode": 2.3,
+      "radius": 0.3,
+      "desc": "Arcane fireball with a wide magical blast."
+    },
+    "arcane+earth": {
+      "name": "Runestone",
+      "shape": "boulder",
+      "speed": 10,
+      "mult": 1.6,
+      "explode": 2.6,
+      "desc": "Rune-charged boulder that detonates on impact."
+    },
+    "arcane+ice": {
+      "name": "Prism Lances",
+      "shape": "bolt",
+      "count": 5,
+      "spread": 7,
+      "speed": 24,
+      "mult": 0.75,
+      "pierce": 2,
+      "radius": 0.16,
+      "desc": "Five piercing lances in a fan."
+    },
+    "arcane+lightning": {
+      "name": "Ley Arc",
+      "shape": "chain",
+      "range": 9,
+      "jumps": 5,
+      "mult": 1,
+      "desc": "Long chain that jumps through five enemies."
+    },
+    "arcane+water": {
+      "name": "Undertow",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 2.6,
+      "tick": 0.4,
+      "mult": 0.25,
+      "pull": 7,
+      "desc": "Vortex that drags enemies to its centre."
+    },
+    "fire+water": {
+      "name": "Scalding Steam",
+      "shape": "cone",
+      "range": 5,
+      "arc": 60,
+      "mult": 1.6,
+      "knock": 4,
+      "desc": "Steam cone — heavy damage, no burn."
+    },
+    "earth+water": {
+      "name": "Mudslide",
+      "shape": "cone",
+      "range": 5.2,
+      "arc": 50,
+      "mult": 0.8,
+      "knock": 14,
+      "slow": 2.5,
+      "desc": "Mud wave — huge knockback, mires enemies."
+    },
+    "earth+lightning": {
+      "name": "Lodestone",
+      "shape": "boulder",
+      "speed": 11,
+      "mult": 1.6,
+      "splash": 1.4,
+      "chainOnImpact": 3,
+      "desc": "Boulder that discharges into three nearby enemies."
+    },
+    "ice+lightning": {
+      "name": "Rime Arc",
+      "shape": "chain",
+      "range": 8,
+      "jumps": 3,
+      "mult": 0.9,
+      "desc": "Chain that chills every target it jumps through."
+    },
+    "arcane+fire+lightning": {
+      "name": "Starfall",
+      "shape": "area",
+      "radius": 3.2,
+      "delay": 1,
+      "life": 0.01,
+      "mult": 2.4,
+      "burst": true,
+      "hitsAll": true,
+      "desc": "Marks the ground; a star lands a second later."
+    }
   }
- ]
 }

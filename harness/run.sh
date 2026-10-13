@@ -5,7 +5,7 @@
 #   harness/run.sh test [filter]  run tests/test_*.gd
 #   harness/run.sh reqs           every active/done requirement in story/STORY.md has a test
 #   harness/run.sh story          run tests, regenerate story/progress.md
-#   harness/run.sh shot WHAT OUT render a frame to a PNG (needs xvfb-run); WHAT = menu | overworld | zone:<id>  [WIZARD_ID [cast]]
+#   harness/run.sh shot WHAT OUT render a frame to a PNG (a desktop, or xvfb-run); WHAT = menu | play | demo | pause | dead  [WIZARD_ID]
 #   harness/run.sh all            check + boot + reqs + story
 # Set GODOT=/path/to/godot if it is not on PATH as godot or godot4.
 set -u
@@ -64,9 +64,14 @@ cmd_test() {
 source harness/reqs.sh
 
 cmd_shot() {
-  command -v xvfb-run >/dev/null 2>&1 || { echo "shot: xvfb-run not found" >&2; return 127; }
-  xvfb-run -a -s "-screen 0 832x700x24" timeout "$TIMEOUT_S" "$GODOT_BIN" --path . --rendering-driver opengl3 \
-    --script res://harness/screenshot.gd -- "${1:-menu}" "${2:-/tmp/shot.png}" "${3:-}" "${4:-}" 2>&1 | grep -E "saved|ERROR"
+  local out="${2:-shot.png}"
+  case "$out" in /*|[A-Za-z]:*) ;; *) out="$PWD/$out" ;; esac
+  command -v cygpath >/dev/null 2>&1 && out="$(cygpath -m "$out")"
+  if command -v xvfb-run >/dev/null 2>&1; then
+    xvfb-run -a -s "-screen 0 1280x720x24" timeout "$TIMEOUT_S" "$GODOT_BIN" --path . --rendering-driver opengl3       --script res://harness/screenshot.gd -- "${1:-menu}" "$out" "${3:-}" 2>&1 | grep -E "saved|ERROR"
+  else
+    timeout "$TIMEOUT_S" "$GODOT_BIN" --path . --resolution 1280x720       --script res://harness/screenshot.gd -- "${1:-menu}" "$out" "${3:-}" 2>&1 | grep -E "saved|ERROR"
+  fi
 }
 
 case "${1:-all}" in

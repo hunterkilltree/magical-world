@@ -1,8 +1,9 @@
 # Magical World
 
-Grauhold Reach: a 2D top-down spellcasting action game (element combos, six zones,
-three bosses). Story and requirements: `story/STORY.md`. Game data: `data/`.
-Design mockups: `story/design/`.
+Court of Waves: a 3D elemental arena game in the style of Magicka. Queue up to three of six
+elements, cast, and the mix decides the spell; survive endless waves of thralls, bulwarks and
+hexcallers. Story and requirements: `story/STORY.md`. Game data: `data/`. Design reference (the
+playable prototype and its source): `story/design/court_of_waves/`.
 
 A Godot 4 project (GDScript) with a headless dev harness for verifying changes
 without opening the editor.
@@ -15,11 +16,23 @@ without opening the editor.
 
 ## Playing
 
-Open the project in Godot and run it (F5). Menu -> New Game / Continue -> overworld with the six zones.
-Arrows move, **Q W E R T / A S D F** queue an element (fire, water, earth, nature, lightning / ice, wind, light, dark;
-the digits 1-9 work too, in the same order), **Space** casts the queued pair, **Esc** leaves a zone, **Enter** continues after a
-result. The bottom-centre bar shows the elements you have queued (the left panel is a key reference); the line above it names the spell the queue will cast. Stepping on a gold tile opens a cache. Pick a wizard on the overworld screen: each deals +30% damage with spells containing its elements (the sixth, the Hollow Warden's shade, unlocks after the ending). Beams fire along the way you last moved; in every zone except the tundra the gates open when all thralls are dead. Completing a zone autosaves. Collect three rune fragments
-(pine cache, the Warden of the Keep, the Cinder Colossus) and the Hollow Warden can finally be hurt.
+Open the project in Godot and run it (F5). Pick one of the six wizards and enter the court.
+
+| Input | Action |
+|-------|--------|
+| W A S D | Move |
+| Mouse | Aim |
+| 1 - 6 | Queue fire, water, ice, lightning, earth, arcane (up to three; fire and ice cancel) |
+| Left click | Cast at the cursor (hold to recast the last spell) |
+| Right click / E | Cast as an area around you |
+| F | Cast on yourself |
+| Space | Dodge roll (no direct hits land; burning still does) |
+| X | Clear the queue |
+| Esc | Pause (shows the grimoire of spells you have found) |
+| R | Restart when paused or fallen |
+
+Elements react: soak enemies, then hit them with lightning for double damage; freeze them and
+shatter them with earth; light the dry brush; blow up the rune barrels. Careless casting hurts you.
 
 ## Harness
 
@@ -32,7 +45,7 @@ harness/run.sh test            # run all tests in tests/
 harness/run.sh test player     # run only test files whose name contains "player"
 harness/run.sh reqs            # every active/done requirement in story/STORY.md has a test
 harness/run.sh story           # run tests, regenerate story/progress.md
-harness/run.sh shot menu /tmp/a.png   # render a real frame (needs xvfb-run); also overworld, zone:<id>
+harness/run.sh shot demo shot.png   # render a real frame (desktop or xvfb-run); also menu, play, pause, dead, live
 harness/run.sh all             # check, boot, reqs, story (default)
 ```
 
