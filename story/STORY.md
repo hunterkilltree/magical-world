@@ -291,11 +291,11 @@ and energy bars drain through a trailing ghost bar; queue slots are element
 orbs that pop in and glow with the combo's colour; cooldowns sweep radially;
 the wave banner and toasts animate. Everything R-047 and R-054 show stays.
 
-### R-063 [planned] Clear in-world indicators
+### R-063 [done] Clear in-world indicators
 Core. Enemy telegraphs fill over their wind-up and pulse just before they
 strike; enemy health bars drain through a ghost bar; damage numbers pop,
-arc and stack instead of overlapping; the reticle dims when the queued spell
-cannot be cast.
+arc and stack instead of overlapping, and so do spell-name callouts; the
+reticle dims when the queued spell cannot be cast (energy or recharge).
 
 ### R-064 [planned] A living arena
 Core. Moonlit key light, sky and light fog; braziers flicker irregularly and

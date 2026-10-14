@@ -489,13 +489,21 @@ func callout(at: Vector2, spell_name: String, c: Color, kicker := "") -> void:
 		k.position.y = 0.55
 		g.add_child(k)
 	var life := 2.1 if kicker != "" else 1.3
+	# older callouts step up out of the way instead of overlapping the new one
+	for old in callouts:
+		if is_instance_valid(old):
+			old.set_meta("lift", old.get_meta("lift", 0.0) + 0.75)
+	g.set_meta("lift", 0.0)
+	g.set_meta("lift_now", 0.0)
 	callouts.append(g)
 	while callouts.size() > 3:
 		var old: Node3D = callouts.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
-	_add(g, life, func(_k: float, _dt: float, el: float):
-		g.position.y = 3.1 + el * 0.3
+	_add(g, life, func(_k: float, dt: float, el: float):
+		var lift: float = g.get_meta("lift_now") + (g.get_meta("lift") - g.get_meta("lift_now")) * minf(1.0, dt * 14.0)
+		g.set_meta("lift_now", lift)
+		g.position.y = 3.1 + el * 0.3 + lift
 		var pop := 1.4 - el / 0.14 * 0.4 if el < 0.14 else 1.0
 		g.scale = Vector3.ONE * pop
 		var a := clampf(minf((life - el) / 0.35, el / 0.05), 0, 1)

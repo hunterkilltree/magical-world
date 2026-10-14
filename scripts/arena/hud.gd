@@ -52,6 +52,8 @@ var cost_label: Label
 var status_row: HBoxContainer
 var tiles := {} # cast/nova/self/dodge -> RadialTile
 var keycaps := {} # element -> {button, style, flash}
+var enemy_ghost := {} # enemy id -> ghost fraction, drains after the bar (R-063)
+var _enemy_hold := {} # enemy id -> [last fraction, hold time]
 var toast: Label
 var banner: Label
 var menu_screen: Control
@@ -663,7 +665,31 @@ func update(s: ArenaSim, events: Array, dt: float) -> void:
 				f = maxf(f, c / maxf(0.001, p.shape_max.get(sh, 1.0)))
 		tiles[k].value = 1.0 - f
 	_update_status(p)
+	_update_enemy_ghosts(s, dt)
 	overlay.queue_redraw()
+
+
+func _update_enemy_ghosts(s: ArenaSim, dt: float) -> void:
+	var seen := {}
+	for e in s.enemies:
+		seen[e.id] = true
+		var k := maxf(0.0, e.hp / e.max_hp)
+		var hold: Array = _enemy_hold.get(e.id, [k, 0.0])
+		if k < hold[0] - 0.001:
+			hold[1] = 0.3
+		hold[0] = k
+		hold[1] -= dt
+		var g: float = enemy_ghost.get(e.id, k)
+		if g <= k:
+			g = k
+		elif hold[1] <= 0:
+			g = maxf(k, g - dt * 0.8)
+		enemy_ghost[e.id] = g
+		_enemy_hold[e.id] = hold
+	for id in enemy_ghost.keys():
+		if not seen.has(id):
+			enemy_ghost.erase(id)
+			_enemy_hold.erase(id)
 
 
 func _banner(text: String) -> void:
@@ -782,6 +808,7 @@ func _draw_overlay() -> void:
 		var x := sc.x - w / 2
 		var k := maxf(0.0, e.hp / e.max_hp)
 		overlay.draw_rect(Rect2(x - 1, sc.y - 1, w + 2, 7), Color(0.086, 0.07, 0.145, 0.82))
+		overlay.draw_rect(Rect2(x, sc.y, w * enemy_ghost.get(e.id, k), 5), Color(1.0, 0.75, 0.68, 0.85))
 		overlay.draw_rect(Rect2(x, sc.y, w * k, 5), Color("#a8ecff") if e.st.frozen > 0 else Color("#ef4444"))
 		var pips := []
 		if e.st.burn > 0:

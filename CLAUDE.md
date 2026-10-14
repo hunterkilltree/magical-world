@@ -101,8 +101,13 @@ a random or auto-generated name.
   slots, spell preview, cooldown tiles, statuses, toasts, enemy health bars + pips, menu/pause grimoire/death screens;
   R-062: one `Theme` on `root` dresses every panel/button/bar/slider, so don't add stylebox overrides except for
   element-coloured pieces (queue orbs use `theme_type_variation = "Orb"`); bars drain through a ghost (`_drain`),
-  cooldowns are `RadialTile`s, animation is stepped in `update(dt)` rather than Tweens so `tick()` drives it),
+  cooldowns are `RadialTile`s, animation is stepped in `update(dt)` rather than Tweens so `tick()` drives it;
+  R-063: enemy bars drain through `enemy_ghost`),
   `mesh_kit` (primitives that follow three.js conventions: torus in XY, circle facing +Z, XYZ Euler order).
+- Indicators (R-063): telegraphs have a faint outline (`m2`, pulses in the last 0.2 s, `tele_d["pulse"]`) and a fill
+  (`m`, `parts["fill"]`) that grows over the windup; `ArenaView.text(..., key)` stacks numbers for the same target
+  within 0.25 s; director callouts step older ones up; `ArenaView.ret_dim` dims the reticle when the queued spell
+  can't be cast (energy or `ArenaSim.recharge_key` timer).
 - `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
   renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.
   Controls: WASD move, mouse aims, 1-6 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,

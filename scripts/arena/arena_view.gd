@@ -71,6 +71,8 @@ var _ret_area: MeshInstance3D
 var _cone_prev: MeshInstance3D
 var _cone_key := ""
 var _wall_prev: MeshInstance3D
+var ret_dim := false # the queued spell can't be cast now (energy or recharge): the reticle dims
+var _stacks := {} # damage-number target -> {t, n}: numbers landing together stack instead of overlapping
 var _quad_glow: QuadMesh
 var _arena_built := false
 
@@ -444,7 +446,9 @@ func _transient(node: Node3D, life: float, update: Callable) -> void:
 	transients.append({"node": node, "t": 0.0, "max": life, "update": update})
 
 
-func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9) -> void:
+# A floating number: pops in, arcs up and sideways, fades. Numbers for the same `key` (a target id)
+# within 0.25 s stack upward.
+func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9, key = null) -> void:
 	var l := Label3D.new()
 	l.text = s
 	l.modulate = color
@@ -455,11 +459,25 @@ func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9) -> void
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
 	l.fixed_size = false
-	l.position = at + Vector3(randf_range(-0.2, 0.2), 0, 0)
+	var lift := 0.0
+	if key != null:
+		var st = _stacks.get(key)
+		if st == null or t - st["t"] > 0.25:
+			st = {"n": -1}
+			_stacks[key] = st
+		st["n"] += 1
+		st["t"] = t
+		lift = st["n"] * 0.38
+	l.position = at + Vector3(randf_range(-0.15, 0.15), lift, 0)
+	l.scale = Vector3.ONE * 1.6
 	add_child(l)
-	var y0 := l.position.y
+	var p0 := l.position
+	var drift := randf_range(0.35, 0.6) * (1.0 if randf() < 0.5 else -1.0)
 	_transient(l, life, func(k: float):
-		l.position.y = y0 + k * 0.9
+		var e := _ease(k)
+		l.position = p0 + Vector3(drift * e, 0.9 * e, 0)
+		var pop := 1.0 - minf(1.0, k * life / 0.12)
+		l.scale = Vector3.ONE * (1.0 + 0.6 * pop * pop)
 		l.modulate.a = 1.0 - k * k)
 
 
@@ -531,21 +549,22 @@ func consume(events: Array, sim: ArenaSim) -> void:
 			"beam":
 				beam_fx(e["from"], e["to"], e["width"], e["color"])
 			"heal":
-				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44)
+				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44, 0.9, "heal")
 			"hit":
 				var col := _el_color(e["el"])
 				if e.get("crit", false):
-					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1)
+					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1, e["id"])
 				else:
-					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
+					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56, 0.9, e["id"])
 			"hurt":
 				var col := Color("#ff9a3c") if e["self"] else Color("#ff5a5a")
-				text(ground(e["pos"], 2.4), "-" + str(roundi(e["dmg"])), col, 52)
+				text(ground(e["pos"], 2.4), "-" + str(roundi(e["dmg"])), col, 52, 0.9, e["id"])
 				if not e["dot"]:
 					shake = minf(1.0, shake + 0.2)
 			"tag":
 				if TAGS.has(e["tag"]):
-					text(ground(e["pos"], 2.9), TAGS[e["tag"]][0], Color(TAGS[e["tag"]][1]), 40, 1.0)
+					# tags carry no target id: stack the ones landing on the same spot
+					text(ground(e["pos"], 2.9), TAGS[e["tag"]][0], Color(TAGS[e["tag"]][1]), 40, 1.0, "tag:%d:%d" % [roundi(e["pos"].x), roundi(e["pos"].y)])
 			"death":
 				var v = enemy_views.get(e["id"])
 				if v:
@@ -686,15 +705,18 @@ func _make_telegraph(kind: String) -> Dictionary:
 	var m := K.flat(RED, 0.0)
 	var m2 := K.flat(RED, 0.0)
 	var parts := {}
+	# m: the fill that grows over the windup; m2: the faint full outline, which pulses just before the strike
 	if kind == "thrall":
-		parts["wedge"] = K.put(g, K.wedge(1.75, 90), m, null, null, null, false)
+		parts["wedge"] = K.put(g, K.wedge(1.75, 90), m2, null, null, null, false)
+		parts["fill"] = K.put(g, K.wedge(1.75, 90), m, [0, 0.004, 0], null, null, false)
 	elif kind == "bulwark":
 		parts["fill"] = K.put(g, K.disc(1.0, 40), m, null, [-PI / 2, 0, 0], null, false)
 		parts["ring"] = K.put(g, K.ring(0.94, 1.0, 48), m2, [0, 0.005, 0], [-PI / 2, 0, 0], null, false)
 	else:
-		parts["line"] = K.put(g, K.box(0.14, 0.01, 1.0), m, [0, 0, 0.5], null, null, false)
+		parts["line"] = K.put(g, K.box(0.14, 0.01, 1.0), m2, [0, 0, 0.5], null, null, false)
+		parts["fill"] = K.put(g, K.box(0.14, 0.012, 1.0), m, [0, 0.003, 0.5], null, null, false)
 	g.position.y = 0.035
-	return {"group": g, "m": m, "m2": m2, "parts": parts}
+	return {"group": g, "m": m, "m2": m2, "parts": parts, "pulse": false}
 
 
 func _sync_enemies(sim: ArenaSim, dt: float) -> void:
@@ -800,19 +822,26 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 	var g: Node3D = T["group"]
 	g.visible = not frozen and e.state != "spawn"
 	var m: StandardMaterial3D = T["m"]
+	var m2: StandardMaterial3D = T["m2"]
+	var winding: bool = e.state == "windup" or e.state == "charge"
+	T["pulse"] = winding and e.state_t < 0.2
+	var flick := 0.45 + 0.55 * absf(sin(t * 22.0)) if T["pulse"] else 1.0
+	var fw := maxf(0.01, w)
 	if e.kind == "thrall":
 		var on: bool = e.state == "windup" or e.state == "strike"
-		m.albedo_color.a = (0.7 if e.state == "strike" else 0.12 + 0.45 * w) if on else 0.0
 		g.position = ground(e.pos, 0.035)
 		g.rotation.y = atan2(e.aim.x, e.aim.y)
+		T["parts"]["fill"].scale = Vector3(fw, 1, fw) if e.state == "windup" else Vector3.ONE
+		m.albedo_color.a = (0.7 if e.state == "strike" else 0.3 + 0.3 * w) if on else 0.0
+		m2.albedo_color.a = 0.3 * flick if e.state == "windup" else 0.0
 	elif e.kind == "bulwark":
 		var on: bool = e.state == "windup"
 		g.position = ground(e.slam, 0.035)
 		T["parts"]["ring"].scale = Vector3(A["radius"], A["radius"], 1)
-		var fr := maxf(0.01, A["radius"] * _ease(w))
+		var fr := maxf(0.01, A["radius"] * fw)
 		T["parts"]["fill"].scale = Vector3(fr, fr, 1)
 		m.albedo_color.a = 0.32 if on else 0.0
-		T["m2"].albedo_color.a = 0.95 if on else 0.0
+		m2.albedo_color.a = 0.95 * flick if on else 0.0
 	else:
 		var on: bool = e.state == "charge"
 		var L := minf(A["range"], sim.player.pos.distance_to(e.pos))
@@ -820,7 +849,10 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 		g.rotation.y = atan2(e.aim.x, e.aim.y)
 		T["parts"]["line"].scale = Vector3(1 + w, 1, L)
 		T["parts"]["line"].position.z = L / 2
-		m.albedo_color.a = 0.2 + 0.55 * w if on else 0.0
+		T["parts"]["fill"].scale = Vector3(1 + w, 1, maxf(0.01, L * w))
+		T["parts"]["fill"].position.z = L * w / 2
+		m.albedo_color.a = 0.75 if on else 0.0
+		m2.albedo_color.a = 0.22 * flick if on else 0.0
 
 
 func _sync_shots(sim: ArenaSim, dt: float) -> void:
@@ -991,7 +1023,9 @@ func _update_reticle(sim: ArenaSim) -> void:
 	var queued := not p.queue.is_empty()
 	var sp := SpellBook.resolve(p.queue if queued else p.last)
 	var col: Color = sp["color"] if not sp.is_empty() else Color.WHITE
-	_ret_ring.material_override.albedo_color = Color(col, 0.85)
+	ret_dim = not sp.is_empty() and (p.energy < sp["cost"] or p.shape_cd.get(ArenaSim.recharge_key(sp), 0.0) > 0)
+	var dim := 0.4 if ret_dim else 1.0
+	_ret_ring.material_override.albedo_color = Color(col, 0.85 * dim)
 	var dv := aim - p.pos
 	var L := dv.length()
 	if L == 0:
@@ -1005,7 +1039,7 @@ func _update_reticle(sim: ArenaSim) -> void:
 		_ret_area.visible = true
 		var r := float(sp["def"].get("radius", 3.0))
 		_ret_area.scale = Vector3(r, r, 1)
-		_ret_area.material_override.albedo_color = Color(col, 0.6 if queued else 0.25)
+		_ret_area.material_override.albedo_color = Color(col, (0.6 if queued else 0.25) * dim)
 	_reticle.position = ground(at)
 	var yaw := atan2(u.x, u.y)
 	if shape == "cone":
@@ -1016,13 +1050,13 @@ func _update_reticle(sim: ArenaSim) -> void:
 		_cone_prev.visible = true
 		_cone_prev.position = ground(p.pos, 0.035)
 		_cone_prev.rotation.y = yaw
-		_cone_prev.material_override.albedo_color = Color(col, 0.16 if queued else 0.06)
+		_cone_prev.material_override.albedo_color = Color(col, (0.16 if queued else 0.06) * dim)
 	if shape == "wall":
 		_wall_prev.visible = true
 		_wall_prev.position = ground(p.pos + u * ArenaSim.TUNING["wall_dist"], 0.04)
 		_wall_prev.rotation.y = yaw
 		_wall_prev.scale = Vector3(sp["def"].get("segments", 5) * 0.95, 1, 1)
-		_wall_prev.material_override.albedo_color = Color(col, 0.3 if queued else 0.12)
+		_wall_prev.material_override.albedo_color = Color(col, (0.3 if queued else 0.12) * dim)
 
 
 # Where an enemy's health bar sits (above its head), for the HUD.
