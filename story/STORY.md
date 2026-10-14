@@ -314,6 +314,16 @@ splits into steam rising and droplets falling. In a combo the second element
 bursts a beat after the first instead of on the same frame. Cast helices
 have no exact spacing. Glacier Prison raises its permafrost pillar.
 
+### R-066 [done] Water rolls in as a breaking wave
+Core. Tsunami and Torrent draw a real wave in the cartoon style of the water
+reference: a deep blue body shading to a lighter, streaked face and a white
+foam lip that curls over. It draws back for a beat, rushes out fast and
+slows, rises and curls, then the lip plunges: splashes burst up unevenly
+along the arc, a jet rises a beat later, and foam spreads and settles into
+the pool. Droplets peel off the lip while it rides in. The crest is uneven
+and breaks unevenly. Torrent's wave is lower, faster and barely curls. A
+Tsunami stays within a third of the particle pools.
+
 ## Retired: the Grauhold Reach campaign
 
 The six-zone grid campaign was replaced by Court of Waves. Its requirements are

@@ -1,5 +1,6 @@
 # Renders the main scene in a given state and saves a PNG. Needs a display (a desktop, or xvfb-run).
-# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|matrix|dead|pause|live> <out.png> [wizard_id]
+# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|matrix|wave|dead|pause|live> <out.png> [wizard_id]
+# `wave` casts a Tsunami sideways across thralls (SHOT_FRAMES env: frames after the cast, default 22).
 # `live` starts a run and lets the real engine loop (input, physics, waves) go for five seconds.
 extends SceneTree
 
@@ -103,6 +104,17 @@ func _initialize() -> void:
 				e.speed = 0
 			for i in 30:
 				main.tick(dt, {"aim": Vector2(0, -6)})
+		elif what == "wave":
+			# A Tsunami rolling sideways across a line of thralls, so the curl reads in profile.
+			p.pos = Vector2(-4, 1)
+			for at in [Vector2(-0.5, -0.5), Vector2(0.5, 1.5), Vector2(1.0, 3.0)]:
+				main.sim.spawn("thrall", at).atk_cd = 99
+			for i in 20:
+				main.tick(dt, {"aim": Vector2(3, 1)})
+			main.tick(dt, {"aim": Vector2(3, 1), "actions": ["el:water", "el:water", "cast"]})
+			var n := int(OS.get_environment("SHOT_FRAMES")) if OS.get_environment("SHOT_FRAMES") != "" else 22
+			for i in n:
+				main.tick(dt, {"aim": Vector2(3, 1)})
 		elif what == "dead":
 			p.hp = 0
 			for i in 90:

@@ -90,6 +90,9 @@ a random or auto-generated name.
   `stragglers`, `jet` (splash secondary), `magic_motes` / `_mote_opts` (per-element drift); `shell(..., squeeze)` anticipates.
   R-065: wind is never drawn bare, only by what it carries (`wind_carry`: dust in one curl); `hit_resolve` gives each
   element its after-burst on projectile hits; a combo's second element bursts a beat after the first (blast, cone).
+  R-066: Tsunami / Torrent draw a curling wave sheet (`scripts/vfx/wave_sheet.gd` + `shaders/wave_sheet.gdshader`,
+  cartoon water: deep blue, streaked face, foam lip), driven by `ArenaView`'s director `wave()`; the pool spreads in after.
+  `harness/run.sh shot wave OUT` (SHOT_FRAMES env picks the moment) shows it.
   `particles.trace = []` logs every spawn for tests.
 - `scripts/audio/sfx.gd` (R-061): recorded clips for sim events, keyed in `data/sfx.json` (takes, dB, pitch range,
   throttle, SFX/UI bus, positional, `len`/`offset` for long loops); `ROUTED` lists the event types with a sound and the

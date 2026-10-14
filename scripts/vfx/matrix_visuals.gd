@@ -95,7 +95,9 @@ static func build(parent: Node3D, a) -> Dictionary:
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.albedo_color.a = 0.65
 			K.put(root, K.disc(1.0, 48), m, [0, 0.03, 0], [-PI / 2, 0, 0], [r, r, 1], false)
-			K.put(root, K.ring(0.94, 1.0, 64), _glow_mat(Color("#67e8f9"), 1.1), [0, 0.04, 0], [-PI / 2, 0, 0], [r, r, 1], false)
+			v["ring"] = K.put(root, K.ring(0.94, 1.0, 64), _glow_mat(Color("#67e8f9"), 0.75), [0, 0.04, 0], [-PI / 2, 0, 0], [r, r, 1], false)
+			v["mat"] = m
+			root.scale = Vector3(0.3, 1, 0.3)
 		"burning_land":
 			_flat_disc(root, Vector3.ZERO, r, Color("#2a1208"), 0.75, 0.03)
 			v["glow"] = K.put(root, K.disc(1.0, 48), _glow_mat(Color("#ff5a1a"), 1.2), [0, 0.034, 0], [-PI / 2, 0, 0], [r * 0.85, r * 0.85, 1], false)
@@ -202,6 +204,14 @@ static func update(v: Dictionary, a, dt: float, t: float, fx) -> void:
 						var vel := Vector3(cos(ang), 0, -sin(ang)) * randf_range(3.5, 5.5) - Vector3(sin(ang), 0, cos(ang)) * randf_range(0.8, 1.6)
 						fx.particles.sprite("dust" if el == "wind" else fx._sprite_of(el), root.position + Vector3(sin(ang) * rr, 0.25, cos(ang) * rr),
 							vel + Vector3(0, randf_range(1.8, 3.2), 0), {"k": randf_range(0.4, 0.7), "buoy": 0.5, "drag": 0.9})
+		"water_pool":
+			# the wave's water spreads out into the pool once it has crashed, instead of being there at once
+			var age: float = a.max_life - a.life
+			var g := clampf((age - 0.45) / 0.7, 0.0, 1.0)
+			g = 1.0 - pow(1.0 - g, 3.0)
+			root.scale = Vector3(0.3 + 0.7 * g, 1, 0.3 + 0.7 * g)
+			v["mat"].albedo_color.a = 0.65 * g * fade
+			v["ring"].material_override.albedo_color.a = 0.9 * g * fade
 		"burning_land", "magma":
 			v["glow"].material_override.albedo_color.a = (0.55 + 0.25 * sin(t * 5 + a.id)) * fade
 		"magnetic":
