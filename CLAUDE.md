@@ -98,7 +98,10 @@ a random or auto-generated name.
   lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
   y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),
   `enemy_model` (thrall/bulwark/hexcaller silhouettes, walls, hit/freeze/burn tint), `hud` (CanvasLayer: bars, queue
-  slots, spell preview, cooldown tiles, statuses, toasts, enemy health bars + pips, menu/pause grimoire/death screens),
+  slots, spell preview, cooldown tiles, statuses, toasts, enemy health bars + pips, menu/pause grimoire/death screens;
+  R-062: one `Theme` on `root` dresses every panel/button/bar/slider, so don't add stylebox overrides except for
+  element-coloured pieces (queue orbs use `theme_type_variation = "Orb"`); bars drain through a ghost (`_drain`),
+  cooldowns are `RadialTile`s, animation is stepped in `update(dt)` rather than Tweens so `tick()` drives it),
   `mesh_kit` (primitives that follow three.js conventions: torus in XY, circle facing +Z, XYZ Euler order).
 - `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
   renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.

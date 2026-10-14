@@ -285,7 +285,7 @@ per sound, pitch jitter, per-sound throttling, an SFX bus with a compressor
 and a UI bus); M mutes and the pause screen sets the volume. Missing files
 play nothing and raise no error.
 
-### R-062 [planned] A themed HUD and screens
+### R-062 [done] A themed HUD and screens
 Core. One shared theme across the HUD, menu, pause and death screens; health
 and energy bars drain through a trailing ghost bar; queue slots are element
 orbs that pop in and glow with the combo's colour; cooldowns sweep radially;
