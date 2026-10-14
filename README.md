@@ -1,6 +1,6 @@
 # Magical World
 
-Court of Waves: a 3D elemental arena game in the style of Magicka. Queue up to three of six
+Court of Waves: a 3D elemental arena game in the style of Magicka. Queue up to three of ten
 elements, cast, and the mix decides the spell; survive endless waves of thralls, bulwarks and
 hexcallers. Story and requirements: `story/STORY.md`. Game data: `data/`. Design reference (the
 playable prototype and its source): `story/design/court_of_waves/`.
@@ -68,12 +68,12 @@ On a fresh checkout the first run does a one-time `--import` to build `.godot/`.
 ### Example output
 
 ```
-check_all: 3 scripts, 0 failed
-Magical World booted
+check_all: 58 scripts, 0 failed
 boot: ok
-PASS  test_example.gd::test_main_scene_loads
-PASS  test_example.gd::test_arithmetic_sanity
-tests: 2 passed, 0 failed
+reqs: 30 requirements, 0 missing tests
+PASS  story/test_r037_spell_book.gd::test_...
+...
+tests: 180 passed, 0 failed
 ```
 
 ## Story and requirements
@@ -89,18 +89,24 @@ refuses to let an agent finish while it fails (skipped if Godot isn't installed)
 
 ## Writing tests
 
-Create `tests/test_<name>.gd`. Every method starting with `test_` is run.
+Create `tests/story/test_rNNN_<name>.gd` for a requirement (or `tests/test_<name>.gd`). Every method
+starting with `test_` is run.
 
 ```gdscript
 extends "res://harness/test_case.gd"
 
-var player
+const M := preload("res://tests/support/main_fixture.gd")
+
+var main
 
 func before_each() -> void:
-	player = load("res://scenes/player.tscn").instantiate()
+	main = M.make(tree) # the real main scene, in play mode
 
-func test_starts_with_full_health() -> void:
-	assert_eq(player.health, 100, "initial health")
+func after_test() -> void:
+	main.free()
+
+func test_the_wizard_starts_at_full_health() -> void:
+	assert_eq(main.sim.player.hp, main.sim.player.max_hp, "initial health")
 ```
 
 Available assertions: `assert_true(cond, msg)`, `assert_eq(actual, expected, msg)`,
@@ -110,7 +116,8 @@ Notes:
 - Extend the base by path, not `class_name`; the class cache isn't built in headless runs.
 - Each test method gets a fresh instance, and `before_each()` runs first.
 - `tree` is the running `SceneTree`, useful for adding nodes. Free anything you instantiate.
-- Test files must live directly in `tests/` and be named `test_*.gd`.
+- Test files live anywhere under `tests/` (searched recursively) and are named `test_*.gd`.
+- Helpers: `tests/support/arena_fixture.gd` (a quiet sim), `main_fixture.gd` (the real main scene), `arena_bot.gd`.
 
 ## Troubleshooting
 
@@ -123,11 +130,15 @@ Notes:
 ## Layout
 
 ```
-harness/run.sh        entry point
-harness/check_all.gd  parse-all-scripts check
-harness/run_tests.gd  test runner
-harness/test_case.gd  base class for tests
-scenes/  scripts/  tests/
+harness/              run.sh (entry point), check_all.gd, run_tests.gd, test_case.gd, screenshot.gd, reqs.sh
+scenes/main.tscn      the game
+scripts/core/         pure game logic (the sim, spell book, enemy types, controls)
+scripts/arena/        the 3D view, models and HUD
+scripts/vfx/          the VFX director, particle pools, wave, lightning, screen effects
+scripts/audio/        sound effects
+shaders/  data/  audio/sfx/
+tests/story/          one test file per requirement; tests/support/ fixtures and the bot
+story/                STORY.md (requirements), IMPROVEMENT_PLAN.md (open issues), design/ (the handoff)
 ```
 
 See `CLAUDE.md` for the rules agents follow when working here.

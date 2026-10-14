@@ -29,7 +29,7 @@ func _collect(dir_path: String) -> Array:
 		if SKIP_DIRS.has(sub) or sub.begins_with("."):
 			continue
 		if FileAccess.file_exists(dir_path.path_join(sub).path_join("project.godot")):
-			continue  # a nested Godot project (e.g. hvitmark_tundra/) is checked by its own harness
+			continue  # a nested Godot project is checked by its own harness
 		out.append_array(_collect(dir_path.path_join(sub)))
 	for f in dir.get_files():
 		if f.ends_with(".gd"):

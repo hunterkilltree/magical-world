@@ -13,7 +13,7 @@ silhouettes), not the meshes.
 ## Core pillar (most important)
 
 **The defining mechanic is combining elements to create spells.** Queue up to
-three of six elements, cast, and the mix decides the spell's shape and effect.
+three of ten elements, cast, and the mix decides the spell's shape and effect.
 Elements react with each other, with enemies and with the arena (puddles, dry
 brush, rune barrels), and careless casting hurts the caster. When a design or
 implementation choice competes with this, the element-combining spell system
@@ -39,7 +39,8 @@ Status is `planned` (no test needed yet), `active` (being built; must have a
 test) or `done` (must have a passing test). Each active/done requirement needs
 `tests/story/test_rNNN_<name>.gd`. To start work on a requirement, change it
 to `active` and write its test first. A retired requirement is `superseded`
-(the harness ignores it).
+(the harness ignores it). R-001 to R-036 belonged to the retired Grauhold Reach
+campaign and were removed (see git history); do not reuse those IDs.
 
 ## The spell system
 
@@ -323,45 +324,3 @@ along the arc, a jet rises a beat later, and foam spreads and settles into
 the pool. Droplets peel off the lip while it rides in. The crest is uneven
 and breaks unevenly. Torrent's wave is lower, faster and barely curls. A
 Tsunami stays within a third of the particle pools.
-
-## Retired: the Grauhold Reach campaign
-
-The six-zone grid campaign was replaced by Court of Waves. Its requirements are
-kept here for history; their code and tests were removed.
-
-- R-001 [superseded] The wizard moves in any direction
-- R-002 [superseded] Zone data is valid
-- R-003 [superseded] Spell data is valid
-- R-004 [superseded] A zone grid becomes a playable level
-- R-005 [superseded] Elements queue and combine into spells
-- R-006 [superseded] Spells deal damage with cooldowns
-- R-007 [superseded] The wizard has health and can fall
-- R-008 [superseded] Enemies spawn at E tiles and chase
-- R-009 [superseded] Terrain hazards act on whoever stands in them
-- R-010 [superseded] Chokepoint gates open on objective
-- R-011 [superseded] Destructible tiles break
-- R-012 [superseded] Loot caches grant a rune fragment or item
-- R-013 [superseded] Zone 1 can be completed end to end
-- R-014 [superseded] Zones 2 to 6 can be completed
-- R-015 [superseded] Bosses fight in phases and end their zone
-- R-016 [superseded] The campaign follows the route graph
-- R-017 [superseded] Progress saves and loads
-- R-018 [superseded] Six wizards with different affinities
-- R-019 [superseded] Ending
-- R-020 [superseded] Non-area spell types
-- R-021 [superseded] A game session ties campaign, save and zones together
-- R-022 [superseded] A zone plays out end to end
-- R-023 [superseded] The main scene is a playable menu, overworld, zone and ending
-- R-024 [superseded] Gates open when the thralls are cleared
-- R-025 [superseded] Casting gives visible feedback
-- R-026 [superseded] The whole game is beatable
-- R-027 [superseded] An element bar and letter keys
-- R-028 [superseded] Floating damage numbers
-- R-029 [superseded] Beams look like beams
-- R-030 [superseded] Raised walls and lived-in tiles
-- R-031 [superseded] A bottom-centre element queue bar
-- R-032 [superseded] Up to five elements combine into one spell
-- R-033 [superseded] Click to move, aim with the mouse
-- R-034 [superseded] Characters are drawn in depth order
-- R-035 [superseded] Zones are the design's 3D dioramas under a Magicka-style camera
-- R-036 [superseded] The wizards are the design's 3D models
