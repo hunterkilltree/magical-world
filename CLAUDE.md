@@ -83,7 +83,8 @@ a random or auto-generated name.
   `scripts/vfx/matrix_visuals.gd`. `harness/run.sh shot matrix OUT` shows them.
 - `scripts/vfx/` (VFX handoff): `vfx_director` (port of vfx.js +
   wow.js), `vfx_particles` (MultiMesh smoke/spark pools), `lightning_bolt`, `screen_fx`, `vfx_textures` (painted in
-  SubViewports; build gradients before painting, or they draw white). Combo casts freeze time briefly (sim `hitstop`).
+  SubViewports; build gradients before painting, or they draw white). Combo casts freeze time briefly (sim `hitstop`). Use the `elemental-vfx` skill (`.claude/skills/elemental-vfx/`) when making or
+  reviewing effects.
   Every particle look is the director's (R-060): `ArenaView.consume` only adds text, corpses, shake, rings and
   geometry, never one-shot bursts. Timing helpers: `_after(delay, fn)` (overlap, delayed secondaries),
   `stragglers`, `jet` (splash secondary), `magic_motes` (per-element drift); `shell(..., squeeze)` anticipates.
