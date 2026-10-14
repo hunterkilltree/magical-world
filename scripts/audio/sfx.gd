@@ -34,6 +34,9 @@ var _pending: Array = [] # delayed plays: {due, key, pos, pitch, S}
 var _stops := {} # player -> {end, db}
 var _warned := {}
 var _ready_done := false
+# Headless runs use the Dummy driver, which never mixes: a started stream would stay registered
+# with the AudioServer and leak at exit. There, plays are logged and routed but not started.
+var _mute_driver := AudioServer.get_driver_name() == "Dummy"
 
 
 func setup() -> void:
@@ -175,6 +178,8 @@ func _start(job: Dictionary) -> void:
 	if S["offset"] and L > 0:
 		from = randf() * maxf(0.0, stream.get_length() - L * job["pitch"])
 	_stops.erase(p)
+	if _mute_driver:
+		return
 	if L > 0:
 		_stops[p] = {"end": clock + L, "db": S["db"]}
 	p.play(from)

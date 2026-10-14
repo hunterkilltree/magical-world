@@ -391,7 +391,7 @@ func _build_pause() -> void:
 	volume_slider.custom_minimum_size = Vector2(180, 24)
 	volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	volume_slider.focus_mode = Control.FOCUS_NONE
-	volume_slider.value_changed.connect(func(x: float): volume_changed.emit(x))
+	volume_slider.value_changed.connect(_on_volume)
 	vol.add_child(volume_slider)
 	row.add_child(vol)
 	v.add_child(row)
@@ -435,6 +435,10 @@ func _on_start() -> void:
 # Shows the saved volume without echoing it back as a change.
 func set_volume(v: float) -> void:
 	volume_slider.set_value_no_signal(v)
+
+
+func _on_volume(v: float) -> void:
+	volume_changed.emit(v)
 
 
 func _on_resume() -> void:
