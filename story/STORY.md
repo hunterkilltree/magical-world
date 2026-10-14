@@ -303,6 +303,17 @@ smoothly but irregularly and shed embers; dust drifts over the court; gate
 banners ripple; puddles shimmer with spreading rings; a faint rune turns at
 the heart of the court. Ambient particles stay within a tenth of the pools.
 
+### R-065 [done] Every element moves by its own nature
+Core. A second elemental-vfx pass, so each element looks like itself wherever
+it appears, not only in blasts. Shadow sinks everywhere it is drawn. Wind is
+invisible: it shows only through the dust it carries, swept in a curl. A
+projectile hit is a small explosion that resolves per element: fire leaves a
+rising wisp of smoke, ice throws a few rigid shards and cold mist that sinks,
+earth dust settles, magic motes follow their element. Fire meeting water
+splits into steam rising and droplets falling. In a combo the second element
+bursts a beat after the first instead of on the same frame. Cast helices
+have no exact spacing. Glacier Prison raises its permafrost pillar.
+
 ## Retired: the Grauhold Reach campaign
 
 The six-zone grid campaign was replaced by Court of Waves. Its requirements are
