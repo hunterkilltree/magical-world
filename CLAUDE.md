@@ -87,7 +87,9 @@ a random or auto-generated name.
   reviewing effects.
   Every particle look is the director's (R-060): `ArenaView.consume` only adds text, corpses, shake, rings and
   geometry, never one-shot bursts. Timing helpers: `_after(delay, fn)` (overlap, delayed secondaries),
-  `stragglers`, `jet` (splash secondary), `magic_motes` (per-element drift); `shell(..., squeeze)` anticipates.
+  `stragglers`, `jet` (splash secondary), `magic_motes` / `_mote_opts` (per-element drift); `shell(..., squeeze)` anticipates.
+  R-065: wind is never drawn bare, only by what it carries (`wind_carry`: dust in one curl); `hit_resolve` gives each
+  element its after-burst on projectile hits; a combo's second element bursts a beat after the first (blast, cone).
   `particles.trace = []` logs every spawn for tests.
 - `scripts/audio/sfx.gd` (R-061): recorded clips for sim events, keyed in `data/sfx.json` (takes, dB, pitch range,
   throttle, SFX/UI bus, positional, `len`/`offset` for long loops); `ROUTED` lists the event types with a sound and the

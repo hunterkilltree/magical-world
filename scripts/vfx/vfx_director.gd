@@ -275,8 +275,9 @@ func radial_sparks(name: String, at: Vector3, n: int, s0: float, s1: float, up :
 
 func crown(x: float, z: float, r: float, n := 26) -> void:
 	for i in n:
-		var a := i / float(n) * TAU + randf() * 0.2
-		var sp := randf_range(3, 6)
+		# push and pull: the bowl tears unevenly, so neither spacing nor height repeats
+		var a := (i + randf_range(-0.45, 0.45)) / float(n) * TAU
+		var sp := randf_range(2.6, 6.4)
 		var at := Vector3(x + sin(a) * r * 0.5, 0.15, z + cos(a) * r * 0.5)
 		particles.spark("water", at, Vector3(sin(a) * sp, randf_range(6, 10), cos(a) * sp))
 		if i % 2 == 0:
@@ -312,7 +313,54 @@ func magic_motes(el: String, at: Vector3, n: int, k: float) -> void:
 		var v := Vector3(sin(a) * sp, randf_range(0.2, 1.5) * signf(P[0] + 0.01), cos(a) * sp)
 		if el == "arcane":
 			v += Vector3(cos(a), 0, -sin(a)) * sp * 0.8
-		particles.sprite(_sprite_of(el), at, v, {"k": k * randf_range(0.6, 1.3), "buoy": P[0], "drag": P[1], "life": randf_range(P[2], P[3])})
+		particles.sprite(_sprite_of(el), at, v, _mote_opts(el, k))
+
+
+# Sprite options that give a magic element its own physics, with a life of its own per mote.
+func _mote_opts(el: String, k: float, o := {}) -> Dictionary:
+	var P: Array = MOTE_PHYSICS.get(el, MOTE_PHYSICS["arcane"])
+	var out := {"k": k * randf_range(0.6, 1.3), "buoy": P[0], "drag": P[1], "life": randf_range(P[2], P[3])}
+	out.merge(o, true)
+	return out
+
+
+# Wind is invisible: it shows only through what it moves. Dust swept round in one curl (tangential,
+# a little outward and up), pushed along `push`; it settles once the gust has passed.
+func wind_carry(at: Vector3, n: int, r: float, push := Vector2.ZERO) -> void:
+	var spin := 1.0 if randf() < 0.5 else -1.0
+	for i in n:
+		var a := randf() * TAU
+		var rr := r * (0.25 + 0.75 * sqrt(randf()))
+		var p := Vector3(at.x + sin(a) * rr, maxf(0.2, at.y + randf_range(-0.5, 0.3)), at.z + cos(a) * rr)
+		var sp := randf_range(3.0, 6.5)
+		var tang := Vector3(cos(a), 0, -sin(a)) * spin * sp
+		var v := tang + Vector3(sin(a), 0, cos(a)) * sp * randf_range(0.1, 0.35) + Vector3(push.x, randf_range(0.6, 2.2), push.y)
+		particles.sprite("dust", p, v, {"k": randf_range(0.35, 0.75), "buoy": -0.2, "drag": 1.3, "life": randf_range(0.7, 1.3)})
+	for i in maxi(1, n / 6):
+		var a := randf() * TAU
+		particles.spark("wind", at + Vector3(sin(a) * r * 0.6, 0.2, cos(a) * r * 0.6), Vector3(cos(a), 0.1, -sin(a)) * spin * randf_range(6, 10) + Vector3(push.x, 0, push.y))
+
+
+# After a projectile's burst dies, the element takes over (elemental-vfx: burst first, then nature).
+func hit_resolve(el: String, p: Vector3) -> void:
+	match el:
+		"fire":
+			for i in randi_range(1, 2):
+				particles.sprite("hotsmoke", p + Vector3(randf_range(-0.2, 0.2), 0.1, randf_range(-0.2, 0.2)), Vector3(randf_range(-0.4, 0.4), randf_range(1.0, 1.8), randf_range(-0.4, 0.4)), {"k": randf_range(0.4, 0.6)})
+			stragglers("fire", p, 1, 9)
+		"ice":
+			spray("ice", p.x, p.y, p.z, randi_range(2, 4), 3.2, {"size": 0.6})
+			for i in 3:
+				particles.sprite("mist", p, Vector3(randf_range(-1.2, 1.2), randf_range(-0.3, 0.2), randf_range(-1.2, 1.2)), {"k": randf_range(0.5, 0.8), "buoy": -0.35})
+		"earth":
+			for i in 4:
+				particles.sprite("dust", Vector3(p.x, 0.4, p.z), Vector3(randf_range(-2, 2), randf_range(0.5, 1.6), randf_range(-2, 2)), {"k": randf_range(0.5, 0.8)})
+		"lightning":
+			forks(p.x, p.z, 1.0, YELLOW, 2)
+		"wind":
+			wind_carry(Vector3(p.x, 0.5, p.z), 7, 0.6)
+		"nature", "light", "dark", "arcane":
+			magic_motes(el, p, 3, 0.5)
 
 
 # A splash's secondary: the cavity refills and a narrow column shoots up from the centre, falls
@@ -438,19 +486,29 @@ func spikes(x: float, z: float, r: float, n: int, life: float, opt := {}) -> voi
 
 
 func helix(el: String, x: float, z: float, n: int) -> void:
-	var off := randf() * TAU
+	# a smooth underlying turn (the path), with every mote nudged off it (push and pull)
+	var a := randf() * TAU
+	var y := 0.15
 	for i in n:
-		var a := off + i * 0.55
-		particles.sprite(_sprite_of(el), Vector3(x + sin(a) * 0.75, 0.15 + i * 0.03, z + cos(a) * 0.75),
-			Vector3(cos(a) * 2.2, randf_range(3.5, 5.0), -sin(a) * 2.2), {"buoy": 0.0, "drag": 1.2, "life": randf_range(0.6, 0.9), "k": 0.6})
+		a += 0.55 * randf_range(0.6, 1.4)
+		y += 0.03 * randf_range(0.5, 1.5)
+		var rr := 0.75 * randf_range(0.8, 1.2)
+		particles.sprite(_sprite_of(el), Vector3(x + sin(a) * rr, y, z + cos(a) * rr),
+			Vector3(cos(a) * 2.2, randf_range(3.5, 5.0), -sin(a) * 2.2), {"buoy": 0.0, "drag": 1.2, "life": randf_range(0.6, 0.9), "k": 0.6 * randf_range(0.75, 1.25)})
 
 
+# Two elements on one turning path, each with its own physics: the first rides the spiral out,
+# the second lifts off it and lags (no identical twins).
 func spiral(a1: String, a2: String, x: float, z: float, r: float) -> void:
-	for i in 60:
-		var a := i * 0.35
-		var rr := 0.2 + i / 60.0 * r
-		particles.sprite(_sprite_of(a1 if i % 2 else a2), Vector3(x + sin(a) * rr, randf_range(0.4, 1.0), z + cos(a) * rr),
-			Vector3(cos(a) * 4, 1.5, -sin(a) * 4), {"buoy": 0.0, "drag": 2.0, "k": 0.7})
+	var a := randf() * TAU
+	for i in 40:
+		a += 0.5 * randf_range(0.6, 1.4)
+		var rr := (0.2 + i / 40.0 * r) * randf_range(0.85, 1.15)
+		var second := randf() < 0.45
+		var p := Vector3(x + sin(a) * rr, randf_range(0.4, 1.0), z + cos(a) * rr)
+		var v := Vector3(cos(a), 0, -sin(a)) * randf_range(3, 5) + Vector3(0, randf_range(2.0, 3.2) if second else 1.2, 0)
+		var o := {"buoy": 0.6 if second else 0.0, "drag": 2.6 if second else 2.0, "k": randf_range(0.5, 0.85)}
+		particles.sprite(_sprite_of(a2 if second else a1), p, v, o)
 
 
 func forks(x: float, z: float, r: float, c: Color, n: int) -> void:
@@ -588,9 +646,16 @@ func blast(e: Dictionary) -> void:
 	var n := 60 if big else 32
 	var s1 := 24.0 if big else 16.0
 	var list := ["fire"] if no_key else _distinct(els)
-	for el in list:
-		radial_sparks(_spark_of(el), Vector3(at.x, 0.8, at.y), roundi(n / float(list.size())) + 6, 8, s1, 0.8)
-		stragglers(_spark_of(el), Vector3(at.x, 0.8, at.y), randi_range(1, 3), s1)
+	for i in list.size():
+		# overlap: the first element carries the shared burst, each next one pops a beat later
+		var el: String = list[i]
+		var burst := func():
+			radial_sparks(_spark_of(el), Vector3(at.x, 0.8, at.y), roundi(n / float(list.size())) + 6, 8, s1, 0.8)
+			stragglers(_spark_of(el), Vector3(at.x, 0.8, at.y), randi_range(1, 3), s1)
+		if i == 0:
+			burst.call()
+		else:
+			_after(0.035 + 0.03 * i + randf() * 0.02, burst)
 	if big:
 		# overlap: a smaller burst off-centre while the first is slowing
 		var off := Vector2.from_angle(randf() * TAU) * R * randf_range(0.2, 0.4)
@@ -600,7 +665,11 @@ func blast(e: Dictionary) -> void:
 			flare(p2 + Vector3(0, 0.2, 0), c, R * 1.2, 0.08)
 			for el in list:
 				radial_sparks(_spark_of(el), p2, roundi(24 / float(list.size())) + 4, 6, 14, 0.8))
-	dust_ring(at.x, at.y, R, 26 if big else 14, R * 3, "mist" if els.has("ice") and not els.has("fire") else "dust")
+	if els.has("wind"):
+		# the wind takes the blast's dust and sweeps it round instead of throwing it out
+		wind_carry(Vector3(at.x, 0.5, at.y), 22 if big else 14, R * 0.9)
+	else:
+		dust_ring(at.x, at.y, R, 26 if big else 14, R * 3, "mist" if els.has("ice") and not els.has("fire") else "dust")
 	if no_key or els.has("fire"):
 		for i in (16 if big else 9):
 			particles.sprite("flame", Vector3(at.x + randf_range(-R, R) * 0.4, randf_range(0.4, 1.2), at.y + randf_range(-R, R) * 0.4),
@@ -656,8 +725,10 @@ func hit(e: Dictionary) -> void:
 	for el in _distinct(e["els"]):
 		radial_sparks(_spark_of(el), p, 10, 4, 11)
 		stragglers(_spark_of(el), p, 1, 11)
-		for i in 4:
-			particles.sprite(_sprite_of(el), p, Vector3(randf_range(-2.5, 2.5), randf_range(0, 2), randf_range(-2.5, 2.5)), {"k": 0.6})
+		if el in ["water", "fire"]:
+			for i in 4:
+				particles.sprite(_sprite_of(el), p, Vector3(randf_range(-2.5, 2.5), randf_range(0, 2), randf_range(-2.5, 2.5)), {"k": 0.6})
+		hit_resolve(el, p)
 	if e["els"].has("water"):
 		_after(randf_range(0.18, 0.26), func(): jet(at.x, at.y, 0.7))
 	if e.get("kind", "") == "boulder":
@@ -685,6 +756,9 @@ func cone(e: Dictionary) -> void:
 	if steam:
 		for pv in along.call(34, 2.2, 3.0):
 			particles.sprite("steam", pv[0], pv[1], {"drag": 2.6, "k": 1.1})
+		# one shared burst that splits: steam rises and vanishes, the water it didn't boil falls out
+		for pv in along.call(14, 1.4, 2.2):
+			particles.spark("water", pv[0], pv[1] * Vector3(0.8, 1, 0.8) + Vector3(0, randf_range(1.5, 3.5), 0))
 	elif els.has("fire"):
 		for pv in along.call(40, 2.2, 3.1):
 			particles.sprite("flame", pv[0], pv[1], {"drag": 2.6, "k": 1.0})
@@ -701,12 +775,29 @@ func cone(e: Dictionary) -> void:
 			particles.sprite("spray", pv[0], pv[1] + Vector3(0, 1, 0), {"drag": 2.4, "k": 1.1})
 		for pv in along.call(30, 2.4, 3.4):
 			particles.spark("water", pv[0], pv[1] * Vector3(1.4, 1, 1.4) + Vector3(0, 3, 0))
-	for el in els:
-		if el in ["ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"] and not (el == "earth" and mud):
+	var lead: String = els[0] if els.size() else ""
+	for el in _distinct(els):
+		if el not in ["ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"] or (el == "earth" and mud):
+			continue
+		var layer := func():
 			for pv in along.call(20, 1.8, 2.8):
-				particles.sprite(_sprite_of(el), pv[0], pv[1], {"drag": 2.4, "k": 0.9})
-			for pv in along.call(14, 2.2, 3.2):
+				if el == "wind":
+					# the air itself is invisible: show the dust it drives downstream, rising then settling
+					particles.sprite("dust", pv[0] - Vector3(0, 0.6, 0), pv[1] * 0.8 + Vector3(0, randf_range(0.5, 1.8), 0),
+						{"k": randf_range(0.4, 0.8), "buoy": -0.2, "drag": 2.0, "life": randf_range(0.6, 1.1)})
+				elif el == "ice":
+					particles.sprite("mist", pv[0], pv[1], {"drag": 2.4, "k": 0.9, "buoy": -0.3}) # cold mist sinks
+				elif el in MOTE_PHYSICS:
+					particles.sprite(_sprite_of(el), pv[0], pv[1], _mote_opts(el, 0.9, {"drag": 2.4}))
+				else:
+					particles.sprite(_sprite_of(el), pv[0], pv[1], {"drag": 2.4, "k": 0.9})
+			for pv in along.call(14 if el != "wind" else 6, 2.2, 3.2):
 				particles.spark(_spark_of(el), pv[0], pv[1] * 1.2)
+		# overlap: a combo's other elements ride in a beat behind the lead one
+		if el == lead:
+			layer.call()
+		else:
+			_after(0.04 + randf() * 0.03, layer)
 
 
 func area_start(e: Dictionary) -> void:
@@ -906,7 +997,7 @@ func _sig(key: String, hook: String, e: Dictionary) -> void:
 			decal("frost", at.x, at.y, e["r"] * 1.15, e["life"] + 3)
 			screen.wave(Vector3(at.x, 0.4, at.y), 0.5)
 			punch(0.3, -1, 0.15)
-		["ice+ice", "explode"], ["ice+water+wind", "explode"]:
+		["ice+water+wind", "explode"]:
 			spikes(at.x, at.y, e["r"] * 0.9, 26, 3.0, {"h": 1.6})
 			decal("frost", at.x, at.y, e["r"] * 1.2, 8)
 		["lightning+water", "area"]:
@@ -992,6 +1083,7 @@ func laser_trail(a: Vector2, b: Vector2, c: Color, life: float) -> void:
 # Glacier Prison: a permafrost pillar with spinning crystal shards.
 func permafrost_pillar(at: Vector2, r: float) -> void:
 	var g := K.group(self, [at.x, 0, at.y])
+	g.set_meta("permafrost", true)
 	var mat := K.mat(0xd6f6ff, 0.08, 0.05, 0x5ab8ff, 0.8, "permafrost")
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color.a = 0.8
@@ -1003,7 +1095,10 @@ func permafrost_pillar(at: Vector2, r: float) -> void:
 	spikes(at.x, at.y, r * 0.9, 18, 3.0, {"h": 1.4})
 	decal("frost", at.x, at.y, r * 1.2, 8)
 	_add(g, 3.0, func(k: float, dt: float, el: float):
-		pillar.scale = Vector3(1, minf(1.0, el / 0.15), 1) * (1.0 if k < 0.85 else (1 - k) / 0.15)
+		# a fast ease-out pop with a slight overshoot: growth that reads as force
+		var u := clampf(el / 0.18, 0.0, 1.0)
+		var grow := 1.0 - pow(1.0 - u, 3.0) + 0.15 * sin(u * PI)
+		pillar.scale = Vector3(1, maxf(0.001, grow), 1) * (1.0 if k < 0.85 else (1 - k) / 0.15)
 		g.rotation.y += dt * 1.5,
 		func(): spray("ice", at.x, 1.2, at.y, 16, 5, {"spread": r}))
 
@@ -1451,7 +1546,9 @@ func _ambient(sim, dt: float) -> void:
 				for i in _rate(16.0, dt):
 					var tx: float = -(at.z - a.pos.y)
 					var tz: float = at.x - a.pos.x
-					particles.sprite(_sprite_of(a.els[randi() % a.els.size()]), at, Vector3(tx * 1.6 + (a.pos.x - at.x) * 0.8, 0.3, tz * 1.6 + (a.pos.y - at.z) * 0.8), {"k": 0.6})
+					var el: String = a.els[randi() % a.els.size()]
+					# wind draws itself with the dust it drags round; other elements with their own matter
+					particles.sprite("dust" if el == "wind" else _sprite_of(el), at, Vector3(tx * 1.6 + (a.pos.x - at.x) * 0.8, 0.3, tz * 1.6 + (a.pos.y - at.z) * 0.8), {"k": 0.6})
 			_:
 				if randf() < dt * 6:
 					particles.sprite(_sprite_of(a.els[randi() % a.els.size()]), at, Vector3(0, 0.6, 0), {"k": 0.7})

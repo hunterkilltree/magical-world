@@ -429,7 +429,7 @@
       "heat": 0.5,
       "glow": 0.4,
       "drag": 2.0,
-      "buoy": 0.5
+      "buoy": -0.7
     }
   },
   "spark_presets": {

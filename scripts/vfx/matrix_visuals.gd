@@ -186,11 +186,22 @@ static func update(v: Dictionary, a, dt: float, t: float, fx) -> void:
 		"vortex":
 			for i in v["rings"].size():
 				var ring: Node3D = v["rings"][i]
-				ring.rotation.z += dt * (3.0 + i)
-				var s := fmod(t * 0.6 + i * 0.25, 1.0)
+				# push and pull: each ring breathes on its own beat, so the funnel never marches in step
+				ring.rotation.z += dt * (3.0 + i * 0.8 + 0.6 * sin(t * 1.3 + i * 2.1))
+				var s := fmod(t * (0.55 + i * 0.04) + i * 0.27 + 0.04 * sin(t * 2.0 + i), 1.0)
 				var rr: float = a.r * (1.0 - s * 0.7)
 				ring.scale = Vector3(rr, rr, 0.5)
 				ring.position.y = 0.3 + s * 2.2
+			if fx and a.delay <= 0:
+				# wind is invisible: the funnel shows by what it drags in at the foot and spins upward
+				for i in 2:
+					if randf() < dt * 2.5 * a.r * fade:
+						var ang := randf() * TAU
+						var rr: float = a.r * randf_range(0.6, 1.0)
+						var el: String = a.els[randi() % a.els.size()]
+						var vel := Vector3(cos(ang), 0, -sin(ang)) * randf_range(3.5, 5.5) - Vector3(sin(ang), 0, cos(ang)) * randf_range(0.8, 1.6)
+						fx.particles.sprite("dust" if el == "wind" else fx._sprite_of(el), root.position + Vector3(sin(ang) * rr, 0.25, cos(ang) * rr),
+							vel + Vector3(0, randf_range(1.8, 3.2), 0), {"k": randf_range(0.4, 0.7), "buoy": 0.5, "drag": 0.9})
 		"burning_land", "magma":
 			v["glow"].material_override.albedo_color.a = (0.55 + 0.25 * sin(t * 5 + a.id)) * fade
 		"magnetic":
