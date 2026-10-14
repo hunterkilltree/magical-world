@@ -84,6 +84,10 @@ a random or auto-generated name.
 - `scripts/vfx/` (VFX handoff, still WIP on this line of work: audio not done): `vfx_director` (port of vfx.js +
   wow.js), `vfx_particles` (MultiMesh smoke/spark pools), `lightning_bolt`, `screen_fx`, `vfx_textures` (painted in
   SubViewports; build gradients before painting, or they draw white). Combo casts freeze time briefly (sim `hitstop`).
+  Every particle look is the director's (R-060): `ArenaView.consume` only adds text, corpses, shake, rings and
+  geometry, never one-shot bursts. Timing helpers: `_after(delay, fn)` (overlap, delayed secondaries),
+  `stragglers`, `jet` (splash secondary), `magic_motes` (per-element drift); `shell(..., squeeze)` anticipates.
+  `particles.trace = []` logs every spawn for tests.
 - `scripts/arena/`: the 3D view, which only reads the sim. `arena_view` (court, props, entity sync, telegraphs, particles,
   lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
   y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),

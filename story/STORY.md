@@ -263,6 +263,45 @@ its line, Photon Railgun leaves a glowing trail and Plasma Spear branches.
 Enemies wear dashed status rings (cyan frozen, orange burning, yellow
 shocked, green rooted, ...), and critical hits show as "CRIT -N!".
 
+## Polish
+
+Feel, look and sound, all in the view layer: no gameplay number or sim timing
+changes. Effects follow the `elemental-vfx` skill (energy first, an explosion
+shape that resolves into the element, no repetition, imply rather than
+simulate).
+
+### R-060 [done] Spell effects read as energy moving through elements
+Core. Every effect is drawn once, by the VFX director (no second layer of
+generic particle bursts). Impacts burst fast and settle slowly: a blast
+squeezes for a frame before it bursts, big blasts overlap a smaller second
+burst, and a few stragglers fly further than the rest. Water splashes throw
+a delayed jet up from the centre; fire throws rogue embers; steam vanishes
+quickly, smoke outlives flame, dust settles. Light motes rise and dark ones
+sink. A big combo stays within a third of the particle pools.
+
+### R-061 [planned] Sound effects from recorded assets
+Core. Sim events play recorded CC0 sounds through a manifest (several takes
+per sound, pitch jitter, per-sound throttling, an SFX bus with a compressor
+and a UI bus); M mutes and the pause screen sets the volume. Missing files
+play nothing and raise no error.
+
+### R-062 [planned] A themed HUD and screens
+Core. One shared theme across the HUD, menu, pause and death screens; health
+and energy bars drain through a trailing ghost bar; queue slots are element
+orbs that pop in and glow with the combo's colour; cooldowns sweep radially;
+the wave banner and toasts animate. Everything R-047 and R-054 show stays.
+
+### R-063 [planned] Clear in-world indicators
+Core. Enemy telegraphs fill over their wind-up and pulse just before they
+strike; enemy health bars drain through a ghost bar; damage numbers pop,
+arc and stack instead of overlapping; the reticle dims when the queued spell
+cannot be cast.
+
+### R-064 [planned] A living arena
+Core. Moonlit key light, sky and light fog; braziers flicker irregularly and
+shed embers; dust drifts over the court; gate banners ripple; puddles shimmer.
+Ambient particles stay within a tenth of the pools.
+
 ## Retired: the Grauhold Reach campaign
 
 The six-zone grid campaign was replaced by Court of Waves. Its requirements are

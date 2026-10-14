@@ -396,26 +396,6 @@ func ground(p: Vector2, y := 0.0) -> Vector3:
 
 
 # ---------------------------------------------------------------- effects
-# A one-shot particle burst of `style` at `pos`.
-func burst(style: String, pos: Vector3, n: int, speed := 3.0, spread := 0.0, up := 0.6) -> void:
-	if n <= 0:
-		return
-	var p := _particles(style, n)
-	p.one_shot = true
-	p.explosiveness = 0.95
-	p.position = pos
-	p.direction = Vector3(0, up, 0)
-	p.spread = 180.0
-	p.initial_velocity_min = speed * 0.4
-	p.initial_velocity_max = speed * 1.2
-	if spread > 0:
-		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-		p.emission_sphere_radius = spread / 2
-	add_child(p)
-	p.emitting = true
-	_transient(p, STYLE.get(style, STYLE["arcane"])["life"] * 1.6 + 0.1, Callable())
-
-
 func _particles(style: String, n: int) -> CPUParticles3D:
 	var S: Dictionary = STYLE.get(style, STYLE["arcane"])
 	var p := CPUParticles3D.new()
@@ -502,7 +482,7 @@ func lightning(pts: Array, color: Color, y0 := 1.15, y1 := 1.0) -> void:
 
 
 # A straight ray of light: a bright core and a wide halo that fade out.
-func beam_fx(from: Vector2, to: Vector2, width: float, color: Color, els: Array) -> void:
+func beam_fx(from: Vector2, to: Vector2, width: float, color: Color) -> void:
 	var g := K.group(self)
 	var core := K.flat(Color(1, 1, 1), 1.0, true)
 	var halo := K.flat(color, 0.6, true)
@@ -510,12 +490,6 @@ func beam_fx(from: Vector2, to: Vector2, width: float, color: Color, els: Array)
 	var b := ground(to, 1.1)
 	_segment(g, a, b, maxf(0.08, width * 0.35), core)
 	_segment(g, a, b, maxf(0.3, width * 1.2), halo)
-	for el in els:
-		burst(_style(el), b, 14, 4.0)
-		var k := 0.0
-		while k < 1.0:
-			burst(_style(el), a.lerp(b, k), 2, 1.5)
-			k += 0.2
 	shake = minf(1.0, shake + 0.15 * width)
 	_transient(g, 0.35, func(k: float):
 		core.albedo_color.a = 1.0 - k
@@ -544,69 +518,34 @@ func _el_color(el: String) -> Color:
 # Turns this tick's sim events into effects.
 func consume(events: Array, sim: ArenaSim) -> void:
 	for e in events:
+		# Every particle look is the director's (R-060); this keeps text, corpses, shake and geometry.
 		director.on_event(e, sim)
 		match e["type"]:
-			"cone":
-				var d: Vector2 = e["dir"]
-				for el in e["els"]:
-					var p := _particles(_style(el), 14)
-					p.one_shot = true
-					p.explosiveness = 0.8
-					p.position = ground(e["pos"] + d * 0.6, 1.0)
-					p.direction = Vector3(d.x, 0.05, d.y)
-					p.spread = e["arc"] / 2.0
-					p.flatness = 0.8
-					p.initial_velocity_min = e["range"] * 1.6
-					p.initial_velocity_max = e["range"] * 2.2
-					p.lifetime = 0.45
-					add_child(p)
-					p.emitting = true
-					_transient(p, 0.6, Callable())
 			"explode":
-				var col: Color = e["color"]
-				var r: float = e["r"]
-				ring_fx(e["pos"], r, col, 0.5)
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 0.6), 12, 6.0, 0.5)
 				shake = minf(1.2, shake + (0.55 if e["big"] else 0.28))
 			"impact":
-				var col: Color = e.get("color", Color.WHITE)
-				if e.get("enemy", false):
-					burst("hex", ground(e["pos"], 1.1), 14, 3.0)
-				else:
-					for el in e["els"]:
-						burst(_style(el), ground(e["pos"], 1.0), 6, 3.0)
-					if e.get("kind", "") == "boulder":
-						burst("earth", ground(e["pos"], 0.6), 16, 4.0)
-						shake = minf(1.0, shake + 0.12)
-			"block":
-				burst("spark", ground(e["pos"], 1.1), 14, 4.0)
+				if not e.get("enemy", false) and e.get("kind", "") == "boulder":
+					shake = minf(1.0, shake + 0.12)
 			"chain":
 				lightning(e["pts"], e["color"])
 			"beam":
-				beam_fx(e["from"], e["to"], e["width"], e["color"], e["els"])
+				beam_fx(e["from"], e["to"], e["width"], e["color"])
 			"heal":
 				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44)
-				burst("heal", ground(e["pos"], 1.0), 6, 1.5, 0.8, 1.0)
 			"hit":
 				var col := _el_color(e["el"])
 				if e.get("crit", false):
 					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1)
 				else:
 					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
-				if not e["dot"]:
-					burst(_style(e["el"]), ground(e["pos"], 1.0), 6, 2.5)
 			"hurt":
 				var col := Color("#ff9a3c") if e["self"] else Color("#ff5a5a")
 				text(ground(e["pos"], 2.4), "-" + str(roundi(e["dmg"])), col, 52)
 				if not e["dot"]:
 					shake = minf(1.0, shake + 0.2)
-					burst("blood", ground(e["pos"], 1.1), 8, 3.0)
 			"tag":
 				if TAGS.has(e["tag"]):
 					text(ground(e["pos"], 2.9), TAGS[e["tag"]][0], Color(TAGS[e["tag"]][1]), 40, 1.0)
-			"ward":
-				burst("arcane", ground(e["pos"], 1.0), 10, 2.0)
 			"death":
 				var v = enemy_views.get(e["id"])
 				if v:
@@ -614,37 +553,12 @@ func consume(events: Array, sim: ArenaSim) -> void:
 					v["tele"].visible = false
 					v["spawn_ring"].visible = false
 					corpses.append({"v": v, "t": 0.0})
-				burst("rune" if not e["frozen"] else "ice", ground(e["pos"], 0.8), 20, 3.0)
 			"spawn":
 				ring_fx(e["pos"], 1.2, Color("#ff3b3b"), 0.9)
 			"wall":
-				burst("earth" if e["mat"] == "stone" else "ice", ground(e["pos"], 0.3), 20, 3.0, 2.0)
 				shake = minf(1.0, shake + 0.1)
-			"wallBreak":
-				burst("earth" if e["mat"] == "stone" else "ice", ground(e["pos"], 0.6), 14, 3.0)
-			"nova":
-				ring_fx(e["pos"], e["r"], e["color"], 0.45)
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 0.5), 30, 7.0, 0.6, 0.2)
-			"selfcast":
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 1.0), 24, 2.0, 1.0, 1.0)
-			"cast":
-				if e["mode"] == "aim" and wizard and wizard.tip and wizard.tip.is_inside_tree():
-					burst(_style(e["els"][0]), wizard.tip.global_position, 8, 1.5)
-			"dodge":
-				burst("smoke", ground(e["pos"], 0.3), 10, 2.0)
-			"ignite":
-				burst("fire", ground(e["pos"], 0.3), 30, 3.0, e["r"])
-			"steam":
-				burst("steam", ground(e["pos"], 0.4), 14, 1.5, e["r"])
-			"charge":
-				burst("lightning", ground(e["pos"], 0.2), 20, 4.0, e["r"])
-			"claw":
-				burst("spark", ground(e["pos"], 1.0), 8, 3.0)
 			"slam":
 				ring_fx(e["pos"], e["r"], RED, 0.4)
-				burst("earth", ground(e["pos"], 0.2), 26, 5.0, e["r"])
 				shake = minf(1.2, shake + 0.4)
 			"playerDeath":
 				shake = minf(1.2, shake + 0.5)
