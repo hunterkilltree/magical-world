@@ -10,6 +10,7 @@ const ArenaSim := preload("res://scripts/core/arena_sim.gd")
 const SpellBook := preload("res://scripts/core/spell_book.gd")
 const Roster := preload("res://scripts/core/wizard_roster.gd")
 const VfxDirector := preload("res://scripts/vfx/vfx_director.gd")
+const MatrixVisuals := preload("res://scripts/vfx/matrix_visuals.gd")
 
 const TAGS := {
 	"steam": ["STEAM", "#e8eef4"], "freeze": ["FROZEN", "#a8ecff"], "shatter": ["SHATTER", "#ffffff"],
@@ -18,6 +19,8 @@ const TAGS := {
 	"entangled": ["ENTANGLED", "#5cc84a"], "kindled": ["KINDLED", "#ff8a3a"], "fanned": ["FANNED", "#ffb070"],
 	"windchill": ["WINDCHILL", "#bfe8dc"], "purged": ["PURGED x1.5", "#fff1a8"], "swallowed": ["SWALLOWED", "#b08ae8"],
 	"reflected": ["REFLECTED", "#fff1a8"], "regrown": ["REGROWN", "#5cc84a"],
+	"thermal": ["THERMAL SHOCK", "#ffb070"], "miss": ["MISS", "#d6c08a"], "confused": ["CONFUSED", "#c084fc"],
+	"deflected": ["DEFLECTED", "#67e8f9"], "immune": ["IMMUNE", "#ffd86b"], "revived": ["REVIVED", "#7dff8a"],
 }
 # Particle looks per element / effect: colours, lifetime, size, gravity (negative rises), additive glow.
 const STYLE := {
@@ -587,7 +590,10 @@ func consume(events: Array, sim: ArenaSim) -> void:
 				burst("heal", ground(e["pos"], 1.0), 6, 1.5, 0.8, 1.0)
 			"hit":
 				var col := _el_color(e["el"])
-				text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
+				if e.get("crit", false):
+					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1)
+				else:
+					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
 				if not e["dot"]:
 					burst(_style(e["el"]), ground(e["pos"], 1.0), 6, 2.5)
 			"hurt":
@@ -796,6 +802,7 @@ func _sync_enemies(sim: ArenaSim, dt: float) -> void:
 				"burn": _emitter(model, "fire", 30, Vector3(0.25, model.height * 0.35, 0.25), model.height * 0.4),
 				"root": _emitter(model, "nature", 20, Vector3(model.ice_r * 0.6, 0.05, model.ice_r * 0.6), 0.05),
 				"curse": _emitter(model, "dark", 16, Vector3(0.3, model.height * 0.4, 0.3), model.height * 0.4),
+				"rings": MatrixVisuals.build_status_rings(model),
 				"shock": _emitter(model, "lightning", 30, Vector3(0.3, model.height * 0.4, 0.3), model.height * 0.4)}
 			enemy_views[e.id] = v
 		_update_enemy_view(v, e, dt, sim)
@@ -873,6 +880,7 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 	v["shock"].emitting = st.shock > 0
 	v["root"].emitting = st.root > 0
 	v["curse"].emitting = st.curse > 0 or st.blind > 0
+	MatrixVisuals.update_status_rings(v["rings"], st, model.ice_r, t)
 	# telegraphs
 	var T: Dictionary = v["tele_d"]
 	var g: Node3D = T["group"]
@@ -958,7 +966,12 @@ func _sync_areas(sim: ArenaSim, dt: float) -> void:
 				v["fxn"] = K.group(self, ground(a.pos))
 				v["fx"] = _emitter(v["fxn"], _style(a.els[0]), int(28 * a.r), Vector3(a.r * 0.7, 0.05, a.r * 0.7), 0.1)
 				v["fx"].emitting = true
+			var mx := MatrixVisuals.build(self, a)
+			v["mx"] = mx
+			if mx.has("root"):
+				v["mx_root"] = mx["root"]
 			area_views[a.id] = v
+		MatrixVisuals.update(v["mx"], a, dt, t, director)
 		var fade := 1.0 if a.delay > 0 else minf(1.0, a.life / 0.4)
 		if a.delay > 0:
 			var k: float = 1 - a.delay / a.delay_max

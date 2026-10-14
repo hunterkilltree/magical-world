@@ -67,7 +67,7 @@ func test_meteor_shower_drops_four() -> void:
 
 func test_supernova_leaves_a_sea_of_fire() -> void:
 	F.cast(s, ["fire", "fire"], Vector2(0, -7))
-	F.run(s, 0.8)
+	F.run(s, 1.5) # two blasts (0.7 s, then 0.4 s later), then the burning land
 	assert_true(s.areas.any(func(a): return a.key == "burning"), "fire left behind")
 
 

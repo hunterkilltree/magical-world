@@ -207,6 +207,62 @@ grimoire lists all 74 spells; Rooted and Regen show as statuses; rooted, blinded
 and cursed show as pips under enemy health bars; beams draw as a bright ray,
 heals as green numbers, and wood and crystal walls have their own look.
 
+## The effects matrix
+
+`story/design/COMBINATIONS_AND_EFFECTS_SUMMARY.md` lists 29 spells with their
+effects and looks. Its numbers are on another scale (damage in the hundreds,
+radii in pixels), so they are fitted to ours: 50 px = 1 m, durations in seconds
+as given, and its cooldowns x0.3 as the spell's own recharge. Damage keeps our
+balance, nudged by the file's ranking. Where a matrix recipe lands on a pair
+that holds a handoff spell (fire+water, fire+earth, fire+lightning,
+water+lightning, water+ice, earth+lightning, water+earth), the handoff spell
+stays and the matrix spell moves to a doubled three-element recipe. Each
+spell the matrix touched carries its row number as `matrix` in `spells.json`.
+
+### R-055 [done] Every matrix spell has a recipe and the matrix's sizes
+Core. All 28 queueable rows resolve to their spell: Steam Bomb (fire, water,
+water), Magma Burst (earth, earth, fire), Plasma Spear (fire, lightning,
+lightning), Mud Prison (earth, water, water), Mountain Rise (earth, earth,
+water) and Magnetic Field (earth, earth, lightning) join the 74. Radius,
+duration and cooldown follow the matrix (Black Hole 4 m for 6 s, World Tree
+5 m for 12 s, ...), and a matrix spell recharges on its own timer instead of
+locking its whole shape.
+
+### R-056 [done] Control effects
+Core. Solar Flare stuns and blinds for 3.5 s; Graveyard silences (no
+attacks) for 5 s; Abyss Water weakens (-40% damage) for 4 s and drains energy
+back to you; Sandstorm makes enemies miss 60% of their attacks; Shadow Storm
+confuses (enemies attack the nearest other enemy); Living Vines root for 5 s
+and Glacier Prison freezes for 6 s; Mudslide and Mud Prison slow by 80% and
+Magma Burst by 60% (other slows stay at 40%).
+
+### R-057 [done] Protective effects
+Core. Forest Fortress gives +75% armour for 10 s; Crystal Garden reflects
+half the damage you take back at the attacker for 7 s; under the World Tree
+you are invulnerable, and casting it grants one revive (back at half health);
+Rainbow Mist cleanses burning, chill, slow and stuns while you stand in it;
+Death Forest gives back 30% of the damage it deals as health.
+
+### R-058 [done] Battlefield effects
+Core. Supernova blasts twice, then leaves 10 s of burning land, and burns
+twice as hot; Tsunami washes enemy shots away and leaves a water pool;
+Magnetic Field destroys enemy shots and pushes enemies out; Mountain Rise is
+a seven-segment stone wall. Thermal Shock (matrix row 9) cannot be queued
+because fire and ice cancel, so it is a reaction: fire hitting a frozen enemy
+does x1.8 and shows as a critical hit (it still thaws, as in R-038).
+
+### R-059 [done] The matrix's looks
+Core. Wildfire spreads seven green-to-amber sub-zones of grass clumps whose
+tips catch fire, with drifting leaves; Steam Bomb is a brownish-amber cloud
+with a dashed edge and six orbiting wisps; Black Hole is a violet singularity
+with a glowing rim and tilted rings; Fire Tornado, Whirlpool and Shadow Storm
+spin rings that spiral inward; the water pool, burning land, magma, mud,
+magnetic field and the World Tree have their own ground looks; Glacier
+Prison raises a permafrost pillar; Divine Judgement drops holy pillars along
+its line, Photon Railgun leaves a glowing trail and Plasma Spear branches.
+Enemies wear dashed status rings (cyan frozen, orange burning, yellow
+shocked, green rooted, ...), and critical hits show as "CRIT -N!".
+
 ## Retired: the Grauhold Reach campaign
 
 The six-zone grid campaign was replaced by Court of Waves. Its requirements are

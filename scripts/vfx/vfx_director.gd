@@ -842,6 +842,29 @@ func _sig(key: String, hook: String, e: Dictionary) -> void:
 		["nature+nature", "area"], ["light+nature+water", "area"]:
 			rune(at.x, at.y, Color("#7dff8a"), e["r"], e["life"], {"hold": true, "spin": 1.2, "r0": e["r"] * 0.6, "a": 0.6})
 			column(at.x, at.y, Color("#7dff8a"), 0.6, 6, 0.8, {"k": 1.4})
+		["light+light", "beam"]:
+			# Holy pillars smiting down along the line.
+			var a: Vector2 = e["from"]
+			var b: Vector2 = e["to"]
+			var k := 0.0
+			while k <= 1.0:
+				var p := a.lerp(b, k)
+				column(p.x, p.y, Color("#fff1a8"), 0.55, 9, 0.6, {"k": 2.0})
+				k += 0.18
+			screen.screen_flash(Color("#fff6d0"), 0.06)
+			punch(0.4, -1.5, 0.3)
+		["light+lightning", "beam"]:
+			laser_trail(e["from"], e["to"], e["color"], 0.8)
+		["fire+lightning+lightning", "beam"]:
+			var a: Vector2 = e["from"]
+			var b: Vector2 = e["to"]
+			bolt([Vector3(a.x, 1.1, a.y), Vector3(b.x, 1.1, b.y)], Color("#ffb070"), {"w": 0.3, "life": 0.35})
+			for i in 4:
+				var p := a.lerp(b, randf_range(0.2, 0.9))
+				var ang := randf() * TAU
+				bolt([Vector3(p.x, 1.1, p.y), Vector3(p.x + sin(ang) * 1.6, 0.1, p.y + cos(ang) * 1.6)], YELLOW, {"quiet": true, "w": 0.12, "life": 0.2})
+		["ice+ice", "explode"]:
+			permafrost_pillar(at, e["r"])
 		["earth+ice", "wall"]:
 			wall_debris(e, "ice")
 			decal("frost", e["pos"].x, e["pos"].y, 2.4, 9)
@@ -869,6 +892,44 @@ func _sig(key: String, hook: String, e: Dictionary) -> void:
 				var a := a0 + randf_range(-0.5, 0.5) * deg_to_rad(e["arc"])
 				var dd := randf_range(1, 1 + e["range"] * 0.7)
 				spray("mud", at.x + sin(a) * dd, 0.3, at.y + cos(a) * dd, 1, 2, {"dir": Vector2(sin(a), cos(a)) * 5})
+
+
+# A glowing laser line that lingers (Photon Railgun).
+func laser_trail(a: Vector2, b: Vector2, c: Color, life: float) -> void:
+	var node := Node3D.new()
+	add_child(node)
+	var gm := MeshInstance3D.new()
+	gm.material_override = _strip(c, 2.2, 1.4)
+	node.add_child(gm)
+	var cm := MeshInstance3D.new()
+	cm.material_override = _strip(Color.WHITE, 2.6, 0.8)
+	node.add_child(cm)
+	var cam: Vector3 = view.camera.global_position if view and view.camera and view.camera.is_inside_tree() else Vector3(0, 20, 20)
+	var seg := [[Vector3(a.x, 1.1, a.y), Vector3(b.x, 1.1, b.y), 1.0, 1.0]]
+	gm.mesh = Bolt.ribbon(self, seg, 0.35, cam)
+	cm.mesh = Bolt.ribbon(self, seg, 0.08, cam)
+	_add(node, life, func(k: float, _dt: float, _el: float):
+		gm.material_override.set_shader_parameter("alpha", (1 - k) * (1 - k))
+		cm.material_override.set_shader_parameter("alpha", 1 - k))
+
+
+# Glacier Prison: a permafrost pillar with spinning crystal shards.
+func permafrost_pillar(at: Vector2, r: float) -> void:
+	var g := K.group(self, [at.x, 0, at.y])
+	var mat := K.mat(0xd6f6ff, 0.08, 0.05, 0x5ab8ff, 0.8, "permafrost")
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color.a = 0.8
+	var pillar := K.put(g, K.cyl(r * 0.35, r * 0.5, 3.2, 7), mat, [0, 1.6, 0])
+	var shards := []
+	for i in 8:
+		var a := i / 8.0 * TAU
+		shards.append(K.put(g, K.cone(0.12, 0.6, 4), mat, [sin(a) * r * 0.7, 1.2, cos(a) * r * 0.7], [0.4, a, 0]))
+	spikes(at.x, at.y, r * 0.9, 18, 3.0, {"h": 1.4})
+	decal("frost", at.x, at.y, r * 1.2, 8)
+	_add(g, 3.0, func(k: float, dt: float, el: float):
+		pillar.scale = Vector3(1, minf(1.0, el / 0.15), 1) * (1.0 if k < 0.85 else (1 - k) / 0.15)
+		g.rotation.y += dt * 1.5,
+		func(): spray("ice", at.x, 1.2, at.y, 16, 5, {"spread": r}))
 
 
 func prism_fan(e: Dictionary) -> void:
@@ -962,6 +1023,7 @@ func on_event(e: Dictionary, sim) -> void:
 		"beam":
 			var a: Vector2 = e["from"]
 			var b: Vector2 = e["to"]
+			_sig(e.get("key", ""), "beam", e)
 			flare(Vector3(b.x, 1.1, b.y), e["color"], 1.4, 0.12)
 			screen.wave(Vector3(a.x, 1.1, a.y), 0.25)
 			punch(0.3, -0.8)

@@ -47,6 +47,16 @@ class Status:
 	var curse := 0.0 # takes x1.25 damage
 	var regen := 0.0 # heals regen_hp per second while > 0 (player)
 	var regen_hp := 0.0
+	# Effects matrix (R-055 to R-058)
+	var slow_pct := 0.0 # how much `slow` slows (0.4 unless a spell says otherwise)
+	var stun := 0.0 # cannot act
+	var silence := 0.0 # cannot start an attack
+	var weaken := 0.0 # deals 40% less damage
+	var inaccurate := 0.0 # misses 60% of attacks
+	var confuse := 0.0 # attacks the nearest other enemy
+	var armor := 0.0 # player: takes damage / 1.75
+	var reflect := 0.0 # player: 50% of damage taken goes back to the attacker
+	var invuln := 0.0 # player: takes no damage
 
 
 # The player and every enemy. Player-only fields sit unused on enemies.
@@ -92,6 +102,7 @@ class Body:
 	var hurt_t := 0.0
 	var cur_speed := 0.0
 	var dead_t := 0.0
+	var revives := 0 # player: World Tree revive charges
 
 
 class Shot:
@@ -130,6 +141,10 @@ class Area:
 	var name := ""
 	var sp := {}
 	var heal := 0.0 # heals the player standing inside, per tick
+	var invulnerable := false # the player standing inside takes no damage
+	var cleanse := false # clears the player's debuffs each tick
+	var repel := 0.0 # pushes enemies out
+	var deflect := false # destroys enemy shots inside
 	var swallow := false # eats enemy shots inside
 	var repeat := 0 # more bursts still to fall (Meteor Shower)
 	var interval := 0.0
@@ -282,6 +297,11 @@ func step(inp: Dictionary, dt: float) -> Array:
 		else:
 			_kill(e)
 	enemies = keep
+	if p.alive and p.hp <= 0 and p.revives > 0:
+		p.revives -= 1
+		p.hp = p.max_hp * 0.5
+		p.st.invuln = 1.5
+		_ev("tag", {"tag": "revived", "pos": p.pos})
 	if p.alive and p.hp <= 0:
 		p.alive = false
 		p.hp = 0
@@ -369,7 +389,8 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 		_ev("fizzle", {"pos": p.pos})
 		return
 	var shape: String = sp["def"]["shape"]
-	if cmode == "aim" and p.shape_cd.get(shape, 0.0) > 0:
+	var timer_key := recharge_key(sp)
+	if cmode == "aim" and p.shape_cd.get(timer_key, 0.0) > 0:
 		if not held:
 			_ev("cooldown", {"shape": shape, "t": p.shape_cd[shape]})
 		return
@@ -384,8 +405,8 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 	p.cd[slot] = cdv
 	p.cd_max[slot] = cdv
 	if cmode == "aim" and sp["cd"] > 0.45:
-		p.shape_cd[shape] = sp["cd"]
-		p.shape_max[shape] = sp["cd"]
+		p.shape_cd[timer_key] = sp["cd"]
+		p.shape_max[timer_key] = sp["cd"]
 	var from_queue := not p.queue.is_empty()
 	var is_new: bool = not stats["found"].has(sp["key"])
 	var distinct: int = sp["counts"].size()
@@ -417,6 +438,11 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 		call("_cast_" + shape, sp, p, d, maxf(1.2, aim_dist))
 
 
+# Which recharge timer a spell uses: its own (spells with a matrix cooldown) or its shape's.
+static func recharge_key(sp: Dictionary) -> String:
+	return sp["key"] if sp["def"].has("cd") else sp["def"]["shape"]
+
+
 func _cast_cone(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
 	var def: Dictionary = sp["def"]
 	var rng_ := float(def.get("range", 5.0))
@@ -435,6 +461,18 @@ func _cast_cone(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
 	for o in _env_list():
 		if _in_cone(o, o.r, p.pos, d, rng_, c):
 			_env_hit(o, sp["els"], false)
+	if def.get("deflect", false):
+		var kept := []
+		for b in shots:
+			if b.owner == "enemy" and _in_cone(b, b.r, p.pos, d, rng_, c):
+				_ev("tag", {"tag": "deflected", "pos": b.pos})
+			else:
+				kept.append(b)
+		shots = kept
+	if def.has("pool"):
+		var pool: Dictionary = def["pool"]
+		_spawn_area(SpellBook.make_spell(["water"], {"name": "water pool", "shape": "area", "radius": pool["radius"],
+			"life": pool["life"], "tick": 0.5, "mult": 0.0, "visual": "water_pool"}, 1.0, "water_pool"), p.pos + d * rng_ * 0.6)
 	_ev("cone", {"pos": p.pos, "dir": d, "range": rng_, "arc": arc, "els": sp["els"], "color": sp["color"], "key": sp["key"]})
 
 
@@ -545,6 +583,10 @@ func _cast_area(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
 
 
 func _cast_wall(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
+	if sp["def"].has("armor"):
+		p.st.armor = maxf(p.st.armor, float(sp["def"]["armor"]))
+	if sp["def"].has("reflectPlayer"):
+		p.st.reflect = maxf(p.st.reflect, float(sp["def"]["reflectPlayer"]))
 	var n := int(sp["def"].get("segments", 5))
 	var c: Vector2 = p.pos + d * TUNING["wall_dist"]
 	for i in n:
@@ -606,6 +648,12 @@ func _spawn_area(sp: Dictionary, at: Vector2) -> Area:
 	a.interval = float(def.get("interval", 0.3))
 	a.scatter = float(def.get("scatter", 0.0))
 	a.center = at
+	a.invulnerable = bool(def.get("invulnerable", false))
+	a.cleanse = bool(def.get("cleanse", false))
+	a.repel = float(def.get("repel", 0.0))
+	a.deflect = bool(def.get("deflectField", false))
+	if def.get("revive", false):
+		player.revives = maxi(player.revives, 1)
 	areas.append(a)
 	_ev("area", {"pos": at, "r": a.r, "life": a.life, "delay": a.delay, "key": a.key, "els": a.els, "color": a.color})
 	return a
@@ -767,8 +815,14 @@ func _hurt(b: Body, dmg: float, el: String, o := {}) -> float:
 		if b.dodge > 0 and not dot:
 			_ev("tag", {"tag": "evade", "pos": b.pos})
 			return 0.0
+		if b.st.invuln > 0:
+			if not dot:
+				_ev("tag", {"tag": "immune", "pos": b.pos})
+			return 0.0
 		if b.st.stoneskin > 0:
 			dmg *= 0.5
+		if b.st.armor > 0:
+			dmg /= 1.75
 		if b.st.ward > 0:
 			var a := minf(b.st.ward, dmg)
 			b.st.ward -= a
@@ -782,6 +836,10 @@ func _hurt(b: Body, dmg: float, el: String, o := {}) -> float:
 			stats["self_dmg"] += dmg
 		if not dot:
 			b.hurt_t = 0.3
+		var src = o.get("src")
+		if src != null and b.st.reflect > 0 and not dot and src.hp > 0:
+			_ev("tag", {"tag": "reflected", "pos": src.pos})
+			_hurt(src, dmg * 0.5, "light")
 	else:
 		if not dot:
 			b.flash = 0.14
@@ -795,7 +853,7 @@ func _hurt(b: Body, dmg: float, el: String, o := {}) -> float:
 		shown = b.dot_acc
 		b.dot_acc = 0
 	_ev("hurt" if is_p else "hit", {"id": b.id, "pos": b.pos, "dmg": shown, "el": el, "dot": dot,
-		"self": o.get("self", false), "reason": o.get("reason", "")})
+		"self": o.get("self", false), "reason": o.get("reason", ""), "crit": o.get("crit", false)})
 	return dmg
 
 
@@ -890,6 +948,9 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 		if el == "lightning" and was_wet:
 			d *= 2
 			tags.append("conduct")
+		if el == "fire" and was_frozen:
+			d *= 1.8 # THERMAL SHOCK: frozen, then blasted with heat (effects matrix #9)
+			tags.append("thermal")
 		if el == "earth" and was_frozen:
 			d *= 2.2
 			tags.append("shatter")
@@ -906,14 +967,24 @@ func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 	if pl.get("shock", 0) > 0 and st.frozen <= 0:
 		st.shock = maxf(st.shock, pl["shock"] * (2 if was_wet else 1))
 	if pl.get("slow", 0) > 0:
+		st.slow_pct = maxf(st.slow_pct if st.slow > 0 else 0.0, pl.get("slowPct", 0.4))
 		st.slow = maxf(st.slow, pl["slow"])
+	if not is_p:
+		for key in ["stun", "silence", "weaken", "inaccurate", "confuse"]:
+			if pl.get(key, 0) > 0:
+				st.set(key, maxf(st.get(key), pl[key]))
+		if pl.get("energyDrain", 0) > 0:
+			player.energy = minf(player.max_energy, player.energy + pl["energyDrain"])
 	var block: float = c.get("block", 1.0)
 	dmg *= block
 	var kn: float = pl.get("knock", 0.0) * k * c.get("knock_mul", 1.0) * block
 	if kn > 0 and c.has("k"):
 		b.kvel += c["k"] * kn / b.mass
 	if dmg > 0.05:
-		var dealt := _hurt(b, dmg, top, {"self": is_p, "reason": c.get("reason", ""), "dot": c.get("area", false)})
+		var dealt := _hurt(b, dmg, top, {"self": is_p, "reason": c.get("reason", ""), "dot": c.get("area", false),
+			"crit": tags.has("thermal") or tags.has("shatter")})
+		if not is_p and pl.get("drainPct", 0) > 0 and dealt > 0:
+			heal(dealt * pl["drainPct"], "Soul drain")
 		if not is_p and pl.get("drain", 0) > 0 and pl["parts"].has("dark") and dealt > 0:
 			heal(dealt * pl["drain"] * pl["parts"]["dark"] / maxf(0.001, _sum_parts(pl)), "Drain")
 	var seen := {}
@@ -1114,7 +1185,7 @@ func _inside(o: Prop, e: Body) -> bool:
 
 # ---------------------------------------------------------------- player
 static func slow_mul(st: Status) -> float:
-	return maxf(0.35, 1.0 - st.chill * 0.16) * (0.6 if st.slow > 0 else 1.0)
+	return maxf(0.35, 1.0 - st.chill * 0.16) * (1.0 - (st.slow_pct if st.slow_pct > 0 else 0.4) if st.slow > 0 else 1.0)
 
 
 func _tick_status(b: Body, dt: float) -> void:
@@ -1138,6 +1209,10 @@ func _tick_status(b: Body, dt: float) -> void:
 	st.haste = maxf(0.0, st.haste - dt)
 	st.root = maxf(0.0, st.root - dt)
 	st.blind = maxf(0.0, st.blind - dt)
+	if st.slow <= 0:
+		st.slow_pct = 0.0
+	for k in ["stun", "silence", "weaken", "inaccurate", "confuse", "armor", "reflect", "invuln"]:
+		st.set(k, maxf(0.0, st.get(k) - dt))
 	st.curse = maxf(0.0, st.curse - dt)
 	if st.regen > 0:
 		st.regen -= dt
@@ -1330,10 +1405,10 @@ func _steer(e: Body, u: Vector2, spd: float, dt: float) -> void:
 
 func _ai_thrall(e: Body, dt: float, c: Dictionary) -> void:
 	var A: Dictionary = e.T["atk"]
-	var p := player
+	var p: Body = c["t"]
 	var u: Vector2 = c["u"]
 	if e.state == "chase":
-		if not p.alive:
+		if not p.alive or p.hp <= 0:
 			e.vel *= 0.9
 			return
 		_steer(e, u, c["spd"], dt)
@@ -1357,7 +1432,7 @@ func _ai_thrall(e: Body, dt: float, c: Dictionary) -> void:
 		if not e.hit_done:
 			if p.alive and c["dist"] < e.r + p.r + 0.5:
 				e.hit_done = true
-				if _hurt(p, A["dmg"], "phys") > 0:
+				if _enemy_hits(e, p, A["dmg"], "phys") > 0:
 					p.kvel += e.aim * 5
 					_ev("claw", {"pos": p.pos})
 			var w := _wall_ahead(e, e.aim)
@@ -1377,11 +1452,11 @@ func _ai_thrall(e: Body, dt: float, c: Dictionary) -> void:
 
 func _ai_bulwark(e: Body, dt: float, c: Dictionary) -> void:
 	var A: Dictionary = e.T["atk"]
-	var p := player
+	var p: Body = c["t"]
 	var u: Vector2 = c["u"]
 	var fv := Vector2(sin(e.face), cos(e.face))
 	if e.state == "chase":
-		if not p.alive:
+		if not p.alive or p.hp <= 0:
 			e.vel *= 0.9
 			return
 		_turn_to(e, atan2(u.x, u.y), e.T["turn"] * dt)
@@ -1396,8 +1471,12 @@ func _ai_bulwark(e: Body, dt: float, c: Dictionary) -> void:
 		e.vel *= 0.8
 		if e.state_t <= 0:
 			var L := p.pos.distance_to(e.slam)
-			if p.alive and L < A["radius"] + p.r and _hurt(p, A["dmg"], "phys") > 0:
+			if p.alive and L < A["radius"] + p.r and _enemy_hits(e, p, A["dmg"], "phys") > 0:
 				p.kvel += (p.pos - e.slam) / (L if L > 0 else 1.0) * A["knock"]
+			if p != player:
+				for o in live():
+					if o != e and o != p and o.pos.distance_to(e.slam) < A["radius"] + o.r:
+						_enemy_hits(e, o, A["dmg"], "phys")
 			for w in walls:
 				if w.pos.distance_to(e.slam) < A["radius"] + w.r:
 					w.hp -= 70
@@ -1414,11 +1493,11 @@ func _ai_bulwark(e: Body, dt: float, c: Dictionary) -> void:
 func _ai_hexcaller(e: Body, dt: float, c: Dictionary) -> void:
 	var T := e.T
 	var A: Dictionary = T["atk"]
-	var p := player
+	var p: Body = c["t"]
 	var u: Vector2 = c["u"]
 	_turn_to(e, atan2(u.x, u.y), T["turn"] * dt)
 	if e.state == "chase":
-		if not p.alive:
+		if not p.alive or p.hp <= 0:
 			e.vel *= 0.9
 			return
 		var m := Vector2.ZERO
@@ -1446,7 +1525,16 @@ func _ai_hexcaller(e: Body, dt: float, c: Dictionary) -> void:
 			b.vel = u * A["speed"]
 			b.r = 0.3
 			b.life = 3.0
-			b.dmg = A["dmg"]
+			b.dmg = A["dmg"] * (0.6 if e.st.weaken > 0 else 1.0)
+			if e.st.inaccurate > 0 and rng.randf() < 0.6:
+				b.vel = b.vel.rotated(rng.randf_range(-0.6, 0.6)) # a wild shot
+			if p != player:
+				# Confused: the hex flies at another enemy, as if it were the player's.
+				b.owner = "player"
+				b.kind = "bolt"
+				b.sp = SpellBook.make_spell(["arcane"], {"name": "Confused hex", "shape": "bolt", "mult": b.dmg / 11.0})
+				b.color = Color("#5cffb0")
+				b.els = ["arcane"]
 			shots.append(b)
 			e.state = "recover"
 			e.state_t = A["recover"]
@@ -1455,6 +1543,34 @@ func _ai_hexcaller(e: Body, dt: float, c: Dictionary) -> void:
 		e.vel *= 0.9
 		if e.state_t <= 0:
 			e.state = "chase"
+
+
+# Who an enemy goes for: the player, or (confused) the nearest other enemy.
+func _target_of(e: Body) -> Body:
+	if e.st.confuse <= 0:
+		return player
+	var best: Body = null
+	var bd := 8.0
+	for o in live():
+		if o != e:
+			var d: float = o.pos.distance_to(e.pos)
+			if d < bd:
+				bd = d
+				best = o
+	return best if best else player
+
+
+# An enemy's attack landing on `target`: confused enemies hit each other; weakened ones deal 40%
+# less; inaccurate ones miss 60% of the time. Returns the damage dealt.
+func _enemy_hits(e: Body, target: Body, dmg: float, el: String) -> float:
+	if e.st.inaccurate > 0 and rng.randf() < 0.6:
+		_ev("tag", {"tag": "miss", "pos": target.pos})
+		return 0.0
+	if e.st.weaken > 0:
+		dmg *= 0.6
+	if target != player:
+		_ev("tag", {"tag": "confused", "pos": e.pos})
+	return _hurt(target, dmg, el, {"src": e})
 
 
 func _update_enemy(e: Body, dt: float) -> void:
@@ -1467,14 +1583,14 @@ func _update_enemy(e: Body, dt: float) -> void:
 	_tick_status(e, dt)
 	if e.hp <= 0:
 		return
-	var p := player
 	var st := e.st
-	var dv := p.pos - e.pos
+	var target := _target_of(e)
+	var dv: Vector2 = target.pos - e.pos
 	var L := dv.length()
 	if L == 0:
 		L = 1.0
-	var c := {"u": dv / L, "dist": L, "spd": e.speed * slow_mul(st)}
-	if st.frozen > 0 or st.shock > 0:
+	var c := {"u": dv / L, "dist": L, "spd": e.speed * slow_mul(st), "t": target}
+	if st.frozen > 0 or st.shock > 0 or st.stun > 0:
 		if e.state == "windup" or e.state == "charge":
 			e.state = "recover"
 			e.state_t = 0.35
@@ -1482,8 +1598,8 @@ func _update_enemy(e: Body, dt: float) -> void:
 		e.vel *= 0.8
 	else:
 		e.state_t -= dt
-		if st.blind > 0 and e.state == "chase":
-			e.atk_cd = maxf(e.atk_cd, 0.2) # blinded: cannot line up an attack
+		if (st.blind > 0 or st.silence > 0) and e.state == "chase":
+			e.atk_cd = maxf(e.atk_cd, 0.2) # blinded or silenced: cannot line up an attack
 		call("_ai_" + e.kind, e, dt, c)
 	if st.root > 0:
 		e.vel = Vector2.ZERO
@@ -1671,6 +1787,22 @@ func _update_areas(dt: float) -> void:
 						"life": l["life"], "tick": l["tick"], "mult": l["mult"], "hitsAll": true}, 1.0, "burning"), a.center)
 			continue
 		a.life -= dt
+		if a.deflect:
+			var kept_d := []
+			for b in shots:
+				if b.owner == "enemy" and b.pos.distance_to(a.pos) < a.r:
+					_ev("tag", {"tag": "deflected", "pos": b.pos})
+				else:
+					kept_d.append(b)
+			shots = kept_d
+		if a.repel > 0:
+			for e in live():
+				var v: Vector2 = e.pos - a.pos
+				var L: float = v.length()
+				if L < a.r + e.r and L > 0.05:
+					e.kvel += v / L * a.repel * dt * 6 / e.mass
+		if a.invulnerable and p.alive and p.pos.distance_to(a.pos) < a.r:
+			p.st.invuln = maxf(p.st.invuln, 0.2)
 		if a.swallow:
 			var kept := []
 			for b in shots:
@@ -1695,6 +1827,9 @@ func _update_areas(dt: float) -> void:
 					_apply_payload(e, pl, {"area": true})
 			if a.hits_all and p.alive and p.pos.distance_to(a.pos) < a.r:
 				_apply_payload(p, pl, {"area": true, "reason": "Standing in your own " + a.name})
+			if a.cleanse and p.alive and p.pos.distance_to(a.pos) < a.r:
+				for k in ["burn", "chill", "frozen", "slow", "shock", "stun", "curse"]:
+					p.st.set(k, 0.0)
 			if a.heal > 0 and p.pos.distance_to(a.pos) < a.r:
 				heal(a.heal, a.name)
 			_env_at(a.pos, a.r * 0.8, a.els, false)

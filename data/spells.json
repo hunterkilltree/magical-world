@@ -277,6 +277,8 @@
       "tick": 0.45,
       "mult": 0.6,
       "hitsAll": true,
+      "visual": "thunder_pool",
+      "matrix": 14,
       "desc": "Electrified pool. Shocks anyone standing in it."
     },
     "earth+ice": {
@@ -352,7 +354,9 @@
       "mult": 0.8,
       "knock": 14,
       "slow": 2.5,
-      "desc": "Mud wave — huge knockback, mires enemies."
+      "slowPct": 0.8,
+      "matrix": 13,
+      "desc": "Mud wave: huge knockback, mires enemies (-80% speed)."
     },
     "earth+lightning": {
       "name": "Lodestone",
@@ -421,36 +425,54 @@
       "radius": 3.6,
       "delay": 0.7,
       "life": 0.01,
-      "mult": 2.2,
+      "mult": 2.4,
       "burst": true,
       "hitsAll": true,
       "leaves": {
-        "radius": 3.0,
-        "life": 5,
+        "radius": 3.6,
+        "life": 10,
         "tick": 0.5,
-        "mult": 0.3
+        "mult": 0.3,
+        "name": "burning land"
       },
-      "desc": "A sun drops where you aim, then leaves a sea of fire."
+      "repeat": 2,
+      "interval": 0.4,
+      "scatter": 0.0,
+      "burnMult": 2.0,
+      "cd": 2.4,
+      "matrix": 1,
+      "desc": "A multi-stage sun: two blasts, then 10 s of burning land. Burns twice as hot."
     },
     "water+water": {
       "name": "Tsunami",
       "shape": "cone",
-      "range": 7.5,
-      "arc": 85,
+      "range": 4.8,
+      "arc": 100,
       "mult": 0.8,
       "knock": 20,
-      "desc": "A wall of water that sweeps the court clear."
+      "life": 3,
+      "deflect": true,
+      "pool": {
+        "radius": 3.2,
+        "life": 3
+      },
+      "cd": 2.1,
+      "matrix": 10,
+      "desc": "A surge wave that knocks the horde back, washes enemy shots away and leaves a pool."
     },
     "ice+ice": {
       "name": "Glacier Prison",
       "shape": "area",
-      "radius": 3,
+      "radius": 3.0,
       "delay": 0.4,
       "life": 0.01,
       "mult": 0.8,
       "burst": true,
-      "freeze": 3.0,
-      "desc": "Permafrost erupts and encases everything inside."
+      "freeze": 6.0,
+      "cd": 2.4,
+      "visual": "glacier",
+      "matrix": 17,
+      "desc": "A permafrost pillar: everything inside is frozen solid for 6 s."
     },
     "lightning+lightning": {
       "name": "Thunderstorm",
@@ -465,12 +487,17 @@
     "nature+nature": {
       "name": "World Tree",
       "shape": "area",
-      "radius": 3.2,
-      "life": 6,
+      "radius": 5.0,
+      "life": 12,
       "tick": 0.5,
       "mult": 0.2,
       "heal": 5,
-      "desc": "Yggdrasil's sprout: roots your foes, heals you while you stand under it."
+      "invulnerable": true,
+      "revive": true,
+      "cd": 6.0,
+      "visual": "world_tree",
+      "matrix": 29,
+      "desc": "Yggdrasil: invulnerable while you stand under it, and one revive charge."
     },
     "wind+wind": {
       "name": "Cyclone",
@@ -486,20 +513,26 @@
       "name": "Divine Judgement",
       "shape": "beam",
       "range": 14,
-      "width": 0.9,
-      "mult": 2.2,
-      "desc": "A holy lance across the whole court."
+      "width": 2.0,
+      "mult": 2.6,
+      "cd": 3.6,
+      "visual": "holy_pillars",
+      "matrix": 24,
+      "desc": "Holy pillars smite down along a line: the strongest single burst."
     },
     "dark+dark": {
       "name": "Black Hole",
       "shape": "area",
-      "radius": 3.8,
-      "life": 3.2,
+      "radius": 4.0,
+      "life": 6,
       "tick": 0.4,
-      "pull": 16,
-      "mult": 0.5,
+      "pull": 18,
+      "mult": 0.8,
       "swallow": true,
-      "desc": "A singularity that eats enemy shots and drags enemies in."
+      "cd": 4.5,
+      "visual": "black_hole",
+      "matrix": 26,
+      "desc": "A cosmic singularity: drags everything in and swallows enemy shots. The strongest spell."
     },
     "arcane+arcane": {
       "name": "Arcane Barrage",
@@ -514,121 +547,156 @@
     "fire+nature": {
       "name": "Wildfire",
       "shape": "area",
-      "radius": 3.4,
-      "life": 4.5,
+      "radius": 4.0,
+      "life": 8,
       "tick": 0.5,
       "mult": 0.45,
       "hitsAll": true,
-      "desc": "Grass bursts up and into flame. Lights the brush."
+      "cd": 2.1,
+      "visual": "wildfire",
+      "matrix": 3,
+      "desc": "Grass tufts burst up across the ground and ignite. Lights the brush."
     },
     "fire+wind": {
       "name": "Fire Tornado",
       "shape": "area",
-      "radius": 2.6,
-      "life": 3.5,
+      "radius": 3.0,
+      "life": 5,
       "tick": 0.35,
       "pull": 6,
       "mult": 0.6,
-      "desc": "A burning vortex that pulls enemies into the flames."
+      "cd": 2.4,
+      "visual": "vortex",
+      "matrix": 5,
+      "desc": "A burning vortex of spiralling rings that drags enemies into the flames."
     },
     "fire+light": {
       "name": "Solar Flare",
       "shape": "area",
-      "radius": 3.4,
+      "radius": 4.4,
       "delay": 0.25,
       "life": 0.01,
       "burst": true,
       "mult": 1.2,
-      "desc": "A coronal flash that burns and blinds."
+      "stun": 3.5,
+      "blind": 3.5,
+      "cd": 2.7,
+      "matrix": 8,
+      "desc": "A white-gold coronal flash: stuns and blinds for 3.5 s."
     },
     "dark+fire": {
       "name": "Hellfire",
       "shape": "bolt",
       "speed": 17,
-      "explode": 2.0,
+      "explode": 1.8,
       "radius": 0.3,
       "mult": 1.3,
       "trueDamage": true,
-      "desc": "Black flame that ignores every resistance."
+      "cd": 2.1,
+      "matrix": 7,
+      "desc": "A black-purple necrotic fireball that ignores every resistance."
     },
     "nature+water": {
       "name": "Living Vines",
       "shape": "area",
-      "radius": 3,
-      "life": 4,
+      "radius": 2.6,
+      "life": 5,
       "tick": 0.5,
       "mult": 0.2,
-      "root": 2.5,
-      "desc": "Vines burst from the ground and bind whatever stands there."
+      "root": 5.0,
+      "cd": 1.8,
+      "matrix": 12,
+      "desc": "Emerald and aqua roots bind whatever stands there for 5 s."
     },
     "water+wind": {
       "name": "Whirlpool",
       "shape": "area",
       "radius": 3.4,
-      "life": 3.5,
+      "life": 6,
       "tick": 0.45,
       "pull": 9,
       "mult": 0.3,
-      "desc": "A swirling pool that soaks and drags."
+      "cd": 2.1,
+      "visual": "vortex",
+      "matrix": 11,
+      "desc": "Teal vortex rings that soak and drag every enemy to the centre."
     },
     "light+water": {
       "name": "Rainbow Mist",
       "shape": "area",
-      "radius": 3,
-      "life": 6,
+      "radius": 3.2,
+      "life": 8,
       "tick": 0.5,
       "mult": 0.0,
       "heal": 4,
-      "desc": "Iridescent mist that heals you and blinds them."
+      "cleanse": true,
+      "cd": 3.0,
+      "matrix": 16,
+      "desc": "Iridescent mist that heals you and cleanses your debuffs while you stand in it."
     },
     "dark+water": {
       "name": "Abyss Water",
       "shape": "beam",
       "range": 9,
-      "width": 0.7,
+      "width": 1.6,
       "mult": 1.0,
-      "desc": "A torrent from the deep that curses and drains."
+      "weaken": 4.0,
+      "energyDrain": 4,
+      "cd": 2.1,
+      "matrix": 15,
+      "desc": "An abyssal torrent: enemies hit deal 40% less damage for 4 s; drains energy back to you."
     },
     "earth+nature": {
       "name": "Forest Fortress",
       "shape": "wall",
       "segments": 5,
       "hp": 170,
-      "life": 12,
+      "life": 10,
       "mat": "wood",
       "regen": 6,
-      "desc": "A living wooden wall that heals itself."
+      "armor": 10.0,
+      "cd": 3.6,
+      "matrix": 19,
+      "desc": "An ancient timber wall that regrows; +75% armor for you for 10 s."
     },
     "earth+wind": {
       "name": "Sandstorm",
       "shape": "area",
-      "radius": 3.6,
-      "life": 4,
+      "radius": 3.8,
+      "life": 6,
       "tick": 0.5,
       "mult": 0.35,
-      "blind": 1.0,
-      "desc": "Blinding grit: nothing inside can start an attack."
+      "inaccurate": 1.0,
+      "cd": 2.1,
+      "matrix": 23,
+      "desc": "A golden desert gale: enemies inside miss 60% of their attacks."
     },
     "earth+light": {
       "name": "Crystal Garden",
       "shape": "wall",
       "segments": 5,
       "hp": 110,
-      "life": 9,
+      "life": 7,
       "mat": "crystal",
       "reflect": true,
-      "desc": "Prismatic crystals that throw hexes back at the caster."
+      "reflectPlayer": 7.0,
+      "cd": 2.7,
+      "matrix": 22,
+      "desc": "Prismatic crystals: 50% of the damage you take is reflected for 7 s; hexes bounce off the wall."
     },
     "dark+earth": {
       "name": "Graveyard",
       "shape": "area",
-      "radius": 3,
+      "radius": 2.2,
       "delay": 0.5,
       "life": 0.01,
       "burst": true,
       "mult": 1.4,
       "root": 2.0,
-      "desc": "The ground opens and holds them in their graves."
+      "silence": 5.0,
+      "cd": 2.7,
+      "matrix": 21,
+      "desc": "The graves open: enemies are dragged down and silenced (no attacks) for 5 s."
     },
     "lightning+nature": {
       "name": "Static Bramble",
@@ -651,9 +719,12 @@
       "name": "Photon Railgun",
       "shape": "beam",
       "range": 16,
-      "width": 0.5,
-      "mult": 1.8,
-      "desc": "A light-speed ray through everything in a line."
+      "width": 0.7,
+      "mult": 2.3,
+      "cd": 2.4,
+      "visual": "laser",
+      "matrix": 25,
+      "desc": "A zero-latency light ray through everything in a line; leaves a glowing trail."
     },
     "dark+lightning": {
       "name": "Void Lightning",
@@ -720,11 +791,14 @@
     "dark+nature": {
       "name": "Death Forest",
       "shape": "area",
-      "radius": 3.4,
-      "life": 5,
+      "radius": 3.6,
+      "life": 8,
       "tick": 0.5,
       "mult": 0.45,
-      "desc": "Cursed woods that drain the life from anything inside."
+      "drainPct": 0.3,
+      "cd": 2.7,
+      "matrix": 28,
+      "desc": "Necrotic woods: 30% of the damage they deal comes back to you as health."
     },
     "arcane+nature": {
       "name": "Wild Magic",
@@ -747,12 +821,16 @@
     "dark+wind": {
       "name": "Shadow Storm",
       "shape": "area",
-      "radius": 3.6,
-      "life": 3.5,
+      "radius": 3.4,
+      "life": 5,
       "tick": 0.4,
       "pull": 3,
       "mult": 0.5,
-      "desc": "A dark tempest that curses all caught in it."
+      "confuse": 2.0,
+      "cd": 2.1,
+      "visual": "vortex",
+      "matrix": 27,
+      "desc": "A dark tempest: confused enemies attack each other."
     },
     "arcane+wind": {
       "name": "Arcane Gale",
@@ -882,6 +960,83 @@
       "jumps": 8,
       "mult": 1.0,
       "desc": "A cursed storm arc through eight enemies."
+    },
+    "fire+water+water": {
+      "name": "Steam Bomb",
+      "shape": "area",
+      "radius": 4.4,
+      "life": 8,
+      "tick": 0.5,
+      "mult": 0.15,
+      "cd": 1.5,
+      "visual": "steam_cloud",
+      "matrix": 2,
+      "desc": "A huge scalding steam cloud with swirling wisps: light damage, long duration."
+    },
+    "earth+earth+fire": {
+      "name": "Magma Burst",
+      "shape": "area",
+      "radius": 2.8,
+      "life": 7,
+      "tick": 0.5,
+      "mult": 0.6,
+      "slow": 7,
+      "slowPct": 0.6,
+      "cd": 1.8,
+      "visual": "magma",
+      "matrix": 4,
+      "desc": "A molten magma pool: burns and slows enemies by 60%."
+    },
+    "fire+lightning+lightning": {
+      "name": "Plasma Spear",
+      "shape": "beam",
+      "range": 16,
+      "width": 0.8,
+      "mult": 2.2,
+      "trueDamage": true,
+      "cd": 1.8,
+      "visual": "plasma",
+      "matrix": 6,
+      "desc": "An ultra-high-voltage plasma ray with branching bolts; ignores armour."
+    },
+    "earth+water+water": {
+      "name": "Mud Prison",
+      "shape": "area",
+      "radius": 3.0,
+      "life": 7,
+      "tick": 0.5,
+      "mult": 0.3,
+      "slow": 2,
+      "slowPct": 0.8,
+      "cd": 1.8,
+      "visual": "mud",
+      "matrix": 13,
+      "desc": "A mire erupts: -80% speed for anything stuck in it."
+    },
+    "earth+earth+water": {
+      "name": "Mountain Rise",
+      "shape": "wall",
+      "segments": 7,
+      "hp": 200,
+      "life": 8,
+      "mat": "stone",
+      "cd": 1.8,
+      "matrix": 18,
+      "desc": "A sturdy stone bulwark that blocks enemies and their shots."
+    },
+    "earth+earth+lightning": {
+      "name": "Magnetic Field",
+      "shape": "area",
+      "radius": 3.4,
+      "life": 6,
+      "tick": 0.5,
+      "mult": 0.3,
+      "deflectField": true,
+      "repel": 8,
+      "cd": 2.4,
+      "visual": "magnetic",
+      "matrix": 20,
+      "desc": "A pulsing electromagnetic field: destroys enemy shots and repels anything that enters."
     }
   }
 }

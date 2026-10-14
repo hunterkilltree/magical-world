@@ -13,18 +13,30 @@ func rune() -> Texture2D:
 	return _painted("rune", 512, _draw_rune)
 
 
+# Gradients used while painting are made first: a texture created inside the paint call is not
+# ready in time and draws as solid white.
 func star() -> Texture2D:
-	return _painted("star", 256, _draw_star)
+	if _cache.has("star"):
+		return _cache["star"]
+	var core := radial([[0.0, Color(1, 1, 1, 1)], [0.12, Color(1, 1, 1, 0.75)], [0.4, Color(1, 1, 1, 0.12)], [1.0, Color(1, 1, 1, 0)]], 128)
+	return _painted("star", 256, func(c: CanvasItem, S: float): _draw_star(c, S, core))
 
 
 func cloud() -> Texture2D:
-	return _painted("cloud", 256, _draw_cloud)
+	if _cache.has("cloud"):
+		return _cache["cloud"]
+	var blob := radial([[0.0, Color(1, 1, 1, 1)], [1.0, Color(1, 1, 1, 0)]], 64)
+	return _painted("cloud", 256, func(c: CanvasItem, S: float): _draw_cloud(c, S, blob))
 
 
 func decal(kind: String) -> Texture2D:
 	if kind == "glow":
 		return glow()
-	return _painted("decal_" + kind, 256, func(c: CanvasItem, S: float): _draw_decal(c, S, kind))
+	if _cache.has("decal_" + kind):
+		return _cache["decal_" + kind]
+	var st: Array = DECAL_STOPS[kind]
+	var base := radial([[0.0, st[0]], [0.55, st[1]], [1.0, st[2]]], 128)
+	return _painted("decal_" + kind, 256, func(c: CanvasItem, S: float): _draw_decal(c, S, kind, base))
 
 
 func glow() -> Texture2D:
@@ -110,9 +122,8 @@ func _draw_rune(c: CanvasItem, S: float) -> void:
 			c.draw_line(rot * (seg[0] * k), rot * (seg[1] * k), w, 3 * k, true)
 
 
-func _draw_star(c: CanvasItem, S: float) -> void:
+func _draw_star(c: CanvasItem, S: float, core: Texture2D) -> void:
 	var h := S / 2
-	var core := radial([[0.0, Color(1, 1, 1, 1)], [0.12, Color(1, 1, 1, 0.75)], [0.4, Color(1, 1, 1, 0.12)], [1.0, Color(1, 1, 1, 0)]], 128)
 	c.draw_texture_rect(core, Rect2(0, 0, S, S), false)
 	for spike in [[S, 7.0, 0.0], [S * 0.85, 5.0, PI / 2], [S * 0.45, 3.0, PI / 4], [S * 0.45, 3.0, -PI / 4]]:
 		var L: float = spike[0] / 2
@@ -126,9 +137,8 @@ func _draw_star(c: CanvasItem, S: float) -> void:
 		c.draw_polygon(pts, cols)
 
 
-func _draw_cloud(c: CanvasItem, S: float) -> void:
+func _draw_cloud(c: CanvasItem, S: float, blob: Texture2D) -> void:
 	var C := S / 2
-	var blob := radial([[0.0, Color(1, 1, 1, 1)], [1.0, Color(1, 1, 1, 0)]], 64)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5
 	for v in 4:
@@ -149,9 +159,8 @@ const DECAL_STOPS := {
 }
 
 
-func _draw_decal(c: CanvasItem, S: float, kind: String) -> void:
-	var st: Array = DECAL_STOPS[kind]
-	c.draw_texture_rect(radial([[0.0, st[0]], [0.55, st[1]], [1.0, st[2]]], 128), Rect2(0, 0, S, S), false)
+func _draw_decal(c: CanvasItem, S: float, kind: String, base: Texture2D) -> void:
+	c.draw_texture_rect(base, Rect2(0, 0, S, S), false)
 	var col := Color(1, 1, 1, 0.9) if kind == "frost" else Color(0.03, 0.02, 0.024, 0.9)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(kind)

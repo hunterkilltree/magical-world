@@ -77,7 +77,7 @@ func test_purged_and_true_damage() -> void:
 func test_forced_freeze() -> void:
 	var e = _foe()
 	s._apply_payload(e, SpellBook.resolve(["ice", "ice"])["payload"])
-	assert_eq(e.st.frozen, 3.0, "Glacier Prison freezes outright")
+	assert_eq(e.st.frozen, 6.0, "Glacier Prison freezes outright for 6 s")
 
 
 func test_resists_for_the_new_elements() -> void:

@@ -75,6 +75,15 @@ a random or auto-generated name.
   payload are listed in `SpellBook.DEF_PAYLOAD`; area extras (`heal`, `swallow`, `repeat`/`interval`/`scatter`,
   `leaves`), wall extras (`regen`, `reflect`) and the `beam` shape live in `arena_sim.gd`. Adding a spell is one
   `combos` entry in `data/spells.json`; `test_r050` fails if a legal pair or double has none.
+- Effects matrix (R-055 to R-059): `story/design/COMBINATIONS_AND_EFFECTS_SUMMARY.md` mapped onto our spells
+  (50 px = 1 m, seconds as given, cooldown x0.3 as the spell's own recharge via `ArenaSim.recharge_key`). Handoff pairs
+  keep their spells; displaced matrix spells live on doubled three-element keys. New statuses in `ArenaSim.Status`
+  (stun, silence, weaken, inaccurate, confuse, slow_pct; player armor, reflect, invuln) and `Body.revives`; enemy hits go
+  through `_enemy_hits` (confusion, weaken, miss, reflect). Looks per area are `def.visual` in `spells.json`, drawn by
+  `scripts/vfx/matrix_visuals.gd`. `harness/run.sh shot matrix OUT` shows them.
+- `scripts/vfx/` (VFX handoff, still WIP on this line of work: audio not done): `vfx_director` (port of vfx.js +
+  wow.js), `vfx_particles` (MultiMesh smoke/spark pools), `lightning_bolt`, `screen_fx`, `vfx_textures` (painted in
+  SubViewports; build gradients before painting, or they draw white). Combo casts freeze time briefly (sim `hitstop`).
 - `scripts/arena/`: the 3D view, which only reads the sim. `arena_view` (court, props, entity sync, telegraphs, particles,
   lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
   y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),
