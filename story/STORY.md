@@ -297,10 +297,11 @@ strike; enemy health bars drain through a ghost bar; damage numbers pop,
 arc and stack instead of overlapping, and so do spell-name callouts; the
 reticle dims when the queued spell cannot be cast (energy or recharge).
 
-### R-064 [planned] A living arena
-Core. Moonlit key light, sky and light fog; braziers flicker irregularly and
-shed embers; dust drifts over the court; gate banners ripple; puddles shimmer.
-Ambient particles stay within a tenth of the pools.
+### R-064 [done] A living arena
+Core. Moonlit key light, a night sky and light fog; braziers flicker
+smoothly but irregularly and shed embers; dust drifts over the court; gate
+banners ripple; puddles shimmer with spreading rings; a faint rune turns at
+the heart of the court. Ambient particles stay within a tenth of the pools.
 
 ## Retired: the Grauhold Reach campaign
 

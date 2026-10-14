@@ -43,6 +43,7 @@ const STYLE := {
 	"heal": {"cols": ["#e8ffd8", "#7dff8a", "#3ccf5a"], "life": 0.8, "size": 0.18, "grav": -2.0, "glow": true},
 }
 const RED := Color("#ff3b3b")
+const BANNER := preload("res://shaders/banner.gdshader")
 
 var camera: Camera3D
 var director: VfxDirector # the VFX handoff's spectacle layer
@@ -63,6 +64,11 @@ var wall_views := {}
 var prop_views := {} # prop id -> {node, mat, ...}
 var pillar_views: Array = []
 var braziers: Array = []
+var banners: Array = [] # gate banners (cloth shader)
+var floor_rune: MeshInstance3D # a faint rune circle turning at the centre
+var ripples := 0 # puddle rings spawned so far (R-064)
+var _ripple_t := {} # puddle id -> seconds to its next ring
+var _flicker := FastNoiseLite.new() # brazier light: smooth but never repeating
 var transients: Array = [] # {node, t, max, update: Callable}
 var corpses: Array = []
 var _reticle: Node3D
@@ -88,7 +94,17 @@ func setup() -> void:
 	_arena_built = true
 	var we := WorldEnvironment.new()
 	env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
+	# a night sky: deep violet overhead, a dusky band at the horizon (R-064)
+	var sky_m := ProceduralSkyMaterial.new()
+	sky_m.sky_top_color = Color("#0b0a1f")
+	sky_m.sky_horizon_color = Color("#3a2f63")
+	sky_m.sky_curve = 0.12
+	sky_m.ground_horizon_color = Color("#2a2347")
+	sky_m.ground_bottom_color = Color("#0d0b18")
+	var sky := Sky.new()
+	sky.sky_material = sky_m
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.background_color = Color("#1a1530")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#a49ce0")
@@ -111,6 +127,7 @@ func setup() -> void:
 	moon.light_color = Color("#ccd2ff")
 	moon.light_energy = 1.0
 	moon.shadow_enabled = true
+	moon.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY # no sun disc in the night sky
 	moon.directional_shadow_max_distance = 60.0
 	add_child(moon)
 	moon.look_at_from_position(Vector3(-9, 22, 8), Vector3.ZERO)
@@ -127,6 +144,13 @@ func setup() -> void:
 	director = VfxDirector.new()
 	add_child(director)
 	director.setup(self)
+	_flicker.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_flicker.frequency = 0.9
+	var rune_m := K.flat(Color("#f0c84a"), 0.06, true) # faint: it must never read as a spell ring
+	rune_m.albedo_texture = director.textures.rune()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(2, 2)
+	floor_rune = K.put(self, plane, rune_m, [0, 0.012, 0], null, [3.4, 1, 3.4], false)
 
 
 # ---------------------------------------------------------------- arena
@@ -180,6 +204,18 @@ func _build_arena() -> void:
 			G.add_child(light)
 			braziers.append({"light": light, "group": G, "local": Vector3(sd * 2.75, 1.45, 1.2)})
 		K.put(G, K.box(6.6, 0.7, 1.6), stone, [0, 3.95, 0])
+		for sd in [-1, 1]:
+			var cloth := PlaneMesh.new()
+			cloth.size = Vector2(0.9, 2.1)
+			cloth.orientation = PlaneMesh.FACE_Z
+			cloth.subdivide_width = 4
+			cloth.subdivide_depth = 16
+			var bm := ShaderMaterial.new()
+			bm.shader = BANNER
+			bm.set_shader_parameter("phase", rnd.randf() * TAU)
+			bm.set_shader_parameter("speed", 1.7 + rnd.randf() * 0.6)
+			bm.set_shader_parameter("wave", 0.12)
+			banners.append(K.put(G, cloth, bm, [sd * 1.35, 2.6, 0.86], null, null, false))
 		for k in range(-4, 5):
 			K.put(G, K.box(0.08, 1.2, 0.08), iron, [k * 0.5, 3.0, -0.3])
 		K.put(G, K.box(4.6, 0.1, 0.1), iron, [0, 2.45, -0.3])
@@ -616,10 +652,51 @@ func render(sim: ArenaSim, dt: float, aim_point: Vector2) -> void:
 		if c["t"] > 1.8:
 			_free_view(c["v"])
 			corpses.remove_at(i)
-	for b in braziers:
-		b["light"].light_energy = 1.6 * (0.82 + sin(t * 13 + b["local"].x) * 0.08 + randf() * 0.12)
+	for i in braziers.size():
+		var b: Dictionary = braziers[i]
+		# two octaves of smooth noise: a slow breath and a quicker lick, never in step or repeating
+		var n := _flicker.get_noise_2d(t * 2.2, i * 31.0) * 0.6 + _flicker.get_noise_2d(t * 6.5, i * 31.0 + 500.0) * 0.4
+		b["light"].light_energy = 1.6 * (0.88 + n * 0.16)
+	_ambient_life(sim, dt)
+	floor_rune.rotation.y += dt * 0.06
 	_update_camera(sim, dt)
 	director.update(dt, sim, tip_pos())
+
+
+# The court breathing between fights (R-064): embers off the braziers (a few drift away on the air),
+# dust motes hanging over the court, and rings spreading across still puddles.
+func _ambient_life(sim: ArenaSim, dt: float) -> void:
+	if dt <= 0:
+		return
+	var parts = director.particles
+	for b in braziers:
+		if randf() < dt * 2.6:
+			var at: Vector3 = b["group"].to_global(b["local"])
+			var rogue := randf() < 0.18
+			var side := Vector2.from_angle(randf() * TAU) * (randf_range(1.8, 2.8) if rogue else randf_range(0.0, 0.4))
+			parts.spark("fire", at + Vector3(randf_range(-0.1, 0.1), 0.05, randf_range(-0.1, 0.1)),
+				Vector3(side.x, randf_range(1.4, 2.6), side.y), {"grav": -0.6, "life": randf_range(0.9, 1.6), "w": 0.6})
+	if randf() < dt * 4.0:
+		var a := randf() * TAU
+		var r := sqrt(randf()) * ArenaSim.ARENA_R
+		parts.sprite("dust", Vector3(sin(a) * r, randf_range(0.4, 2.2), -cos(a) * r), Vector3(randf_range(0.1, 0.3), randf_range(-0.05, 0.08), randf_range(-0.1, 0.1)),
+			{"buoy": 0.02, "drag": 0.15, "life": randf_range(4.0, 6.0), "k": 0.22, "a": 0.14})
+	for pd in sim.puddles:
+		if pd.state != "water":
+			continue
+		var left: float = _ripple_t.get(pd.id, randf_range(0.2, 1.5)) - dt
+		if left <= 0:
+			left = randf_range(1.2, 3.0)
+			var a := randf() * TAU
+			var at: Vector2 = pd.pos + Vector2(sin(a), cos(a)) * sqrt(randf()) * pd.r * 0.55
+			var m := K.flat(Color("#bfe0ff"), 0.0)
+			var o := K.put(self, K.ring(0.9, 1.0, 40), m, ground(at, 0.04), [-PI / 2, 0, 0], null, false)
+			var size: float = pd.r * randf_range(0.25, 0.45)
+			_transient(o, 1.5, func(k: float):
+				o.scale = Vector3.ONE * (0.1 + size * _ease(k))
+				m.albedo_color.a = 0.32 * (1.0 - k))
+			ripples += 1
+		_ripple_t[pd.id] = left
 
 
 # The wizard's staff tip in world space (where spells leave from), or null without a wizard.

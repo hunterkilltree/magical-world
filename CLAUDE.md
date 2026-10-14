@@ -108,6 +108,10 @@ a random or auto-generated name.
   (`m`, `parts["fill"]`) that grows over the windup; `ArenaView.text(..., key)` stacks numbers for the same target
   within 0.25 s; director callouts step older ones up; `ArenaView.ret_dim` dims the reticle when the queued spell
   can't be cast (energy or `ArenaSim.recharge_key` timer).
+- Atmosphere (R-064): procedural night sky (`env.sky`), brazier lights driven by `FastNoiseLite` (no per-frame
+  `randf()` flicker), `ArenaView._ambient_life` (brazier embers, dust motes, puddle ripple rings; keep it under a
+  tenth of the particle pools), gate `banners` (`shaders/banner.gdshader`: a wave travels down, pinned at the top)
+  and a faint turning `floor_rune` (keep it faint so it never reads as a spell ring).
 - `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
   renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.
   Controls: WASD move, mouse aims, 1-6 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,
