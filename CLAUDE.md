@@ -41,9 +41,9 @@ The game is Court of Waves (3D, Magicka-style elemental arena: endless waves in 
 core mechanic is combining elements to create spells (see "Core pillar" in `story/STORY.md`). It follows `story/STORY.md`;
 the design reference is the playable prototype handed off in `story/design/court_of_waves/` (play
 `Court of Waves - playable.html`; rules in `reference/game/sim.js`). Game data is `data/*.json`; the gameplay numbers in
-`spells.json` / `enemies.json` are final from playtesting, so do not retune them by feel. Older mockups in `story/design/`
-(zones, overworld, weapons) belong to the retired Grauhold Reach campaign. Requirements are `### R-NNN [status] Title`
-entries (`planned` -> `active` -> `done`; retired ones are `superseded` and ignored by the harness).
+`spells.json` / `enemies.json` are final from playtesting, so do not retune them by feel. Requirements are `### R-NNN [status] Title`
+entries (`planned` -> `active` -> `done`; retired ones are `superseded` and ignored by the harness). Open ideas and
+known issues not yet turned into requirements are in `story/IMPROVEMENT_PLAN.md`.
 
 1. Pick the next `planned` requirement (lowest ID) and set it to `active`.
 2. Write `tests/story/test_rNNN_<name>.gd` first; it should fail.
@@ -120,7 +120,7 @@ a random or auto-generated name.
   and a faint turning `floor_rune` (keep it faint so it never reads as a spell ring).
 - `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
   renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.
-  Controls: WASD move, mouse aims, 1-6 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,
+  Controls: WASD move, mouse aims, 1-9 and 0 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,
   Esc pause, R restart, M mute (volume slider on the pause screen).
 - `harness/run.sh shot WHAT OUT [WIZARD]` renders a real frame (WHAT = menu | play | demo | pause | dead | live; uses
   xvfb-run when present, else the desktop). Look at it after visual changes. `live` runs the real engine loop for 5 s.
@@ -134,6 +134,3 @@ a random or auto-generated name.
   telegraphs, avoid puddles when it would cast lightning) clears wave 3 in about 53 s of game time with no self-damage
   (seed 11). Re-run it after any rules change. Not playtested by a human.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
-- `hvitmark_tundra/` is a separate Godot project (its own `project.godot`, harness, tests): the Hvitmark Tundra prototype, built in
-  milestones. Run its checks with `hvitmark_tundra/harness/run.sh all`. The main harness's `check_all.gd` skips nested projects
-  (any folder containing a `project.godot`). It is deliberately independent of the Court of Waves code (different spell model).

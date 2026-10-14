@@ -1,29 +1,11 @@
 # Improvement plan
 
-An audit of `master` at `2b5e391` (after PRs #12 to #15). It uses the project skills in
-`.claude/skills/`:
-- **code-reviewer** for the findings;
-- **the-fool** for a pre-mortem ("it's six months from now and the game failed; why?");
-- **test-master** for the test gaps;
-- **game-developer** for performance and architecture;
-- **debugging-wizard** for how to work through each item.
+Open issues and ideas from a skills-based audit of `master` (code-reviewer, the-fool, test-master,
+game-developer, debugging-wizard), kept to what is **not done yet**. Finished items are removed; the
+history is in git.
 
 How to use it: work top to bottom. Each item becomes a `planned` requirement in `story/STORY.md`, then gets a
 failing test, then a fix, with one PR per item, following the story workflow in `CLAUDE.md`.
-
-## Where the project stands
-
-- **Working:**
-  - The whole arena game: 10 elements and 80 combos.
-  - Enemies, waves, reactions, the 3D view, the HUD and menus.
-  - The effects matrix.
-- **Tests:** 127 tests across 23 story requirement files. The full suite runs in about 4 s.
-- **Not done:**
-  - The VFX handoff's sound.
-  - Its own requirements and tests.
-  - Any human playtest.
-  - CI.
-  - Builds you can hand to someone.
 
 ## Priority 0: fix before anything else
 
@@ -51,15 +33,12 @@ failing test, then a fix, with one PR per item, following the story workflow in 
   - Add `.github/workflows/harness.yml`: download Godot 4.x headless on Linux and run `harness/run.sh all` on every PR.
   - Make branch protection on `master` require it.
 
-### 3. Finish the VFX handoff
-- **What's wrong:**
-  - It's merged as a WIP commit. The combo time-freeze (hitstop) is a **gameplay rule** with no requirement and no test.
-  - `vfx_director`, `vfx_particles`, `screen_fx` and `lightning_bolt` have no direct tests.
-  - The sound isn't done.
-- **Do:**
-  - Add requirements for the hitstop rule (0.035 s per combo, 0.16 s for a first-ever combo, 0.08 s for shatter), the charge-up circle, release effects, impact recipes, screen effects and the camera kick.
-  - Port `audio.js` (synthesized sound, M to mute, per-event throttling).
-  - Write the tests first.
+### 3. Pin down the VFX rules still untested
+- The sound and the one-effects-system rule are done (R-060, R-061), and R-060/R-065/R-066 test the director.
+- **Still open:** the combo time-freeze (hitstop) is a **gameplay rule** with no requirement of its own: 0.035 s per combo,
+  0.16 s for a first-ever combo, 0.08 s for shatter (only R-048 checks that some hitstop happens). Nor are the charge-up
+  circle and the camera kick covered.
+- **Do:** add requirements and tests for those values first.
 
 ### 4. A human playtest
 - **What's wrong:** the game has never been played by a person. Balance claims rest on a bot that uses 5 of the 80 spells, on one seed.
@@ -106,8 +85,8 @@ failing test, then a fix, with one PR per item, following the story workflow in 
 | File | Lines | Hotspot |
 |---|---|---|
 | `scripts/core/arena_sim.gd` | 1866 | `_apply_payload` (136 lines), `_update_areas` (74) |
-| `scripts/vfx/vfx_director.gd` | 1339 | `_sig` (101), `on_event` (90), `_update_trails` (79) |
-| `scripts/arena/arena_view.gd` | 1126 | `_ambient` (123), `consume` (109), `_update_enemy_view` (97) |
+| `scripts/vfx/vfx_director.gd` | 1631 | `_sig` (101), `on_event` (90), `_update_trails` (79) |
+| `scripts/arena/arena_view.gd` | 1139 | `_ambient` (123), `consume` (109), `_update_enemy_view` (97) |
 
 Suggested split, with no behaviour change and the tests staying green:
 - `arena_sim` keeps the tick loop and owns:
@@ -118,7 +97,7 @@ Suggested split, with no behaviour change and the tests staying green:
 - `vfx_director` keeps the event routing and owns:
   - `vfx_recipes.gd`
   - `spell_signatures.gd`: the `_sig` table moved into data where possible.
-- `arena_view` drops its old CPUParticles effect layer. It overlaps the new director (see item 11).
+- `arena_view` keeps only its looping emitters (`STYLE`); one-shot effects are already the director's (R-060).
 
 ### 10. Typed events instead of loose dictionaries
 - **What's wrong:** events and payloads are `Dictionary` objects with string keys. A typo, e.g. `"deflectField"` vs `"deflect"`, silently does nothing.
@@ -127,18 +106,13 @@ Suggested split, with no behaviour change and the tests staying green:
   - In debug builds, assert that every emitted event has its required fields.
   - Add a data-validation test for `spells.json` and `enemies.json`: known shapes, known keys only, valid elements, numbers in range.
 
-### 11. One effects system, not two
-- `arena_view` still has its first-generation particles (the `STYLE` table and CPUParticles3D bursts) next to the VFX director.
-- After item 3, remove the old layer, so one place owns each effect.
-
-### 12. Repository hygiene
-- Add `.gitattributes` with `* text=auto eol=lf` for `.gd`, `.json`, `.md` and `.gdshader`. Every commit currently warns "LF will be replaced by CRLF".
-- Decide on `hvitmark_tundra/` (an independent prototype): keep it with its own CI job, or move it out.
-- Mark the retired Grauhold Reach mockups in `story/design/` as historical, e.g. by moving them under `story/design/legacy/`.
+### 11. Line endings
+- Add `.gitattributes` with `* text=auto eol=lf` for `.gd`, `.json`, `.md` and `.gdshader`, then renormalise once
+  (`git add --renormalize .`). Every commit currently warns "LF will be replaced by CRLF".
 
 ## Priority 3: performance (game-developer)
 
-### 13. Measure frame time, then optimise
+### 12. Measure frame time, then optimise
 - **Likely hot spots** (unmeasured; profile first):
   - The CPU particle pools loop over up to 2 × 1400 particles in GDScript every frame.
   - Trail and lightning ribbons are rebuilt with `SurfaceTool` every frame and every 0.07 s.
@@ -154,20 +128,20 @@ Suggested split, with no behaviour change and the tests staying green:
   - Rebuild ribbons only when they change.
 - Profile again after each change, one change at a time (debugging-wizard).
 
-### 14. Renderer decision
+### 13. Renderer decision
 - The VFX handoff says bloom is mandatory, with HDR emissive values above 1.
 - The project runs the Compatibility renderer, where glow bleeds across the whole frame.
 - **Do:** compare screenshots under Forward+ and Compatibility, then pick one deliberately and record why in `CLAUDE.md`.
 
 ## Priority 4: player comfort and shipping
 
-### 15. Accessibility and settings
+### 14. Accessibility and settings
 - A settings screen: master volume, effects volume, screen shake, flash intensity and chromatic aberration.
   - Flashes and colour splitting are a photosensitivity risk.
 - Element keys show colour plus name today. Add a distinct icon per element for colour-blind players.
 - Key rebinding: the bindings are already data in `controls.gd`.
 
-### 16. Builds people can play
+### 15. Builds people can play
 - Add `export_presets.cfg` (Windows and Web).
 - Add version numbering and a short changelog.
 - A CI job that produces the builds as artifacts.
@@ -179,14 +153,14 @@ Suggested split, with no behaviour change and the tests staying green:
 |---|---|---|
 | 1 | Fix defensive-spell uptime | S |
 | 2 | Godot on PATH, CI, branch protection | S |
-| 3 | Finish VFX (requirements, tests, audio) | L |
+| 11 | `.gitattributes` | S |
+| 3 | Hitstop, charge-up and camera-kick requirements | S |
 | 4 | Human playtest | S (time) |
 | 5, 6 | Spell bench and stronger bots | M |
-| 12 | `.gitattributes` and repository hygiene | S |
-| 9, 10, 11 | Refactor, typed events, one effects system | L |
-| 13, 14 | Benchmark, optimise, renderer decision | M |
+| 9, 10 | Split the big files, typed events | L |
+| 12, 13 | Benchmark, optimise, renderer decision | M |
 | 7, 8 | Persistence, onboarding | M |
-| 15, 16 | Settings, accessibility, builds | M |
+| 14, 15 | Settings, accessibility, builds | M |
 
 S = under a day, M = a few days, L = a week or more.
 

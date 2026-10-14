@@ -22,7 +22,8 @@ const TAGS := {
 	"thermal": ["THERMAL SHOCK", "#ffb070"], "miss": ["MISS", "#d6c08a"], "confused": ["CONFUSED", "#c084fc"],
 	"deflected": ["DEFLECTED", "#67e8f9"], "immune": ["IMMUNE", "#ffd86b"], "revived": ["REVIVED", "#7dff8a"],
 }
-# Particle looks per element / effect: colours, lifetime, size, gravity (negative rises), additive glow.
+# Looping CPU emitters (areas, burning/charged props, status auras, trails), picked per element by `_style`:
+# colours, lifetime, size, gravity (negative rises), additive glow. One-shot effects belong to the VFX director.
 const STYLE := {
 	"fire": {"cols": ["#ffd27a", "#ff7a2f", "#ff4a1a"], "life": 0.5, "size": 0.32, "grav": -4.0, "glow": true},
 	"water": {"cols": ["#5cb8ff", "#2f7fff", "#bfe6ff"], "life": 0.55, "size": 0.14, "grav": 14.0, "glow": true},
