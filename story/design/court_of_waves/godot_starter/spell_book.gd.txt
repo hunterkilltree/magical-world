@@ -1,0 +1,91 @@
+# Port of resolveSpell / makeSpell from reference/game/spells.js.
+# Autoload as "SpellBook". Reads res://data/spells.json (copy from this handoff).
+extends Node
+
+var elements := {}
+var shapes := {}
+var cancels := {}
+var max_queue := 3
+var _book := {}   # sorted "a+b" key -> combo def
+const RANK := ["wall", "area", "boulder", "chain", "bolt", "cone"]
+
+func _ready() -> void:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/spells.json"))
+	elements = data.elements
+	shapes = data.shapes
+	cancels = data.cancels
+	max_queue = int(data.max_queue)
+	for k in data.combos:
+		_book[_norm(k)] = data.combos[k]
+
+func _norm(key: String) -> String:
+	var p := key.split("+")
+	p.sort()
+	return "+".join(p)
+
+# Returns true if the element was queued; false if it cancelled or the queue is full.
+func queue_element(queue: Array, el: String) -> bool:
+	var opp: String = cancels.get(el, "")
+	if opp != "":
+		var i := queue.rfind(opp)
+		if i >= 0:
+			queue.remove_at(i)
+			return false
+	if queue.size() >= max_queue:
+		return false
+	queue.append(el)
+	return true
+
+func resolve(queue: Array) -> Dictionary:
+	if queue.is_empty():
+		return {}
+	var els := queue.duplicate()
+	els.sort()
+	var exact := "+".join(els)
+	var distinct: Array = []
+	for e in els:
+		if not distinct.has(e):
+			distinct.append(e)
+	var dkey := "+".join(distinct)
+	if _book.has(exact):
+		return make_spell(els, _book[exact], 1.0, exact, _book[exact].name)
+	if _book.has(dkey):
+		return make_spell(els, _book[dkey], 1.0 + 0.3 * (els.size() - distinct.size()), dkey, _book[dkey].name)
+	var best_key := ""
+	for i in distinct.size():
+		for j in range(i + 1, distinct.size()):
+			var k: String = distinct[i] + "+" + distinct[j]
+			if _book.has(k) and (best_key == "" or RANK.find(_book[k].shape) < RANK.find(_book[best_key].shape)):
+				best_key = k
+	if best_key == "":
+		return {}
+	var riders: Array = []
+	for e in distinct:
+		if not best_key.split("+").has(e):
+			riders.append(elements[e].name)
+	var d: Dictionary = _book[best_key]
+	return make_spell(els, d, 1.15, best_key, "%s + %s" % [d.name, ", ".join(riders)])
+
+func make_spell(els: Array, def: Dictionary, power: float, key: String, spell_name: String) -> Dictionary:
+	var counts := {}
+	for e in els:
+		counts[e] = counts.get(e, 0) + 1
+	var m: float = def.get("mult", 1.0) * power
+	var pl := {"parts": {}, "knock": float(def.get("knock", 0)), "els": counts.keys()}
+	for el in counts:
+		var n: int = counts[el]
+		var h: Dictionary = elements[el].hit
+		if h.get("dmg", 0) > 0: pl.parts[el] = h.dmg * n * m
+		if h.has("knock"): pl.knock += h.knock * n
+		if h.has("burn"):
+			pl["burn"] = h.burn * (1.0 + 0.3 * (n - 1))
+			pl["burnDps"] = h.burnDps * n * power
+		if h.has("wet"): pl["wet"] = h.wet
+		if h.has("chill"): pl["chill"] = h.chill * n
+		if h.has("shock"): pl["shock"] = h.shock
+	if def.has("slow"): pl["slow"] = def.slow
+	var shape: Dictionary = shapes.get(def.shape, shapes.bolt)
+	return {
+		"key": key, "def": def, "name": spell_name, "els": els, "counts": counts, "power": power,
+		"payload": pl, "cost": roundi(els.size() * 8 * shape.cost), "cd": def.get("cd", shape.cd),
+	}

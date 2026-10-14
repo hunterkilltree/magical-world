@@ -36,7 +36,8 @@
   .stat { display: grid; gap: 3px; padding: 2px 16px; text-align: center; min-width: 64px; }
   .stat b { font-family: var(--font-display); font-size: 20px; font-weight: 700; line-height: 1; }
   .stat + .stat { border-left: 1px solid rgba(255,255,255,.08); }
-  .pausebtn { position: absolute; top: 16px; right: 16px; pointer-events: auto; display: flex; align-items: center; gap: 10px;
+  .tr { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; }
+  .pausebtn { pointer-events: auto; display: flex; align-items: center; gap: 10px;
     padding: 10px 14px; color: #f4f1ff; font: 600 13px var(--font-body); cursor: pointer; }
   .pausebtn span { font-size: 11px; color: var(--ink-faint); }
   .pausebtn:hover { border-color: var(--accent-frontend); }
@@ -55,6 +56,8 @@
   .st { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; color: #161225; background: var(--c); }
 
   .spell { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 12px 14px; display: grid; gap: 11px; justify-items: center; }
+  .spell { transition: box-shadow .2s, border-color .2s; }
+  .spell.combo { border-color: var(--sc); box-shadow: 0 0 36px -8px var(--sc); }
   #h-queue { display: flex; align-items: center; gap: 9px; transition: opacity .15s; }
   #h-queue.dim .slot { opacity: .55; }
   .slot { width: 64px; height: 38px; border-radius: 999px; border: 1.5px dashed rgba(255,255,255,.2); display: grid; place-items: center;
@@ -157,7 +160,10 @@
       <div class="stat"><span class="k">Kills</span><b id="h-kills">0</b></div>
       <div class="stat"><span class="k">Score</span><b id="h-score">0</b></div>
     </div>
-    <button class="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>
+    <div class="tr">
+      <button class="pausebtn glass" id="h-mute">Sound on <span>M</span></button>
+      <button class="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>
+    </div>
 
     <div class="vitals glass">
       <div class="who"><span class="sw" id="h-sw"></span><div><div class="k" id="h-role">Ember Pyromancer</div><b id="h-name">Brann Cinderhand</b></div></div>

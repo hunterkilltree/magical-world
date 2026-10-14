@@ -1,5 +1,5 @@
 # Renders the main scene in a given state and saves a PNG. Needs a display (a desktop, or xvfb-run).
-# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|dead|pause|live> <out.png> [wizard_id]
+# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|matrix|dead|pause|live> <out.png> [wizard_id]
 # `live` starts a run and lets the real engine loop (input, physics, waves) go for five seconds.
 extends SceneTree
 
@@ -70,6 +70,39 @@ func _initialize() -> void:
 				for i in 12:
 					main.tick(dt, {"aim": c[1]})
 			main.tick(dt, {"aim": Vector2(5, -2), "actions": ["el:nature", "el:water", "el:light"]})
+		elif what == "matrix":
+			# The effects matrix: Wildfire, a Black Hole, Steam Bomb, a Magnetic Field and the World Tree,
+			# with frozen / burning / confused / rooted enemies showing their status rings.
+			p.pos = Vector2(0, 4)
+			var foes := []
+			for at in [Vector2(-5, -3), Vector2(-3.8, -4.5), Vector2(4.5, -2), Vector2(6, -3.5), Vector2(1, -6), Vector2(-1.5, 0.5)]:
+				var e = main.sim.spawn("thrall", at)
+				e.atk_cd = 99
+				foes.append(e)
+			foes[0].st.frozen = 9
+			foes[1].st.burn = 9
+			foes[2].st.confuse = 9
+			foes[3].st.root = 9
+			foes[4].st.shock = 9
+			foes[5].st.stun = 9
+			var casts := [[["fire", "nature"], Vector2(-4.5, -3.5)], [["dark", "dark"], Vector2(5, -3)],
+				[["fire", "water", "water"], Vector2(0, -6)], [["earth", "earth", "lightning"], Vector2(-1, 0)],
+				[["nature", "nature"], Vector2(0, 4.5)]]
+			for c in casts:
+				main.sim.player.cd["cast"] = 0
+				main.sim.player.shape_cd = {}
+				main.sim.player.energy = 100
+				var acts := []
+				for el in c[0]:
+					acts.append("el:" + el)
+				acts.append("cast")
+				main.tick(dt, {"aim": c[1], "actions": acts})
+				for i in 10:
+					main.tick(dt, {"aim": c[1]})
+			for e in foes:
+				e.speed = 0
+			for i in 30:
+				main.tick(dt, {"aim": Vector2(0, -6)})
 		elif what == "dead":
 			p.hp = 0
 			for i in 90:

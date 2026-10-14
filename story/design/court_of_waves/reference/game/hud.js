@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const CONTROLS = [
   ['W A S D', 'Move'], ['Mouse', 'Aim'], ['1 – 6', 'Queue an element (up to 3)'], ['Left click', 'Cast at cursor · hold to recast'],
   ['Right click / E', 'Cast as an area around you'], ['F', 'Cast on yourself'], ['Space', 'Dodge roll (brief invulnerability)'],
-  ['X', 'Clear queue'], ['Esc', 'Pause'], ['R', 'Restart (paused or fallen)']
+  ['X', 'Clear queue'], ['Esc', 'Pause'], ['M', 'Sound on / off'], ['R', 'Restart (paused or fallen)']
 ];
 const STATUS = [
   ['burn', 'Burning', '#ff6a2b'], ['wet', 'Wet', '#3d9bff'], ['chill', 'Chilled', '#a8ecff'], ['frozen', 'Frozen', '#ffffff'],
@@ -80,6 +80,8 @@ export function createHud(o) {
   $('d-restart').addEventListener('click', () => o.onRestart());
   $('d-menu').addEventListener('click', () => o.onMenu());
   $('h-pause').addEventListener('click', () => o.onPause());
+  $('h-mute').addEventListener('click', () => o.onMute());
+  const spellPanel = document.querySelector('.spell');
 
   const replay = (n, text) => { n.textContent = text; n.classList.remove('show'); void n.offsetWidth; n.classList.add('show'); };
   const toast = (text) => { if (text === lastToast && toastT > 0) return; lastToast = text; toastT = 1.6; replay(els.toast, text); };
@@ -107,6 +109,7 @@ export function createHud(o) {
 
   return {
     reset() { vig = 0; prevMode = null; },
+    setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
     update(g, events, dt) {
       const p = g.player;
       showScreens(g);
@@ -148,6 +151,9 @@ export function createHud(o) {
       set(els.cost, sp ? `${sp.cost} energy` : '');
       els.spell.style.color = sp ? hex(sp.color) : '';
       els.queue.classList.toggle('dim', !queued);
+      const combo = queued && sp && new Set(p.queue).size >= 2;
+      spellPanel.classList.toggle('combo', !!combo);
+      if (combo) spellPanel.style.setProperty('--sc', hex(sp.color));
 
       for (const k in tiles) {
         let f = p.cd[k] > 0 ? p.cd[k] / (p.cdMax[k] || 1) : 0;

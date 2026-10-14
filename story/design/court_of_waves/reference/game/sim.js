@@ -121,14 +121,16 @@ function cast(s, inp, mode, held) {
   const cd = mode === 'aim' ? Math.min(sp.cd, 0.45) : mode === 'nova' ? P.novaCd : P.selfCd;
   p.cd[slot] = cd; p.cdMax[slot] = cd;
   if (mode === 'aim' && sp.cd > 0.45) { p.shapeCd[shape] = sp.cd; p.shapeMax[shape] = sp.cd; }
-  if (p.queue.length) p.last = [...p.queue];
+  const fromQueue = p.queue.length > 0, isNew = !s.stats.found.has(sp.key), distinct = Object.keys(sp.counts).length;
+  if (fromQueue) p.last = [...p.queue];
   p.queue = [];
   p.castT = 0.3;
   s.stats.casts++; s.stats.found.add(sp.key);
+  if (fromQueue && distinct >= 2) s.hitstop = Math.max(s.hitstop, isNew ? 0.16 : 0.035);
   const ax = inp.aim.x - p.x, az = inp.aim.z - p.z, aimDist = Math.hypot(ax, az);
   if (aimDist > 0.05) { p.fx = ax / aimDist; p.fz = az / aimDist; }
   const dx = p.fx, dz = p.fz;
-  ev(s, 'cast', { mode, shape: sp.def.shape, name: sp.name, key: sp.key, els: sp.els, color: sp.color, x: p.x, z: p.z, dx, dz });
+  ev(s, 'cast', { mode, shape: sp.def.shape, name: sp.name, key: sp.key, els: sp.els, color: sp.color, x: p.x, z: p.z, dx, dz, fromQueue, isNew, distinct });
   if (sp.counts.lightning && p.st.wet > 0 && mode !== 'self') {
     hurt(s, p, 7 * sp.counts.lightning, 'lightning', { self: true, reason: 'Cast lightning while wet' });
     p.st.shock = Math.max(p.st.shock, 0.35);
@@ -186,7 +188,7 @@ const CAST = {
       pts.push([ex, ez]);
       envAt(s, ex, ez, 0.9, sp.els, false);
     }
-    ev(s, 'chain', { pts, els: sp.els, color: sp.color });
+    ev(s, 'chain', { pts, els: sp.els, color: sp.color, key: sp.key });
   },
   area(s, sp, p, dx, dz, aimDist) {
     const L = Math.min(aimDist, sp.def.range ?? P.aimRange);
@@ -195,7 +197,7 @@ const CAST = {
   wall(s, sp, p, dx, dz) {
     const n = sp.def.segments ?? 5, cx = p.x + dx * P.wallDist, cz = p.z + dz * P.wallDist;
     for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.95; addWall(s, cx - dz * o, cz + dx * o, sp); }
-    ev(s, 'wall', { x: cx, z: cz, mat: sp.def.mat });
+    ev(s, 'wall', { x: cx, z: cz, mat: sp.def.mat, key: sp.key, dx, dz, n });
   }
 };
 
@@ -221,6 +223,7 @@ function spawnArea(s, sp, x, z) {
   s.areas.push({ id: s.nid++, x, z, r: d.radius ?? 3, life: d.life ?? 3, max: d.life ?? 3, tick: d.tick ?? 0.5, tickT: 0,
     delay: d.delay ?? 0, delayMax: d.delay ?? 0, pull: d.pull ?? 0, burst: !!d.burst, hitsAll: !!d.hitsAll,
     els: sp.els, color: sp.color, key: sp.key, name: sp.name, sp });
+  ev(s, 'area', { x, z, r: d.radius ?? 3, life: d.life ?? 3, delay: d.delay ?? 0, key: sp.key, els: sp.els, color: sp.color });
 }
 
 function addWall(s, x, z, sp) {
@@ -236,7 +239,7 @@ function addWall(s, x, z, sp) {
 function nova(s, sp) {
   const p = s.player, d = sp.def;
   const r = d.shape === 'area' ? d.radius ?? 3 : d.shape === 'wall' ? 2.2 : P.novaR;
-  ev(s, 'nova', { x: p.x, z: p.z, r, els: sp.els, color: sp.color, shape: d.shape });
+  ev(s, 'nova', { x: p.x, z: p.z, r, els: sp.els, color: sp.color, shape: d.shape, key: sp.key });
   if (d.shape === 'wall') {
     for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; addWall(s, p.x + Math.sin(a) * 2.2, p.z + Math.cos(a) * 2.2, sp); }
     return;
@@ -351,7 +354,7 @@ function applyPayload(s, t, pl, c = {}) {
     if (d > topV) { topV = d; top = el; }
     dmg += d;
   }
-  if (tags.includes('shatter')) { st.frozen = 0; st.chill = 0; }
+  if (tags.includes('shatter')) { st.frozen = 0; st.chill = 0; s.hitstop = Math.max(s.hitstop, 0.08); }
   if (pl.shock && st.frozen <= 0) st.shock = Math.max(st.shock, pl.shock * (wasWet ? 2 : 1));
   if (pl.slow) st.slow = Math.max(st.slow, pl.slow);
   if (c.block) dmg *= c.block;
@@ -376,7 +379,7 @@ function explode(s, x, z, R, pl, o = {}) {
   }
   for (const w of s.walls) if (Math.hypot(w.x - x, w.z - z) < R + w.r) wallHit(s, w, pl, 0.8);
   envAt(s, x, z, R, pl.els, true);
-  ev(s, 'explode', { x, z, r: R, els: o.els ?? pl.els, color: o.color ?? 0xffa040, big: !!o.big });
+  ev(s, 'explode', { x, z, r: R, els: o.els ?? pl.els, color: o.color ?? 0xffa040, big: !!o.big, key: o.key });
   if (o.big) s.hitstop = Math.max(s.hitstop, 0.05);
 }
 
@@ -796,7 +799,7 @@ function shotStep(s, b) {
 function impact(s, b, target) {
   if (b.owner === 'enemy') { ev(s, 'impact', { x: b.x, z: b.z, color: 0x5cffb0, els: [], enemy: true }); return; }
   const sp = b.sp, d = sp.def, R = d.explode || d.splash || 0;
-  if (R) explode(s, b.x, b.z, R, sp.payload, { selfMul: d.explode ? 0.45 : 0.3, big: !!d.explode, color: sp.color, els: sp.els });
+  if (R) explode(s, b.x, b.z, R, sp.payload, { selfMul: d.explode ? 0.45 : 0.3, big: !!d.explode, color: sp.color, els: sp.els, key: sp.key });
   else envAt(s, b.x, b.z, 0.5, sp.els, b.kind === 'boulder');
   if (d.chainOnImpact) {
     const hit = new Set(target ? [target.id] : []);
@@ -805,7 +808,7 @@ function impact(s, b, target) {
     if (nx) { const pts = [[b.x, b.z]]; chainWalk(s, ZAP, nx, d.chainOnImpact - 1, pts, 0.9, hit); ev(s, 'chain', { pts, els: ['lightning'], color: 0xf4e15c }); }
   }
   if (d.leaves) spawnArea(s, LEAVES(d.leaves), b.x, b.z);
-  ev(s, 'impact', { x: b.x, z: b.z, els: sp.els, color: sp.color, kind: b.kind, r: R });
+  ev(s, 'impact', { x: b.x, z: b.z, els: sp.els, color: sp.color, kind: b.kind, r: R, key: sp.key });
 }
 
 // ---------------------------------------------------------------- areas & walls
@@ -815,7 +818,7 @@ function updateAreas(s, dt) {
     if (a.delay > 0) {
       a.delay -= dt;
       if (a.delay <= 0 && a.burst) {
-        explode(s, a.x, a.z, a.r, a.sp.payload, { selfMul: a.hitsAll ? 0.6 : 0, big: true, color: a.color, els: a.els, reason: 'Stood under your own ' + a.name });
+        explode(s, a.x, a.z, a.r, a.sp.payload, { selfMul: a.hitsAll ? 0.6 : 0, big: true, color: a.color, els: a.els, key: a.key, reason: 'Stood under your own ' + a.name });
         a.life = 0;
       }
       continue;

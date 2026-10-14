@@ -21,6 +21,7 @@ const STATUS := [
 	["burn", "Burning", "#ff6a2b"], ["wet", "Wet", "#3d9bff"], ["chill", "Chilled", "#a8ecff"], ["frozen", "Frozen", "#ffffff"],
 	["shock", "Shocked", "#f4e15c"], ["slow", "Mired", "#b3793f"], ["stoneskin", "Stoneskin", "#b3793f"], ["ward", "Ward", "#d04bff"],
 	["haste", "Haste", "#f4e15c"], ["root", "Rooted", "#5cc84a"], ["regen", "Regen", "#5cc84a"],
+	["armor", "Armour +75%", "#b3793f"], ["reflect", "Reflect 50%", "#fff1a8"], ["invuln", "Invulnerable", "#ffd86b"],
 ]
 
 var view # ArenaView, for health bars over enemies

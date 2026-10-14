@@ -11,7 +11,8 @@ const DATA_PATH := "res://data/spells.json"
 const ORDER := ["fire", "water", "ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"]
 const RANK := ["wall", "area", "beam", "boulder", "chain", "bolt", "cone"]
 # Combo keys that pass straight into the payload (status effects a spell adds on top of its elements).
-const DEF_PAYLOAD := ["slow", "root", "blind", "freeze", "trueDamage"]
+const DEF_PAYLOAD := ["slow", "root", "blind", "freeze", "trueDamage", "stun", "silence", "weaken", "inaccurate",
+	"confuse", "slowPct", "energyDrain", "drainPct"]
 
 static var _data: Dictionary = {}
 static var _book: Dictionary = {} # sorted "a+b" key -> combo def
@@ -137,6 +138,8 @@ static func make_spell(els: Array, def: Dictionary, power := 1.0, key := "", spe
 	for k in DEF_PAYLOAD:
 		if def.has(k):
 			pl[k] = def[k] if k == "trueDamage" else maxf(float(def[k]), pl.get(k, 0.0))
+	if def.has("burnMult") and pl.has("burnDps"):
+		pl["burnDps"] *= float(def["burnMult"])
 	var sh := shape(def.get("shape", "bolt"))
 	return {
 		"key": key, "def": def, "name": spell_name, "els": sorted_els, "counts": counts, "power": power,

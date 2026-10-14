@@ -67,7 +67,7 @@ func test_meteor_shower_drops_four() -> void:
 
 func test_supernova_leaves_a_sea_of_fire() -> void:
 	F.cast(s, ["fire", "fire"], Vector2(0, -7))
-	F.run(s, 0.8)
+	F.run(s, 1.5) # two blasts (0.7 s, then 0.4 s later), then the burning land
 	assert_true(s.areas.any(func(a): return a.key == "burning"), "fire left behind")
 
 
@@ -93,7 +93,7 @@ func test_crystal_walls_reflect_orbs() -> void:
 	b.life = 3
 	b.dmg = 12
 	s.shots.append(b)
-	var ev := F.run(s, 1.0)
+	var ev := F.run(s, 1.6) # longer: casting Crystal Garden freezes time briefly (R-055)
 	assert_true(F.tags(ev).has("reflected"), "REFLECTED")
 	assert_true(hex.hp < hex.max_hp, "the hex hits its own caster")
 	assert_eq(s.player.hp, 100.0)
