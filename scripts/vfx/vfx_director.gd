@@ -214,7 +214,8 @@ func fireball(at: Vector3, r: float, ramp: String, life := 0.6) -> MeshInstance3
 	return o
 
 
-func shell(at: Vector3, r: float, c: Color, life := 0.3, dome := false, k0 := 2.4) -> MeshInstance3D:
+# `squeeze`: anticipation. A small pop, one frame pulled inward, then the burst (elemental-vfx).
+func shell(at: Vector3, r: float, c: Color, life := 0.3, dome := false, k0 := 2.4, squeeze := false) -> MeshInstance3D:
 	var m := ShaderMaterial.new()
 	m.shader = DOME
 	m.set_shader_parameter("color", c)
@@ -230,8 +231,12 @@ func shell(at: Vector3, r: float, c: Color, life := 0.3, dome := false, k0 := 2.
 	o.material_override = m
 	o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	o.position = at
-	_add(o, life, func(k: float, _dt: float, _el: float):
+	if squeeze:
+		o.set_meta("squeeze", true)
+	_add(o, life, func(k: float, _dt: float, el: float):
 		var s := r * (0.15 + 0.85 * ease_out(k))
+		if squeeze:
+			s = r * (0.3 if el < 0.035 else 0.16) if el < 0.07 else r * (0.15 + 0.85 * ease_out((el - 0.07) / maxf(0.01, life - 0.07)))
 		o.scale = Vector3(s, s * (0.55 if dome else 1.0), s)
 		m.set_shader_parameter("fade", (1 - k) * (1 - k)))
 	return o
@@ -278,6 +283,49 @@ func crown(x: float, z: float, r: float, n := 26) -> void:
 			particles.sprite("spray", at + Vector3(0, 0.15, 0), Vector3(sin(a) * sp * 0.6, randf_range(3, 5), cos(a) * sp * 0.6))
 	for i in 10:
 		particles.sprite("mist", Vector3(x + randf_range(-r, r) * 0.6, 0.3, z + randf_range(-r, r) * 0.6), Vector3(randf_range(-1, 1), 0.4, randf_range(-1, 1)))
+
+
+# ---------------------------------------------------------------- timing (elemental-vfx)
+# Calls `fn` after `delay` seconds of effect time: overlapping bursts and delayed secondaries.
+func _after(delay: float, fn: Callable) -> void:
+	_add(Node3D.new(), delay, func(_k: float, _dt: float, _el: float): pass, fn)
+
+
+# "The ones that got away": a few pieces 1.5 - 2.5x faster than the pack, flying low.
+func stragglers(name: String, at: Vector3, n: int, speed: float) -> void:
+	for i in n:
+		var a := randf() * TAU
+		var sp := speed * randf_range(1.5, 2.5)
+		particles.spark(name, at, Vector3(cos(a) * sp, randf_range(0.3, 2.0), sin(a) * sp))
+
+
+# Magic motes: few, each with its own life, and a physics per element. Light floats up, dark sinks,
+# nature drifts like spores, arcane swirls around the source.
+const MOTE_PHYSICS := {"light": [1.6, 2.6, 0.3, 0.9], "dark": [-0.8, 1.6, 0.6, 1.3], "nature": [0.3, 1.6, 0.6, 1.2], "arcane": [0.0, 2.2, 0.4, 1.0]}
+
+
+func magic_motes(el: String, at: Vector3, n: int, k: float) -> void:
+	var P: Array = MOTE_PHYSICS.get(el, MOTE_PHYSICS["arcane"])
+	for i in n:
+		var a := randf() * TAU
+		var sp := randf_range(1.5, 5.0)
+		var v := Vector3(sin(a) * sp, randf_range(0.2, 1.5) * signf(P[0] + 0.01), cos(a) * sp)
+		if el == "arcane":
+			v += Vector3(cos(a), 0, -sin(a)) * sp * 0.8
+		particles.sprite(_sprite_of(el), at, v, {"k": k * randf_range(0.6, 1.3), "buoy": P[0], "drag": P[1], "life": randf_range(P[2], P[3])})
+
+
+# A splash's secondary: the cavity refills and a narrow column shoots up from the centre, falls
+# back and rings out. Bigger splashes throw taller, thicker jets.
+func jet(x: float, z: float, r: float) -> void:
+	var n := clampi(roundi(6 + r * 4), 6, 16)
+	var lift := clampf(0.7 + r * 0.15, 0.8, 1.2)
+	for i in n:
+		particles.spark("water", Vector3(x + randf_range(-0.12, 0.12), 0.15, z + randf_range(-0.12, 0.12)),
+			Vector3(randf_range(-0.8, 0.8), randf_range(6.5, 9.5) * lift, randf_range(-0.8, 0.8)))
+	for i in roundi(n / 3.0):
+		particles.sprite("spray", Vector3(x, 0.3 + i * 0.25, z), Vector3(randf_range(-0.4, 0.4), randf_range(3, 5) * lift, randf_range(-0.4, 0.4)), {"k": 0.6})
+	_after(0.5 * lift, func(): ring_flash(Vector2(x, z), r * 0.8, Color("#9fd0ff")))
 
 
 # ---------------------------------------------------------------- primitives (wow.js)
@@ -441,13 +489,21 @@ func callout(at: Vector2, spell_name: String, c: Color, kicker := "") -> void:
 		k.position.y = 0.55
 		g.add_child(k)
 	var life := 2.1 if kicker != "" else 1.3
+	# older callouts step up out of the way instead of overlapping the new one
+	for old in callouts:
+		if is_instance_valid(old):
+			old.set_meta("lift", old.get_meta("lift", 0.0) + 0.75)
+	g.set_meta("lift", 0.0)
+	g.set_meta("lift_now", 0.0)
 	callouts.append(g)
 	while callouts.size() > 3:
 		var old: Node3D = callouts.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
-	_add(g, life, func(_k: float, _dt: float, el: float):
-		g.position.y = 3.1 + el * 0.3
+	_add(g, life, func(_k: float, dt: float, el: float):
+		var lift: float = g.get_meta("lift_now") + (g.get_meta("lift") - g.get_meta("lift_now")) * minf(1.0, dt * 14.0)
+		g.set_meta("lift_now", lift)
+		g.position.y = 3.1 + el * 0.3 + lift
 		var pop := 1.4 - el / 0.14 * 0.4 if el < 0.14 else 1.0
 		g.scale = Vector3.ONE * pop
 		var a := clampf(minf((life - el) / 0.35, el / 0.05), 0, 1)
@@ -487,7 +543,8 @@ func release(e: Dictionary, tip, tier: float) -> void:
 	kick += Vector3(-d.x, 0.15, -d.y) * 0.12 * power
 	var spread := 0.6 if shape == "cone" else PI if shape in ["area", "wall"] or mode != "aim" else 0.22
 	var base := atan2(d.x, d.y)
-	var n := roundi(8 + 10 * power)
+	# one budget shared by the elements: per-element counts stacked into a white blowout at the tip
+	var n := roundi((8 + 6 * power) / float(els.size())) + 4
 	for el in els:
 		for i in n:
 			var a := base + randf_range(-spread, spread)
@@ -524,19 +581,35 @@ func blast(e: Dictionary) -> void:
 	var no_key: bool = e.get("key", "") == ""
 	var at: Vector2 = e["pos"]
 	var c: Color = e["color"]
-	shell(Vector3(at.x, 0, at.y), R * 1.25, c, 0.38 if big else 0.28, true)
+	shell(Vector3(at.x, 0, at.y), R * 1.25, c, 0.38 if big else 0.28, true, 2.4, true)
 	flare(Vector3(at.x, 1.0, at.y), c, R * (2.4 if big else 1.6), 0.16 if big else 0.1)
 	if no_key or els.has("fire") or els.has("arcane") or els.has("lightning") or els.has("light") or els.has("dark"):
 		fireball(Vector3(at.x, 0.75, at.y), R * (0.72 if big else 0.55), "fire" if no_key else pick_ramp(els), 0.85 if big else 0.6)
 	var n := 60 if big else 32
+	var s1 := 24.0 if big else 16.0
 	var list := ["fire"] if no_key else _distinct(els)
 	for el in list:
-		radial_sparks(_spark_of(el), Vector3(at.x, 0.8, at.y), roundi(n / float(list.size())) + 6, 8, 24 if big else 16, 0.8)
+		radial_sparks(_spark_of(el), Vector3(at.x, 0.8, at.y), roundi(n / float(list.size())) + 6, 8, s1, 0.8)
+		stragglers(_spark_of(el), Vector3(at.x, 0.8, at.y), randi_range(1, 3), s1)
+	if big:
+		# overlap: a smaller burst off-centre while the first is slowing
+		var off := Vector2.from_angle(randf() * TAU) * R * randf_range(0.2, 0.4)
+		_after(randf_range(0.08, 0.14), func():
+			var p2 := Vector3(at.x + off.x, 0.8, at.y + off.y)
+			shell(Vector3(p2.x, 0, p2.z), R * 0.7, c, 0.25, true, 1.8)
+			flare(p2 + Vector3(0, 0.2, 0), c, R * 1.2, 0.08)
+			for el in list:
+				radial_sparks(_spark_of(el), p2, roundi(24 / float(list.size())) + 4, 6, 14, 0.8))
 	dust_ring(at.x, at.y, R, 26 if big else 14, R * 3, "mist" if els.has("ice") and not els.has("fire") else "dust")
 	if no_key or els.has("fire"):
 		for i in (16 if big else 9):
 			particles.sprite("flame", Vector3(at.x + randf_range(-R, R) * 0.4, randf_range(0.4, 1.2), at.y + randf_range(-R, R) * 0.4),
 				Vector3(randf_range(-3, 3), randf_range(1, 4), randf_range(-3, 3)), {"k": R * 0.55})
+		# rogue embers rocket off sideways
+		for i in randi_range(1, 3):
+			var a := randf() * TAU
+			var sp := randf_range(19, 28)
+			particles.spark("fire", Vector3(at.x, 0.9, at.y), Vector3(cos(a) * sp, randf_range(0.5, 2.5), sin(a) * sp), {"life": randf_range(0.5, 0.9)})
 		for i in (14 if big else 7):
 			particles.sprite("hotsmoke", Vector3(at.x + randf_range(-R, R) * 0.35, randf_range(0.6, 1.6), at.y + randf_range(-R, R) * 0.35),
 				Vector3(randf_range(-1.5, 1.5), randf_range(1.5, 3.2), randf_range(-1.5, 1.5)), {"k": R * 0.5})
@@ -559,15 +632,14 @@ func blast(e: Dictionary) -> void:
 			particles.sprite("mist", Vector3(at.x + randf_range(-R, R) * 0.5, 0.4, at.y + randf_range(-R, R) * 0.5), Vector3(randf_range(-2, 2), 0.3, randf_range(-2, 2)), {"k": R * 0.5})
 	if els.has("water"):
 		crown(at.x, at.y, R)
+		_after(randf_range(0.2, 0.32), func(): jet(at.x, at.y, R))
 	if els.has("earth"):
 		for i in (10 if big else 6):
 			particles.sprite("dust", Vector3(at.x + randf_range(-R, R) * 0.3, randf_range(0.4, 1.4), at.y + randf_range(-R, R) * 0.3),
 				Vector3(randf_range(-1.5, 1.5), randf_range(1, 3), randf_range(-1.5, 1.5)), {"k": R * 0.5, "buoy": 0.6})
 	for el in ["nature", "light", "dark"]:
 		if els.has(el):
-			for i in 10:
-				var a := randf() * TAU
-				particles.sprite(_sprite_of(el), Vector3(at.x, 0.8, at.y), Vector3(sin(a) * 4, randf_range(0.5, 2.5), cos(a) * 4), {"k": R * 0.45})
+			magic_motes(el, Vector3(at.x, 0.8, at.y), 7, R * 0.45)
 	kick.y += 0.35 if big else 0.15
 
 
@@ -583,8 +655,11 @@ func hit(e: Dictionary) -> void:
 	flare(p, e["color"], 1.0, 0.08)
 	for el in _distinct(e["els"]):
 		radial_sparks(_spark_of(el), p, 10, 4, 11)
+		stragglers(_spark_of(el), p, 1, 11)
 		for i in 4:
 			particles.sprite(_sprite_of(el), p, Vector3(randf_range(-2.5, 2.5), randf_range(0, 2), randf_range(-2.5, 2.5)), {"k": 0.6})
+	if e["els"].has("water"):
+		_after(randf_range(0.18, 0.26), func(): jet(at.x, at.y, 0.7))
 	if e.get("kind", "") == "boulder":
 		dust_ring(at.x, at.y, 1.2, 14, 4.5)
 		shell(Vector3(at.x, 0, at.y), 1.8, Color("#ffd9a0"), 0.25, true, 1.2)
@@ -716,11 +791,12 @@ func cast_fx(e: Dictionary) -> void:
 		return
 	rune(at.x, at.y, c, 1.1 + tier * 0.45, 0.55 + tier * 0.1, {"spin": 4 + tier, "r0": 0.5})
 	if tier >= 1.3:
-		column(at.x, at.y, c, 0.35 + 0.18 * tier, 4 + tier * 2.2, 0.4 + tier * 0.05)
+		# lower intensity than other columns: it stacks with the rune, flare and sparks on the caster
+		column(at.x, at.y, c, 0.35 + 0.18 * tier, 4 + tier * 2.2, 0.4 + tier * 0.05, {"k": 1.4})
 		screen.wave(Vector3(at.x, 1, at.y), 0.18 * tier)
 		punch(0.25 * tier, -0.9 * tier, 0.08 * tier)
 		for el in _distinct(e["els"]):
-			helix(el, at.x, at.y, roundi(18 + tier * 8))
+			helix(el, at.x, at.y, roundi(8 + tier * 3)) # sparse: dense additive helices blow out to white
 	if combo:
 		screen.screen_flash(c, 0.04 * tier)
 		callout(at, e["name"], c, "NEW SPELL" if e.get("is_new", false) else "")
@@ -1052,6 +1128,62 @@ func on_event(e: Dictionary, sim) -> void:
 		"cancel":
 			screen.wave(Vector3(e["pos"].x, 1.6, e["pos"].y), 0.2)
 			punch(0.2)
+		"selfcast":
+			var at: Vector2 = e["pos"]
+			for el in _distinct(e["els"]):
+				helix(el, at.x, at.y, 14)
+			ground_glow(at.x, at.y, e["color"], 1.6, 0.5, 1.2)
+		"heal":
+			var at: Vector2 = e["pos"]
+			for i in 7:
+				var a := randf() * TAU
+				particles.sprite("spore", Vector3(at.x + sin(a) * 0.5, randf_range(0.3, 1.2), at.y + cos(a) * 0.5),
+					Vector3(sin(a) * 0.6, randf_range(0.6, 1.6), cos(a) * 0.6), {"k": 0.6, "buoy": 1.2, "life": randf_range(0.6, 1.1)})
+		"ward":
+			magic_motes("arcane", Vector3(e["pos"].x, 1.0, e["pos"].y), 6, 0.5)
+		"block":
+			var p := Vector3(e["pos"].x, 1.1, e["pos"].y)
+			radial_sparks("light", p, 10, 4, 9)
+			flare(p, Color("#fff6d8"), 0.9, 0.07)
+		"hit":
+			if not e["dot"]:
+				var p := Vector3(e["pos"].x, 1.0, e["pos"].y)
+				radial_sparks(_spark_of(e["el"]), p, 5, 2, 6)
+		"hurt":
+			if not e["dot"]:
+				for i in 6:
+					particles.sprite("blood", Vector3(e["pos"].x, 1.1, e["pos"].y), Vector3(randf_range(-2.5, 2.5), randf_range(0.5, 3), randf_range(-2.5, 2.5)), {"k": randf_range(0.7, 1.3)})
+		"wallBreak":
+			var at: Vector2 = e["pos"]
+			spray({"ice": "ice", "wood": "wood", "crystal": "crystal"}.get(e["mat"], "rock"), at.x, 0.6, at.y, 8, 3.5)
+			dust_ring(at.x, at.y, 0.8, 8, 3, "mist" if e["mat"] == "ice" else "dust")
+		"ignite":
+			var at: Vector2 = e["pos"]
+			var r: float = e["r"]
+			for i in 12:
+				particles.sprite("flame", Vector3(at.x + randf_range(-r, r) * 0.6, 0.3, at.y + randf_range(-r, r) * 0.6), Vector3(0, randf_range(0.6, 2.0), 0), {"k": randf_range(0.6, 1.0)})
+			for i in 2:
+				particles.sprite("hotsmoke", Vector3(at.x, 0.8, at.y), Vector3(randf_range(-0.5, 0.5), 1.2, randf_range(-0.5, 0.5)), {"k": 0.8})
+			stragglers("fire", Vector3(at.x, 0.4, at.y), randi_range(1, 2), 5)
+		"steam":
+			var at: Vector2 = e["pos"]
+			var r: float = e["r"]
+			for i in 10:
+				particles.sprite("steam", Vector3(at.x + randf_range(-r, r) * 0.6, 0.3, at.y + randf_range(-r, r) * 0.6), Vector3(randf_range(-0.4, 0.4), randf_range(0.8, 1.8), randf_range(-0.4, 0.4)), {"k": 0.9})
+		"charge":
+			var at: Vector2 = e["pos"]
+			radial_sparks("lightning", Vector3(at.x, 0.15, at.y), 12, 3, 8, 0.9)
+			for i in 3:
+				particles.sprite("plasma", Vector3(at.x + randf_range(-0.5, 0.5), 0.3, at.y + randf_range(-0.5, 0.5)), Vector3(0, 0.6, 0), {"k": 0.8})
+		"dodge":
+			var at: Vector2 = e["pos"]
+			var d: Vector2 = e.get("dir", Vector2.ZERO)
+			for i in 8:
+				var a := randf() * TAU
+				particles.sprite("dust", Vector3(at.x + sin(a) * 0.3, 0.2, at.y + cos(a) * 0.3),
+					Vector3(sin(a) * 1.5 - d.x * 2, randf_range(0.2, 0.8), cos(a) * 1.5 - d.y * 2), {"k": 0.6})
+			for i in 3:
+				particles.sprite("gust", Vector3(at.x, 0.7, at.y), Vector3(-d.x * 3, 0.2, -d.y * 3), {"k": 0.7})
 		"playerDeath":
 			screen.wave(Vector3(e["pos"].x, 1, e["pos"].y), 1.0)
 			punch(0.8, 3)
@@ -1124,7 +1256,8 @@ func update(dt: float, sim, tip) -> void:
 		m.rotation.z += d["spin"].y * dt
 		if d["life"] < 0.4:
 			m.scale = Vector3.ONE * d["size"] * (d["life"] / 0.4)
-		if d["type"] == "lava" and m.position.y > 0.2 and randf() < dt * 30:
+		# a hint of flame, not a stream: imply, don't simulate (elemental-vfx)
+		if d["type"] == "lava" and m.position.y > 0.2 and randf() < dt * 10:
 			particles.sprite("flame", m.position, Vector3(0, 0.5, 0), {"k": 0.35, "life": 0.3})
 	for i in range(decals.size() - 1, -1, -1):
 		var d: Dictionary = decals[i]

@@ -2,7 +2,7 @@
 # WASD/arrows move, the mouse aims, 1-9 and 0 queue fire/water/ice/lightning/earth/arcane/nature/wind/
 # light/dark, left click
 # casts (hold to recast), right click or E casts around you, F on yourself, Space or Shift
-# dodges, X or Backspace clears, Esc or P pauses, R restarts.
+# dodges, X or Backspace clears, Esc or P pauses, R restarts, M mutes the sound.
 extends RefCounted
 
 const ELEMENT_KEYS := {
@@ -15,6 +15,7 @@ const KEYS := {
 	"move_up": [KEY_W, KEY_UP], "move_down": [KEY_S, KEY_DOWN],
 	"cast_area": [KEY_E], "cast_self": [KEY_F], "dodge": [KEY_SPACE, KEY_SHIFT],
 	"clear": [KEY_X, KEY_BACKSPACE], "pause": [KEY_ESCAPE, KEY_P], "restart": [KEY_R],
+	"mute": [KEY_M],
 }
 const MOUSE := {"cast": MOUSE_BUTTON_LEFT, "cast_area": MOUSE_BUTTON_RIGHT}
 # What the HUD lists, in order.
@@ -22,7 +23,7 @@ const HELP := [
 	["W A S D", "Move"], ["Mouse", "Aim"], ["1 - 0", "Queue an element (up to 3)"],
 	["Left click", "Cast at cursor, hold to recast"], ["Right click / E", "Cast as an area around you"],
 	["F", "Cast on yourself"], ["Space", "Dodge roll (brief invulnerability)"], ["X", "Clear queue"],
-	["Esc", "Pause"], ["R", "Restart (paused or fallen)"],
+	["Esc", "Pause"], ["R", "Restart (paused or fallen)"], ["M", "Mute sound"],
 ]
 
 
@@ -60,7 +61,7 @@ static func action_for(event: InputEvent) -> String:
 		if event.is_action("el_" + el):
 			return "el:" + el
 	for pair in [["cast", "cast"], ["cast_area", "nova"], ["cast_self", "self"], ["dodge", "dodge"],
-			["clear", "clear"], ["pause", "pause"], ["restart", "restart"]]:
+			["clear", "clear"], ["pause", "pause"], ["restart", "restart"], ["mute", "mute"]]:
 		if event.is_action(pair[0]):
 			return pair[1]
 	return ""

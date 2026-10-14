@@ -153,7 +153,7 @@
       "heat": 1,
       "glow": 0,
       "drag": 3.2,
-      "buoy": 0.25
+      "buoy": -0.35
     },
     "mud": {
       "life": [
@@ -177,6 +177,29 @@
       "glow": 0,
       "drag": 2.2,
       "buoy": -1.5
+    },
+    "blood": {
+      "life": [
+        0.35,
+        0.6
+      ],
+      "s0": 0.14,
+      "s1": 0.3,
+      "a": 0.9,
+      "c0": [
+        0.42,
+        0.07,
+        0.07
+      ],
+      "c1": [
+        0.22,
+        0.04,
+        0.04
+      ],
+      "heat": 1,
+      "glow": 0,
+      "drag": 1.2,
+      "buoy": -9
     },
     "mist": {
       "life": [
@@ -203,8 +226,8 @@
     },
     "steam": {
       "life": [
-        0.9,
-        1.5
+        0.55,
+        0.95
       ],
       "s0": 0.5,
       "s1": 2.4,
@@ -631,7 +654,7 @@
       "st": 0.035
     }
   },
-  "_notes_court": "Our additions for the four extra elements (nature, wind, light, dark) are the spore, gust, radiance and shadow sprites, the nature/wind/light/dark sparks, and element_fx (which sprite, spark and fireball ramp each element uses). Not part of the handoff; tuned by eye.",
+  "_notes_court": "Our additions for the four extra elements (nature, wind, light, dark) are the spore, gust, radiance and shadow sprites, the nature/wind/light/dark sparks, and element_fx (which sprite, spark and fireball ramp each element uses). Not part of the handoff; tuned by eye. R-060 (elemental-vfx skill): steam is shorter-lived than smoke so it vanishes, dust has negative buoy so it settles, and the blood sprite replaces the old CPU burst on player hurt.",
   "element_fx": {
     "fire": {
       "sprite": "flame",

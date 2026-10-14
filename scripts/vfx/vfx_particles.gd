@@ -51,6 +51,8 @@ var _s_next := 0
 var _k_next := 0
 var _s_live := {} # index -> true
 var _k_live := {}
+var clock := 0.0 # seconds of update() so far
+var trace = null # tests: set to [] to log every spawn as {kind, name, at, vel, o, t}
 
 
 static func presets() -> Dictionary:
@@ -136,6 +138,8 @@ static func _v(a: Array) -> Vector3:
 func sprite(name: String, at: Vector3, vel: Vector3, o := {}) -> void:
 	if _smoke == null or not sm.has(name):
 		return
+	if trace != null:
+		trace.append({"kind": "sprite", "name": name, "at": at, "vel": vel, "o": o, "t": clock})
 	var P: Dictionary = sm[name]
 	var i := _s_next
 	_s_next = (i + 1) % SMOKE_MAX
@@ -164,6 +168,8 @@ func sprite(name: String, at: Vector3, vel: Vector3, o := {}) -> void:
 func spark(name: String, at: Vector3, vel: Vector3, o := {}) -> void:
 	if _spark == null or not sp.has(name):
 		return
+	if trace != null:
+		trace.append({"kind": "spark", "name": name, "at": at, "vel": vel, "o": o, "t": clock})
 	var P: Dictionary = sp[name]
 	var i := _k_next
 	_k_next = (i + 1) % SPARK_MAX
@@ -198,6 +204,7 @@ func clear() -> void:
 func update(dt: float) -> void:
 	if _smoke == null:
 		return
+	clock += dt
 	_update_smoke(dt)
 	_update_sparks(dt)
 

@@ -1,4 +1,4 @@
-# Thin game shell: input -> ArenaSim (fixed 60 Hz) -> ArenaView (3D) + Hud.
+# Thin game shell: input -> ArenaSim (fixed 60 Hz) -> ArenaView (3D) + Hud + Sfx.
 # Menu (pick a wizard) -> play (endless waves) -> dead -> restart. Port of the prototype's main.js.
 extends Node3D
 
@@ -7,12 +7,14 @@ const ArenaView := preload("res://scripts/arena/arena_view.gd")
 const Hud := preload("res://scripts/arena/hud.gd")
 const Controls := preload("res://scripts/core/controls.gd")
 const Roster := preload("res://scripts/core/wizard_roster.gd")
+const Sfx := preload("res://scripts/audio/sfx.gd")
 
 const STEP := 1.0 / 60.0
 
 var sim: ArenaSim
 var view: ArenaView
 var hud: Hud
+var sfx: Sfx
 var wizard_id := Roster.DEFAULT_ID
 var aim := Vector2(0, -1)
 var _actions: Array = []
@@ -42,6 +44,11 @@ func start() -> void:
 	hud.restart_pressed.connect(new_game.bind("play"))
 	hud.menu_pressed.connect(new_game.bind("menu"))
 	hud.element_pressed.connect(_on_element)
+	sfx = Sfx.new()
+	add_child(sfx)
+	sfx.setup()
+	hud.set_volume(sfx.volume)
+	hud.volume_changed.connect(sfx.set_volume)
 	new_game("menu")
 
 
@@ -79,6 +86,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	var a := Controls.action_for(event)
 	if a == "":
 		return
+	if a == "mute":
+		sfx.set_muted(not sfx.muted)
+		hud.say("Sound off" if sfx.muted else "Sound on")
+		return
 	if a == "restart":
 		if sim.mode == "dead" or sim.mode == "paused":
 			new_game("play")
@@ -110,6 +121,8 @@ func _process(delta: float) -> void:
 	view.consume(_events, sim)
 	view.render(sim, 0.0 if sim.mode == "paused" else minf(delta, 0.05), aim)
 	hud.update(sim, _events, delta)
+	sfx.consume(_events, sim)
+	sfx.update(delta)
 	_events.clear()
 
 
@@ -121,4 +134,6 @@ func tick(dt: float, inp := {}) -> Array:
 	view.consume(ev, sim)
 	view.render(sim, dt, aim)
 	hud.update(sim, ev, dt)
+	sfx.consume(ev, sim)
+	sfx.update(dt)
 	return ev

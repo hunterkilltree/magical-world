@@ -43,6 +43,7 @@ const STYLE := {
 	"heal": {"cols": ["#e8ffd8", "#7dff8a", "#3ccf5a"], "life": 0.8, "size": 0.18, "grav": -2.0, "glow": true},
 }
 const RED := Color("#ff3b3b")
+const BANNER := preload("res://shaders/banner.gdshader")
 
 var camera: Camera3D
 var director: VfxDirector # the VFX handoff's spectacle layer
@@ -63,6 +64,11 @@ var wall_views := {}
 var prop_views := {} # prop id -> {node, mat, ...}
 var pillar_views: Array = []
 var braziers: Array = []
+var banners: Array = [] # gate banners (cloth shader)
+var floor_rune: MeshInstance3D # a faint rune circle turning at the centre
+var ripples := 0 # puddle rings spawned so far (R-064)
+var _ripple_t := {} # puddle id -> seconds to its next ring
+var _flicker := FastNoiseLite.new() # brazier light: smooth but never repeating
 var transients: Array = [] # {node, t, max, update: Callable}
 var corpses: Array = []
 var _reticle: Node3D
@@ -71,6 +77,8 @@ var _ret_area: MeshInstance3D
 var _cone_prev: MeshInstance3D
 var _cone_key := ""
 var _wall_prev: MeshInstance3D
+var ret_dim := false # the queued spell can't be cast now (energy or recharge): the reticle dims
+var _stacks := {} # damage-number target -> {t, n}: numbers landing together stack instead of overlapping
 var _quad_glow: QuadMesh
 var _arena_built := false
 
@@ -86,7 +94,17 @@ func setup() -> void:
 	_arena_built = true
 	var we := WorldEnvironment.new()
 	env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
+	# a night sky: deep violet overhead, a dusky band at the horizon (R-064)
+	var sky_m := ProceduralSkyMaterial.new()
+	sky_m.sky_top_color = Color("#0b0a1f")
+	sky_m.sky_horizon_color = Color("#3a2f63")
+	sky_m.sky_curve = 0.12
+	sky_m.ground_horizon_color = Color("#2a2347")
+	sky_m.ground_bottom_color = Color("#0d0b18")
+	var sky := Sky.new()
+	sky.sky_material = sky_m
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.background_color = Color("#1a1530")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#a49ce0")
@@ -109,6 +127,7 @@ func setup() -> void:
 	moon.light_color = Color("#ccd2ff")
 	moon.light_energy = 1.0
 	moon.shadow_enabled = true
+	moon.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY # no sun disc in the night sky
 	moon.directional_shadow_max_distance = 60.0
 	add_child(moon)
 	moon.look_at_from_position(Vector3(-9, 22, 8), Vector3.ZERO)
@@ -125,6 +144,13 @@ func setup() -> void:
 	director = VfxDirector.new()
 	add_child(director)
 	director.setup(self)
+	_flicker.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_flicker.frequency = 0.9
+	var rune_m := K.flat(Color("#f0c84a"), 0.06, true) # faint: it must never read as a spell ring
+	rune_m.albedo_texture = director.textures.rune()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(2, 2)
+	floor_rune = K.put(self, plane, rune_m, [0, 0.012, 0], null, [3.4, 1, 3.4], false)
 
 
 # ---------------------------------------------------------------- arena
@@ -178,6 +204,18 @@ func _build_arena() -> void:
 			G.add_child(light)
 			braziers.append({"light": light, "group": G, "local": Vector3(sd * 2.75, 1.45, 1.2)})
 		K.put(G, K.box(6.6, 0.7, 1.6), stone, [0, 3.95, 0])
+		for sd in [-1, 1]:
+			var cloth := PlaneMesh.new()
+			cloth.size = Vector2(0.9, 2.1)
+			cloth.orientation = PlaneMesh.FACE_Z
+			cloth.subdivide_width = 4
+			cloth.subdivide_depth = 16
+			var bm := ShaderMaterial.new()
+			bm.shader = BANNER
+			bm.set_shader_parameter("phase", rnd.randf() * TAU)
+			bm.set_shader_parameter("speed", 1.7 + rnd.randf() * 0.6)
+			bm.set_shader_parameter("wave", 0.12)
+			banners.append(K.put(G, cloth, bm, [sd * 1.35, 2.6, 0.86], null, null, false))
 		for k in range(-4, 5):
 			K.put(G, K.box(0.08, 1.2, 0.08), iron, [k * 0.5, 3.0, -0.3])
 		K.put(G, K.box(4.6, 0.1, 0.1), iron, [0, 2.45, -0.3])
@@ -396,26 +434,6 @@ func ground(p: Vector2, y := 0.0) -> Vector3:
 
 
 # ---------------------------------------------------------------- effects
-# A one-shot particle burst of `style` at `pos`.
-func burst(style: String, pos: Vector3, n: int, speed := 3.0, spread := 0.0, up := 0.6) -> void:
-	if n <= 0:
-		return
-	var p := _particles(style, n)
-	p.one_shot = true
-	p.explosiveness = 0.95
-	p.position = pos
-	p.direction = Vector3(0, up, 0)
-	p.spread = 180.0
-	p.initial_velocity_min = speed * 0.4
-	p.initial_velocity_max = speed * 1.2
-	if spread > 0:
-		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-		p.emission_sphere_radius = spread / 2
-	add_child(p)
-	p.emitting = true
-	_transient(p, STYLE.get(style, STYLE["arcane"])["life"] * 1.6 + 0.1, Callable())
-
-
 func _particles(style: String, n: int) -> CPUParticles3D:
 	var S: Dictionary = STYLE.get(style, STYLE["arcane"])
 	var p := CPUParticles3D.new()
@@ -464,7 +482,9 @@ func _transient(node: Node3D, life: float, update: Callable) -> void:
 	transients.append({"node": node, "t": 0.0, "max": life, "update": update})
 
 
-func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9) -> void:
+# A floating number: pops in, arcs up and sideways, fades. Numbers for the same `key` (a target id)
+# within 0.25 s stack upward.
+func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9, key = null) -> void:
 	var l := Label3D.new()
 	l.text = s
 	l.modulate = color
@@ -475,11 +495,25 @@ func text(at: Vector3, s: String, color: Color, size := 48, life := 0.9) -> void
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
 	l.fixed_size = false
-	l.position = at + Vector3(randf_range(-0.2, 0.2), 0, 0)
+	var lift := 0.0
+	if key != null:
+		var st = _stacks.get(key)
+		if st == null or t - st["t"] > 0.25:
+			st = {"n": -1}
+			_stacks[key] = st
+		st["n"] += 1
+		st["t"] = t
+		lift = st["n"] * 0.38
+	l.position = at + Vector3(randf_range(-0.15, 0.15), lift, 0)
+	l.scale = Vector3.ONE * 1.6
 	add_child(l)
-	var y0 := l.position.y
+	var p0 := l.position
+	var drift := randf_range(0.35, 0.6) * (1.0 if randf() < 0.5 else -1.0)
 	_transient(l, life, func(k: float):
-		l.position.y = y0 + k * 0.9
+		var e := _ease(k)
+		l.position = p0 + Vector3(drift * e, 0.9 * e, 0)
+		var pop := 1.0 - minf(1.0, k * life / 0.12)
+		l.scale = Vector3.ONE * (1.0 + 0.6 * pop * pop)
 		l.modulate.a = 1.0 - k * k)
 
 
@@ -502,7 +536,7 @@ func lightning(pts: Array, color: Color, y0 := 1.15, y1 := 1.0) -> void:
 
 
 # A straight ray of light: a bright core and a wide halo that fade out.
-func beam_fx(from: Vector2, to: Vector2, width: float, color: Color, els: Array) -> void:
+func beam_fx(from: Vector2, to: Vector2, width: float, color: Color) -> void:
 	var g := K.group(self)
 	var core := K.flat(Color(1, 1, 1), 1.0, true)
 	var halo := K.flat(color, 0.6, true)
@@ -510,12 +544,6 @@ func beam_fx(from: Vector2, to: Vector2, width: float, color: Color, els: Array)
 	var b := ground(to, 1.1)
 	_segment(g, a, b, maxf(0.08, width * 0.35), core)
 	_segment(g, a, b, maxf(0.3, width * 1.2), halo)
-	for el in els:
-		burst(_style(el), b, 14, 4.0)
-		var k := 0.0
-		while k < 1.0:
-			burst(_style(el), a.lerp(b, k), 2, 1.5)
-			k += 0.2
 	shake = minf(1.0, shake + 0.15 * width)
 	_transient(g, 0.35, func(k: float):
 		core.albedo_color.a = 1.0 - k
@@ -544,69 +572,35 @@ func _el_color(el: String) -> Color:
 # Turns this tick's sim events into effects.
 func consume(events: Array, sim: ArenaSim) -> void:
 	for e in events:
+		# Every particle look is the director's (R-060); this keeps text, corpses, shake and geometry.
 		director.on_event(e, sim)
 		match e["type"]:
-			"cone":
-				var d: Vector2 = e["dir"]
-				for el in e["els"]:
-					var p := _particles(_style(el), 14)
-					p.one_shot = true
-					p.explosiveness = 0.8
-					p.position = ground(e["pos"] + d * 0.6, 1.0)
-					p.direction = Vector3(d.x, 0.05, d.y)
-					p.spread = e["arc"] / 2.0
-					p.flatness = 0.8
-					p.initial_velocity_min = e["range"] * 1.6
-					p.initial_velocity_max = e["range"] * 2.2
-					p.lifetime = 0.45
-					add_child(p)
-					p.emitting = true
-					_transient(p, 0.6, Callable())
 			"explode":
-				var col: Color = e["color"]
-				var r: float = e["r"]
-				ring_fx(e["pos"], r, col, 0.5)
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 0.6), 12, 6.0, 0.5)
 				shake = minf(1.2, shake + (0.55 if e["big"] else 0.28))
 			"impact":
-				var col: Color = e.get("color", Color.WHITE)
-				if e.get("enemy", false):
-					burst("hex", ground(e["pos"], 1.1), 14, 3.0)
-				else:
-					for el in e["els"]:
-						burst(_style(el), ground(e["pos"], 1.0), 6, 3.0)
-					if e.get("kind", "") == "boulder":
-						burst("earth", ground(e["pos"], 0.6), 16, 4.0)
-						shake = minf(1.0, shake + 0.12)
-			"block":
-				burst("spark", ground(e["pos"], 1.1), 14, 4.0)
+				if not e.get("enemy", false) and e.get("kind", "") == "boulder":
+					shake = minf(1.0, shake + 0.12)
 			"chain":
 				lightning(e["pts"], e["color"])
 			"beam":
-				beam_fx(e["from"], e["to"], e["width"], e["color"], e["els"])
+				beam_fx(e["from"], e["to"], e["width"], e["color"])
 			"heal":
-				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44)
-				burst("heal", ground(e["pos"], 1.0), 6, 1.5, 0.8, 1.0)
+				text(ground(e["pos"], 2.5), "+" + str(roundi(e["amt"])), Color("#7dff8a"), 44, 0.9, "heal")
 			"hit":
 				var col := _el_color(e["el"])
 				if e.get("crit", false):
-					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1)
+					text(ground(e["pos"], 2.5), "CRIT -%d!" % roundi(e["dmg"]), Color("#ffd27a"), 72, 1.1, e["id"])
 				else:
-					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56)
-				if not e["dot"]:
-					burst(_style(e["el"]), ground(e["pos"], 1.0), 6, 2.5)
+					text(ground(e["pos"], 2.2), str(roundi(e["dmg"])), col, 40 if e["dot"] else 56, 0.9, e["id"])
 			"hurt":
 				var col := Color("#ff9a3c") if e["self"] else Color("#ff5a5a")
-				text(ground(e["pos"], 2.4), "-" + str(roundi(e["dmg"])), col, 52)
+				text(ground(e["pos"], 2.4), "-" + str(roundi(e["dmg"])), col, 52, 0.9, e["id"])
 				if not e["dot"]:
 					shake = minf(1.0, shake + 0.2)
-					burst("blood", ground(e["pos"], 1.1), 8, 3.0)
 			"tag":
 				if TAGS.has(e["tag"]):
-					text(ground(e["pos"], 2.9), TAGS[e["tag"]][0], Color(TAGS[e["tag"]][1]), 40, 1.0)
-			"ward":
-				burst("arcane", ground(e["pos"], 1.0), 10, 2.0)
+					# tags carry no target id: stack the ones landing on the same spot
+					text(ground(e["pos"], 2.9), TAGS[e["tag"]][0], Color(TAGS[e["tag"]][1]), 40, 1.0, "tag:%d:%d" % [roundi(e["pos"].x), roundi(e["pos"].y)])
 			"death":
 				var v = enemy_views.get(e["id"])
 				if v:
@@ -614,37 +608,12 @@ func consume(events: Array, sim: ArenaSim) -> void:
 					v["tele"].visible = false
 					v["spawn_ring"].visible = false
 					corpses.append({"v": v, "t": 0.0})
-				burst("rune" if not e["frozen"] else "ice", ground(e["pos"], 0.8), 20, 3.0)
 			"spawn":
 				ring_fx(e["pos"], 1.2, Color("#ff3b3b"), 0.9)
 			"wall":
-				burst("earth" if e["mat"] == "stone" else "ice", ground(e["pos"], 0.3), 20, 3.0, 2.0)
 				shake = minf(1.0, shake + 0.1)
-			"wallBreak":
-				burst("earth" if e["mat"] == "stone" else "ice", ground(e["pos"], 0.6), 14, 3.0)
-			"nova":
-				ring_fx(e["pos"], e["r"], e["color"], 0.45)
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 0.5), 30, 7.0, 0.6, 0.2)
-			"selfcast":
-				for el in e["els"]:
-					burst(_style(el), ground(e["pos"], 1.0), 24, 2.0, 1.0, 1.0)
-			"cast":
-				if e["mode"] == "aim" and wizard and wizard.tip and wizard.tip.is_inside_tree():
-					burst(_style(e["els"][0]), wizard.tip.global_position, 8, 1.5)
-			"dodge":
-				burst("smoke", ground(e["pos"], 0.3), 10, 2.0)
-			"ignite":
-				burst("fire", ground(e["pos"], 0.3), 30, 3.0, e["r"])
-			"steam":
-				burst("steam", ground(e["pos"], 0.4), 14, 1.5, e["r"])
-			"charge":
-				burst("lightning", ground(e["pos"], 0.2), 20, 4.0, e["r"])
-			"claw":
-				burst("spark", ground(e["pos"], 1.0), 8, 3.0)
 			"slam":
 				ring_fx(e["pos"], e["r"], RED, 0.4)
-				burst("earth", ground(e["pos"], 0.2), 26, 5.0, e["r"])
 				shake = minf(1.2, shake + 0.4)
 			"playerDeath":
 				shake = minf(1.2, shake + 0.5)
@@ -683,10 +652,51 @@ func render(sim: ArenaSim, dt: float, aim_point: Vector2) -> void:
 		if c["t"] > 1.8:
 			_free_view(c["v"])
 			corpses.remove_at(i)
-	for b in braziers:
-		b["light"].light_energy = 1.6 * (0.82 + sin(t * 13 + b["local"].x) * 0.08 + randf() * 0.12)
+	for i in braziers.size():
+		var b: Dictionary = braziers[i]
+		# two octaves of smooth noise: a slow breath and a quicker lick, never in step or repeating
+		var n := _flicker.get_noise_2d(t * 2.2, i * 31.0) * 0.6 + _flicker.get_noise_2d(t * 6.5, i * 31.0 + 500.0) * 0.4
+		b["light"].light_energy = 1.6 * (0.88 + n * 0.16)
+	_ambient_life(sim, dt)
+	floor_rune.rotation.y += dt * 0.06
 	_update_camera(sim, dt)
 	director.update(dt, sim, tip_pos())
+
+
+# The court breathing between fights (R-064): embers off the braziers (a few drift away on the air),
+# dust motes hanging over the court, and rings spreading across still puddles.
+func _ambient_life(sim: ArenaSim, dt: float) -> void:
+	if dt <= 0:
+		return
+	var parts = director.particles
+	for b in braziers:
+		if randf() < dt * 2.6:
+			var at: Vector3 = b["group"].to_global(b["local"])
+			var rogue := randf() < 0.18
+			var side := Vector2.from_angle(randf() * TAU) * (randf_range(1.8, 2.8) if rogue else randf_range(0.0, 0.4))
+			parts.spark("fire", at + Vector3(randf_range(-0.1, 0.1), 0.05, randf_range(-0.1, 0.1)),
+				Vector3(side.x, randf_range(1.4, 2.6), side.y), {"grav": -0.6, "life": randf_range(0.9, 1.6), "w": 0.6})
+	if randf() < dt * 4.0:
+		var a := randf() * TAU
+		var r := sqrt(randf()) * ArenaSim.ARENA_R
+		parts.sprite("dust", Vector3(sin(a) * r, randf_range(0.4, 2.2), -cos(a) * r), Vector3(randf_range(0.1, 0.3), randf_range(-0.05, 0.08), randf_range(-0.1, 0.1)),
+			{"buoy": 0.02, "drag": 0.15, "life": randf_range(4.0, 6.0), "k": 0.22, "a": 0.14})
+	for pd in sim.puddles:
+		if pd.state != "water":
+			continue
+		var left: float = _ripple_t.get(pd.id, randf_range(0.2, 1.5)) - dt
+		if left <= 0:
+			left = randf_range(1.2, 3.0)
+			var a := randf() * TAU
+			var at: Vector2 = pd.pos + Vector2(sin(a), cos(a)) * sqrt(randf()) * pd.r * 0.55
+			var m := K.flat(Color("#bfe0ff"), 0.0)
+			var o := K.put(self, K.ring(0.9, 1.0, 40), m, ground(at, 0.04), [-PI / 2, 0, 0], null, false)
+			var size: float = pd.r * randf_range(0.25, 0.45)
+			_transient(o, 1.5, func(k: float):
+				o.scale = Vector3.ONE * (0.1 + size * _ease(k))
+				m.albedo_color.a = 0.32 * (1.0 - k))
+			ripples += 1
+		_ripple_t[pd.id] = left
 
 
 # The wizard's staff tip in world space (where spells leave from), or null without a wizard.
@@ -772,15 +782,18 @@ func _make_telegraph(kind: String) -> Dictionary:
 	var m := K.flat(RED, 0.0)
 	var m2 := K.flat(RED, 0.0)
 	var parts := {}
+	# m: the fill that grows over the windup; m2: the faint full outline, which pulses just before the strike
 	if kind == "thrall":
-		parts["wedge"] = K.put(g, K.wedge(1.75, 90), m, null, null, null, false)
+		parts["wedge"] = K.put(g, K.wedge(1.75, 90), m2, null, null, null, false)
+		parts["fill"] = K.put(g, K.wedge(1.75, 90), m, [0, 0.004, 0], null, null, false)
 	elif kind == "bulwark":
 		parts["fill"] = K.put(g, K.disc(1.0, 40), m, null, [-PI / 2, 0, 0], null, false)
 		parts["ring"] = K.put(g, K.ring(0.94, 1.0, 48), m2, [0, 0.005, 0], [-PI / 2, 0, 0], null, false)
 	else:
-		parts["line"] = K.put(g, K.box(0.14, 0.01, 1.0), m, [0, 0, 0.5], null, null, false)
+		parts["line"] = K.put(g, K.box(0.14, 0.01, 1.0), m2, [0, 0, 0.5], null, null, false)
+		parts["fill"] = K.put(g, K.box(0.14, 0.012, 1.0), m, [0, 0.003, 0.5], null, null, false)
 	g.position.y = 0.035
-	return {"group": g, "m": m, "m2": m2, "parts": parts}
+	return {"group": g, "m": m, "m2": m2, "parts": parts, "pulse": false}
 
 
 func _sync_enemies(sim: ArenaSim, dt: float) -> void:
@@ -886,19 +899,26 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 	var g: Node3D = T["group"]
 	g.visible = not frozen and e.state != "spawn"
 	var m: StandardMaterial3D = T["m"]
+	var m2: StandardMaterial3D = T["m2"]
+	var winding: bool = e.state == "windup" or e.state == "charge"
+	T["pulse"] = winding and e.state_t < 0.2
+	var flick := 0.45 + 0.55 * absf(sin(t * 22.0)) if T["pulse"] else 1.0
+	var fw := maxf(0.01, w)
 	if e.kind == "thrall":
 		var on: bool = e.state == "windup" or e.state == "strike"
-		m.albedo_color.a = (0.7 if e.state == "strike" else 0.12 + 0.45 * w) if on else 0.0
 		g.position = ground(e.pos, 0.035)
 		g.rotation.y = atan2(e.aim.x, e.aim.y)
+		T["parts"]["fill"].scale = Vector3(fw, 1, fw) if e.state == "windup" else Vector3.ONE
+		m.albedo_color.a = (0.7 if e.state == "strike" else 0.3 + 0.3 * w) if on else 0.0
+		m2.albedo_color.a = 0.3 * flick if e.state == "windup" else 0.0
 	elif e.kind == "bulwark":
 		var on: bool = e.state == "windup"
 		g.position = ground(e.slam, 0.035)
 		T["parts"]["ring"].scale = Vector3(A["radius"], A["radius"], 1)
-		var fr := maxf(0.01, A["radius"] * _ease(w))
+		var fr := maxf(0.01, A["radius"] * fw)
 		T["parts"]["fill"].scale = Vector3(fr, fr, 1)
 		m.albedo_color.a = 0.32 if on else 0.0
-		T["m2"].albedo_color.a = 0.95 if on else 0.0
+		m2.albedo_color.a = 0.95 * flick if on else 0.0
 	else:
 		var on: bool = e.state == "charge"
 		var L := minf(A["range"], sim.player.pos.distance_to(e.pos))
@@ -906,7 +926,10 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 		g.rotation.y = atan2(e.aim.x, e.aim.y)
 		T["parts"]["line"].scale = Vector3(1 + w, 1, L)
 		T["parts"]["line"].position.z = L / 2
-		m.albedo_color.a = 0.2 + 0.55 * w if on else 0.0
+		T["parts"]["fill"].scale = Vector3(1 + w, 1, maxf(0.01, L * w))
+		T["parts"]["fill"].position.z = L * w / 2
+		m.albedo_color.a = 0.75 if on else 0.0
+		m2.albedo_color.a = 0.22 * flick if on else 0.0
 
 
 func _sync_shots(sim: ArenaSim, dt: float) -> void:
@@ -1077,7 +1100,9 @@ func _update_reticle(sim: ArenaSim) -> void:
 	var queued := not p.queue.is_empty()
 	var sp := SpellBook.resolve(p.queue if queued else p.last)
 	var col: Color = sp["color"] if not sp.is_empty() else Color.WHITE
-	_ret_ring.material_override.albedo_color = Color(col, 0.85)
+	ret_dim = not sp.is_empty() and (p.energy < sp["cost"] or p.shape_cd.get(ArenaSim.recharge_key(sp), 0.0) > 0)
+	var dim := 0.4 if ret_dim else 1.0
+	_ret_ring.material_override.albedo_color = Color(col, 0.85 * dim)
 	var dv := aim - p.pos
 	var L := dv.length()
 	if L == 0:
@@ -1091,7 +1116,7 @@ func _update_reticle(sim: ArenaSim) -> void:
 		_ret_area.visible = true
 		var r := float(sp["def"].get("radius", 3.0))
 		_ret_area.scale = Vector3(r, r, 1)
-		_ret_area.material_override.albedo_color = Color(col, 0.6 if queued else 0.25)
+		_ret_area.material_override.albedo_color = Color(col, (0.6 if queued else 0.25) * dim)
 	_reticle.position = ground(at)
 	var yaw := atan2(u.x, u.y)
 	if shape == "cone":
@@ -1102,13 +1127,13 @@ func _update_reticle(sim: ArenaSim) -> void:
 		_cone_prev.visible = true
 		_cone_prev.position = ground(p.pos, 0.035)
 		_cone_prev.rotation.y = yaw
-		_cone_prev.material_override.albedo_color = Color(col, 0.16 if queued else 0.06)
+		_cone_prev.material_override.albedo_color = Color(col, (0.16 if queued else 0.06) * dim)
 	if shape == "wall":
 		_wall_prev.visible = true
 		_wall_prev.position = ground(p.pos + u * ArenaSim.TUNING["wall_dist"], 0.04)
 		_wall_prev.rotation.y = yaw
 		_wall_prev.scale = Vector3(sp["def"].get("segments", 5) * 0.95, 1, 1)
-		_wall_prev.material_override.albedo_color = Color(col, 0.3 if queued else 0.12)
+		_wall_prev.material_override.albedo_color = Color(col, (0.3 if queued else 0.12) * dim)
 
 
 # Where an enemy's health bar sits (above its head), for the HUD.
