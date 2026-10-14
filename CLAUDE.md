@@ -81,13 +81,19 @@ a random or auto-generated name.
   (stun, silence, weaken, inaccurate, confuse, slow_pct; player armor, reflect, invuln) and `Body.revives`; enemy hits go
   through `_enemy_hits` (confusion, weaken, miss, reflect). Looks per area are `def.visual` in `spells.json`, drawn by
   `scripts/vfx/matrix_visuals.gd`. `harness/run.sh shot matrix OUT` shows them.
-- `scripts/vfx/` (VFX handoff, still WIP on this line of work: audio not done): `vfx_director` (port of vfx.js +
+- `scripts/vfx/` (VFX handoff): `vfx_director` (port of vfx.js +
   wow.js), `vfx_particles` (MultiMesh smoke/spark pools), `lightning_bolt`, `screen_fx`, `vfx_textures` (painted in
   SubViewports; build gradients before painting, or they draw white). Combo casts freeze time briefly (sim `hitstop`).
   Every particle look is the director's (R-060): `ArenaView.consume` only adds text, corpses, shake, rings and
   geometry, never one-shot bursts. Timing helpers: `_after(delay, fn)` (overlap, delayed secondaries),
   `stragglers`, `jet` (splash secondary), `magic_motes` (per-element drift); `shell(..., squeeze)` anticipates.
   `particles.trace = []` logs every spawn for tests.
+- `scripts/audio/sfx.gd` (R-061): recorded clips for sim events, keyed in `data/sfx.json` (takes, dB, pitch range,
+  throttle, SFX/UI bus, positional, `len`/`offset` for long loops); `ROUTED` lists the event types with a sound and the
+  manifest's `silent` the rest (`test_r061` fails on a new event type that is in neither). Queue pings and combo chords
+  pitch one bell clip to the element's note (`NOTE`). Clips are Kenney CC0 in `audio/sfx/` (`audio/CREDITS.md`); after
+  adding clips run `godot --headless --path . --import` and commit their `.import` files. Volume and mute live in
+  `user://settings.cfg`. `sfx.trace = []` logs plays for tests.
 - `scripts/arena/`: the 3D view, which only reads the sim. `arena_view` (court, props, entity sync, telegraphs, particles,
   lightning, Label3D damage numbers, camera FOV 40 at (0, 13.5, 12.5) leaning 15% to the cursor, pillar fade, mouse ray to
   y = 0), `wizard_model` (port of wizard-rig.js: rigged legs, gait blend, `animate` plants the soles on y = 0),
@@ -97,7 +103,7 @@ a random or auto-generated name.
 - `scripts/main.gd` is the thin shell: `_unhandled_input` -> action queue, `_physics_process` steps the sim, `_process`
   renders; `tick(dt, input)` does one frame without the engine loop (tests, screenshots). Menu -> play -> dead -> R.
   Controls: WASD move, mouse aims, 1-6 queue, LMB cast (hold = recast), RMB/E around you, F self, Space dodge, X clear,
-  Esc pause, R restart.
+  Esc pause, R restart, M mute (volume slider on the pause screen).
 - `harness/run.sh shot WHAT OUT [WIZARD]` renders a real frame (WHAT = menu | play | demo | pause | dead | live; uses
   xvfb-run when present, else the desktop). Look at it after visual changes. `live` runs the real engine loop for 5 s.
   `run.sh test` fails on any `SCRIPT ERROR` in the output (runtime errors inside tests only log).

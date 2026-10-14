@@ -8,6 +8,7 @@ signal resume_pressed
 signal restart_pressed
 signal menu_pressed
 signal element_pressed(el: String)
+signal volume_changed(v: float)
 
 const SpellBook := preload("res://scripts/core/spell_book.gd")
 const Roster := preload("res://scripts/core/wizard_roster.gd")
@@ -54,6 +55,7 @@ var dead_screen: Control
 var roster_buttons := {}
 var grimoire_box: GridContainer
 var found_label: Label
+var volume_slider: HSlider
 var dead_kicker: Label
 var dead_stats: GridContainer
 var blurb_label: Label
@@ -378,6 +380,20 @@ func _build_pause() -> void:
 	row.add_child(_button("Resume", _on_resume))
 	row.add_child(_button("Restart", _on_restart))
 	row.add_child(_button("Menu", _on_menu))
+	var vol := HBoxContainer.new()
+	vol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vol.alignment = BoxContainer.ALIGNMENT_END
+	vol.add_child(_label("Volume  (M mutes)", 13, DIM))
+	volume_slider = HSlider.new()
+	volume_slider.min_value = 0.0
+	volume_slider.max_value = 1.0
+	volume_slider.step = 0.05
+	volume_slider.custom_minimum_size = Vector2(180, 24)
+	volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	volume_slider.focus_mode = Control.FOCUS_NONE
+	volume_slider.value_changed.connect(func(x: float): volume_changed.emit(x))
+	vol.add_child(volume_slider)
+	row.add_child(vol)
 	v.add_child(row)
 
 
@@ -414,6 +430,11 @@ func _on_pick(id: String) -> void:
 
 func _on_start() -> void:
 	start_pressed.emit()
+
+
+# Shows the saved volume without echoing it back as a change.
+func set_volume(v: float) -> void:
+	volume_slider.set_value_no_signal(v)
 
 
 func _on_resume() -> void:

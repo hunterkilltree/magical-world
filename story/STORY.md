@@ -279,7 +279,7 @@ a delayed jet up from the centre; fire throws rogue embers; steam vanishes
 quickly, smoke outlives flame, dust settles. Light motes rise and dark ones
 sink. A big combo stays within a third of the particle pools.
 
-### R-061 [planned] Sound effects from recorded assets
+### R-061 [done] Sound effects from recorded assets
 Core. Sim events play recorded CC0 sounds through a manifest (several takes
 per sound, pitch jitter, per-sound throttling, an SFX bus with a compressor
 and a UI bus); M mutes and the pause screen sets the volume. Missing files
