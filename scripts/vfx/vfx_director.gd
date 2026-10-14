@@ -10,6 +10,7 @@ const Particles := preload("res://scripts/vfx/vfx_particles.gd")
 const Textures := preload("res://scripts/vfx/vfx_textures.gd")
 const ScreenFx := preload("res://scripts/vfx/screen_fx.gd")
 const Bolt := preload("res://scripts/vfx/lightning_bolt.gd")
+const WaveSheet := preload("res://scripts/vfx/wave_sheet.gd")
 const SpellBook := preload("res://scripts/core/spell_book.gd")
 const FIREBALL := preload("res://shaders/fireball.gdshader")
 const DOME := preload("res://shaders/shockwave_dome.gdshader")
@@ -771,10 +772,12 @@ func cone(e: Dictionary) -> void:
 		for pv in along.call(24, 2.2, 3.0):
 			particles.sprite("mud", pv[0], pv[1] + Vector3(0, 3, 0), {"drag": 2.4, "k": 1.2})
 	elif els.has("water") and not steam:
-		for pv in along.call(30, 2.2, 3.0):
+		# the wave sheet (`wave`, from _sig) carries the water; this is only the launch spray at the caster
+		var big_wave: bool = e["key"] == "water+water"
+		for pv in along.call(8 if big_wave else 14, 0.8, 1.6):
 			particles.sprite("spray", pv[0], pv[1] + Vector3(0, 1, 0), {"drag": 2.4, "k": 1.1})
-		for pv in along.call(30, 2.4, 3.4):
-			particles.spark("water", pv[0], pv[1] * Vector3(1.4, 1, 1.4) + Vector3(0, 3, 0))
+		for pv in along.call(6 if big_wave else 16, 1.6, 2.6):
+			particles.spark("water", pv[0], pv[1] * Vector3(1.2, 1, 1.2) + Vector3(0, 3, 0))
 	var lead: String = els[0] if els.size() else ""
 	for el in _distinct(els):
 		if el not in ["ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"] or (el == "earth" and mud):
@@ -1053,12 +1056,69 @@ func _sig(key: String, hook: String, e: Dictionary) -> void:
 				var a := a0 + randf_range(-0.5, 0.5) * deg_to_rad(e["arc"])
 				var sp := randf_range(4, 10)
 				particles.sprite("steam", Vector3(at.x, 1, at.y), Vector3(sin(a) * sp, randf_range(0.5, 1.5), cos(a) * sp), {"k": 1.8, "drag": 1.2})
+		["water+water", "cone"]:
+			# Tsunami: a tall curling wave across the whole arc that crashes at its reach
+			wave(e, {"hmax": 1.7, "curl_max": 1.0, "r0": 0.7, "reach": e["range"], "t_rise": 0.7, "t_break": 0.62, "life": 1.45},
+				{"spray": 80.0, "splashes": 9, "jets": 2, "punch": true})
+		["water", "cone"]:
+			# Torrent: a low, fast pressure wave that only half curls
+			wave(e, {"hmax": 0.8, "curl_max": 0.45, "r0": 0.6, "reach": e["range"] * 0.95, "t_rise": 0.32, "t_break": 0.3, "life": 0.7},
+				{"spray": 50.0, "splashes": 4, "jets": 0, "punch": false})
 		["earth+water", "cone"]:
 			var a0 := atan2(e["dir"].x, e["dir"].y)
 			for i in 12:
 				var a := a0 + randf_range(-0.5, 0.5) * deg_to_rad(e["arc"])
 				var dd := randf_range(1, 1 + e["range"] * 0.7)
 				spray("mud", at.x + sin(a) * dd, 0.3, at.y + cos(a) * dd, 1, 2, {"dir": Vector2(sin(a), cos(a)) * 5})
+
+
+# A breaking wave rolling out over a cone (WaveSheet). While it rides in, droplets peel off the lip;
+# when the lip plunges, splashes burst up unevenly along the arc, a beat later a jet or two rises
+# from the impact (the splash's secondary) and foam spreads and settles into the pool.
+func wave(e: Dictionary, shape: Dictionary, o: Dictionary) -> WaveSheet:
+	var d: Vector2 = e["dir"]
+	var w := WaveSheet.new()
+	add_child(w)
+	w.setup(e["pos"], atan2(d.x, d.y), deg_to_rad(e["arc"]) / 2.0, shape)
+	var broke := [false]
+	_add(w, w.life, func(_k: float, dt: float, el: float):
+		w.step(el)
+		if el < w.t_break:
+			for i in _rate(o["spray"] * minf(1.0, el / 0.2), dt):
+				var u := randf_range(0.1, 0.9)
+				var p := w.lip_point(u)
+				var f := w.forward(u)
+				particles.sprite("spray", p, f * randf_range(2.5, 5.5) + Vector3(0, randf_range(1.5, 3.5), 0), {"k": randf_range(0.35, 0.8)})
+				if randf() < 0.45:
+					particles.spark("water", p, f * randf_range(4, 8) + Vector3(0, randf_range(2, 5), 0))
+		elif not broke[0]:
+			broke[0] = true
+			_wave_break(w, o))
+	return w
+
+
+func _wave_break(w: WaveSheet, o: Dictionary) -> void:
+	var n: int = o["splashes"]
+	for j in n:
+		var u := clampf((j + 0.5 + randf_range(-0.35, 0.35)) / float(n), 0.05, 0.95)
+		var p := w.landing(u)
+		var f := w.forward(u)
+		var big := w.seg_height(u) * w.hmax
+		_after(w.seg_delay(u) + randf() * 0.04, func():
+			for i in roundi(4 + big * 2):
+				particles.sprite("spray", p, f * randf_range(1.5, 4.5) + Vector3(randf_range(-1, 1), randf_range(2.5, 5.0) * big, randf_range(-1, 1)), {"k": randf_range(0.5, 1.0)})
+			for i in roundi(4 + big * 3):
+				particles.spark("water", p, f * randf_range(2, 6) + Vector3(randf_range(-2, 2), randf_range(4, 8) * minf(1.3, big), randf_range(-2, 2)))
+			stragglers("water", p, randi_range(0, 1), 5)
+			for i in 3:
+				particles.sprite("foam", p + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4)), f * randf_range(1.5, 3.5) + Vector3(randf_range(-1, 1), 0.2, randf_range(-1, 1)), {"k": randf_range(0.6, 1.1)}))
+	for j in o["jets"]:
+		var u := randf_range(0.25, 0.75)
+		var p := w.landing(u)
+		_after(randf_range(0.22, 0.4), func(): jet(p.x, p.z, 0.9))
+	if o["punch"]:
+		punch(0.15, -0.6, 0.3)
+		screen.wave(w.landing(0.5) + Vector3(0, 0.6, 0), 0.35)
 
 
 # A glowing laser line that lingers (Photon Railgun).
@@ -1176,6 +1236,8 @@ func on_event(e: Dictionary, sim) -> void:
 					screen.wave(Vector3(e["pos"].x, 0.6, e["pos"].y), 0.2)
 				_sig(e.get("key", ""), "impact", e)
 		"area":
+			if e["key"] == "water_pool":
+				return # a Tsunami's pool: the wave's crash and foam already mark it (`wave`)
 			area_start(e)
 			rune(e["pos"].x, e["pos"].y, e["color"], e["r"], e["delay"] + 0.6, {"r0": e["r"] * 0.3, "spin": 3.0, "a": 0.7})
 			_sig(e["key"], "area", e)
