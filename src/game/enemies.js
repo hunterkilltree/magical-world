@@ -18,19 +18,24 @@ export const ENEMY_TYPES = {
   }
 };
 
-export function waveRoster(n) {
+// How a wave grows with the party (co-op, R-080): more enemies and tougher ones per extra wizard.
+export const PARTY_SCALE = { count: 0.5, hp: 0.4 };
+
+// `party` is the number of wizards; `rng` is the sim's random number source.
+export function waveRoster(n, party = 1, rng = Math.random) {
   const list = [];
-  const add = (k, c) => { for (let i = 0; i < c; i++) list.push(k); };
+  const more = 1 + PARTY_SCALE.count * (party - 1);
+  const add = (k, c) => { for (let i = 0; i < Math.round(c * more); i++) list.push(k); };
   add('thrall', 3 + Math.floor(n * 1.5));
   if (n >= 2) add('hexcaller', 1 + Math.floor((n - 2) * 0.7));
   if (n >= 3) add('bulwark', 1 + Math.floor((n - 3) * 0.5));
   for (let i = list.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
+    const j = (rng() * (i + 1)) | 0;
     [list[i], list[j]] = [list[j], list[i]];
   }
   return {
     list,
-    hpScale: 1 + 0.12 * (n - 1),
+    hpScale: (1 + 0.12 * (n - 1)) * (1 + PARTY_SCALE.hp * (party - 1)),
     speedScale: 1 + Math.min(0.25, 0.03 * (n - 1)),
     interval: Math.max(0.28, 0.75 - n * 0.05)
   };

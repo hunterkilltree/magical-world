@@ -4,3 +4,5 @@
 export_presets.cfg
 .mono/
 harness/out/
+node_modules/
+dist/

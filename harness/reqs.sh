@@ -8,7 +8,7 @@ req_list() {
     sed -E 's/^### (R-[0-9]{3}) \[([a-z]+)\] (.*)$/\1|\2|\3/'
 }
 
-req_test_files() { ls tests/story/test_r"${1#R-}"_*.gd 2>/dev/null; }
+req_test_files() { ls tests/story/test_r"${1#R-}"_*.gd tests/web/test_r"${1#R-}"_*.test.mjs 2>/dev/null; }
 
 # reqs: fail if an active/done requirement has no test file.
 cmd_reqs() {
@@ -17,7 +17,7 @@ cmd_reqs() {
   while IFS='|' read -r id st title; do
     total=$((total + 1))
     if [ "$st" != planned ] && [ -z "$(req_test_files "$id")" ]; then
-      echo "MISSING TEST  $id [$st] $title  (expected tests/story/test_r${id#R-}_*.gd)" >&2
+      echo "MISSING TEST  $id [$st] $title  (expected tests/story/test_r${id#R-}_*.gd or tests/web/test_r${id#R-}_*.test.mjs)" >&2
       missing=$((missing + 1))
     fi
   done < <(req_list)
@@ -30,6 +30,10 @@ cmd_reqs() {
 cmd_story() {
   local results rc=0 bad=0 id st title files res icon
   results="$(cmd_test 2>&1)" || rc=$?
+  if [ -d tests/web ] && command -v node >/dev/null 2>&1; then
+    results="$results
+$(cmd_web 2>&1)" || rc=$?
+  fi
   echo "$results" | tail -n 40
   {
     echo "# Story progress"

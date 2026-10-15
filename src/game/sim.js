@@ -9,8 +9,23 @@ export const ARENA_R = 15;
 export const BOUND = ARENA_R - 0.9;
 export const GATES = [0, 0.5, 1, 1.5].map((k) => ({ a: k * Math.PI, x: Math.sin(k * Math.PI) * 13.2, z: -Math.cos(k * Math.PI) * 13.2 }));
 export const TUNING = { r: 0.42, speed: 5.4, hp: 100, energy: 100, regen: 18, dodgeSpeed: 13.5, dodgeTime: 0.26,
-  dodgeCd: 1.0, novaCd: 3, selfCd: 1.4, novaR: 3.4, aimRange: 10, wallDist: 2.4, shoveR: 2.6, fanR: 2.5 };
+  dodgeCd: 1.0, novaCd: 3, selfCd: 1.4, novaR: 3.4, aimRange: 10, wallDist: 2.4, shoveR: 2.6, fanR: 2.5,
+  friendly: 0.5, reviveR: 1.8, reviveT: 3, reviveHp: 0.4, reviveDrain: 0.5 };
+export const MAX_PLAYERS = 4;
 const P = TUNING;
+
+// The sim's random numbers. Tests and replays seed them (seedRandom); a live game uses Math.random.
+let rand = Math.random;
+export function seedRandom(seed) {
+  let a = seed >>> 0;
+  rand = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+export function unseedRandom() { rand = Math.random; }
 const DECAY = ['frozen', 'shock', 'slow', 'stoneskin', 'haste', 'root', 'blind', 'curse', 'stun', 'silence', 'weaken', 'inaccurate', 'confuse', 'regen', 'armor', 'reflect', 'invuln', 'amp'];
 const MOVES = new Set(['guard', 'blink', 'dash', 'decoy', 'swap']);
 const LONG = new Set(['area', 'wall', ...MOVES]);
@@ -30,7 +45,10 @@ const LEAVES = (l, burnMult) => makeSpell(['fire'], { name: l.name ?? 'burning g
 const status = () => ({ burn: 0, burnDps: 0, kindled: false, wet: 0, chill: 0, chillT: 0, frozen: 0, shock: 0, slow: 0, slowPct: 0.4,
   stoneskin: 0, ward: 0, wardT: 0, haste: 0, root: 0, blind: 0, curse: 0, stun: 0, silence: 0, weaken: 0, inaccurate: 0, confuse: 0,
   regen: 0, regenHp: 0, armor: 0, reflect: 0, invuln: 0, revive: 0, amp: 0 });
+export const newStatus = () => status();
 const ev = (s, type, o) => s.events.push({ type, ...o });
+const stop = (s, v) => { if (!s.coop) s.hitstop = Math.max(s.hitstop, v); };
+const byId = (s, id) => (id === undefined ? null : s.players.find((q) => q.id === id) ?? null);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const live = (s) => s.enemies.filter((e) => e.state !== 'spawn' && e.hp > 0);
 const clampIn = (x, z, m) => { const L = Math.hypot(x, z); return L > m ? [(x * m) / L, (z * m) / L] : [x, z]; };
@@ -49,31 +67,87 @@ function makeProps() {
   };
 }
 
-export function createGame(wizard, role) {
+function makePlayer(id, wizard, role, x, z, name) {
+  return {
+    id, name: name ?? id, isPlayer: true, wizard, role: ROLES[role] ? role : WIZARD_ROLE[wizard] ?? 'destroyer', x, z,
+    wind: null, castMax: 0.3, castStyle: 'thrust', castW: 0.5, dashT: 0, dashVx: 0, dashVz: 0, dashSp: null, dashW: 0, dashHit: null, vx: 0, vz: 0, kvx: 0, kvz: 0, r: P.r, mass: 1.2,
+    hp: P.hp, maxHp: P.hp, energy: P.energy, maxEnergy: P.energy, fx: 0, fz: -1,
+    queue: [], last: null, cd: { cast: 0, nova: 0, self: 0, dodge: 0 }, shapeCd: {}, shapeMax: {}, spellCd: {}, spellMax: {},
+    cdMax: { cast: 0.3, nova: P.novaCd, self: P.selfCd, dodge: P.dodgeCd },
+    dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, down: false, reviveT: 0, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0
+  };
+}
+
+function baseGame() {
   return {
     mode: 'menu', t: 0, wave: 0, kills: 0, score: 0, waveT: 2.2, spawnQ: [], spawnT: 0, waveInfo: null,
-    hitstop: 0, nid: 1, remaining: 0,
-    player: {
-      id: 'player', wizard, role: ROLES[role] ? role : WIZARD_ROLE[wizard] ?? 'destroyer', x: 0, z: 3.5,
-      wind: null, castMax: 0.3, castStyle: 'thrust', castW: 0.5, dashT: 0, dashVx: 0, dashVz: 0, dashSp: null, dashW: 0, dashHit: null, vx: 0, vz: 0, kvx: 0, kvz: 0, r: P.r, mass: 1.2,
-      hp: P.hp, maxHp: P.hp, energy: P.energy, maxEnergy: P.energy, fx: 0, fz: -1,
-      queue: [], last: null, cd: { cast: 0, nova: 0, self: 0, dodge: 0 }, shapeCd: {}, shapeMax: {}, spellCd: {}, spellMax: {},
-      cdMax: { cast: 0.3, nova: P.novaCd, self: P.selfCd, dodge: P.dodgeCd },
-      dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0
-    },
+    hitstop: 0, nid: 1, remaining: 0, coop: false, friendly: 0, who: null,
+    players: [], player: null,
     enemies: [], shots: [], areas: [], walls: [], decoys: [], regrow: [], props: makeProps(), events: [],
     stats: { casts: 0, dealt: 0, taken: 0, selfDmg: 0, healed: 0, found: new Set() }
   };
 }
 
+// One wizard, the original game. `game.player` is that wizard.
+export function createGame(wizard, role) {
+  const s = baseGame();
+  s.players.push(makePlayer('player', wizard, role, 0, 3.5));
+  s.player = s.players[0];
+  return s;
+}
+
+// Co-op (R-080): one to four wizards. slots: [{id?, wizard, role?, name?}]. No pause, no hit-stop,
+// allies take half of your blasts, and waves grow with the party.
+export function createCoopGame(slots = []) {
+  const s = baseGame();
+  s.coop = true;
+  s.friendly = P.friendly;
+  for (const slot of slots) addPlayer(s, slot);
+  s.player = s.players[0] ?? null;
+  return s;
+}
+
+// Joins a wizard (null when the party is full). Ids are p1..p4; a free one is reused.
+export function addPlayer(s, { id, wizard, role, name } = {}) {
+  if (s.players.length >= MAX_PLAYERS) return null;
+  if (!id) id = [1, 2, 3, 4].map((n) => 'p' + n).find((x) => !s.players.some((q) => q.id === x));
+  if (s.players.some((q) => q.id === id)) return null;
+  const k = Math.max(0, (+String(id).replace(/\D/g, '') || 1) - 1) % MAX_PLAYERS, a = (k * Math.PI) / 2;
+  const q = makePlayer(id, wizard, role, Math.sin(a) * 3.5, Math.cos(a) * 3.5, name);
+  s.players.push(q);
+  s.players.sort((m, n) => m.id.localeCompare(n.id));
+  if (!s.player) s.player = q;
+  return q;
+}
+
+export function removePlayer(s, id) {
+  const i = s.players.findIndex((q) => q.id === id);
+  if (i < 0) return false;
+  s.players.splice(i, 1);
+  if (s.player && s.player.id === id) s.player = s.players[0] ?? null;
+  return true;
+}
+
+// Inputs: {players: {id: {move, aim, actions}}}, or the single-player shape {move, aim, actions}
+// which drives the first wizard.
+function inputOf(p, raw) {
+  return { move: raw?.move ?? { x: 0, z: 0 }, aim: raw?.aim ?? { x: p.x + p.fx, z: p.z + p.fz }, actions: raw?.actions ?? [] };
+}
+
 export function step(s, inp, dt) {
   s.events = [];
-  for (const a of inp.actions) act(s, a, inp);
+  const raw = inp.players ?? (s.players[0] ? { [s.players[0].id]: inp } : {});
+  const ins = new Map(s.players.map((q) => [q.id, inputOf(q, raw[q.id])]));
+  for (const p of s.players) for (const a of ins.get(p.id).actions) act(s, p, a, ins.get(p.id));
   if (s.mode !== 'play' && s.mode !== 'dead') return s.events;
   if (s.hitstop > 0) { s.hitstop -= dt; dt *= 0.2; }
   s.t += dt;
-  const p = s.player;
-  if (p.alive) updatePlayer(s, inp, dt); else p.deadT += dt;
+  for (const p of s.players) {
+    s.who = p;
+    if (p.alive) updatePlayer(s, p, ins.get(p.id), dt); else p.deadT += dt;
+  }
+  s.who = null;
+  if (s.mode === 'play') updateRevives(s, dt);
   if (s.mode === 'play') updateWaves(s, dt);
   for (const e of s.enemies) updateEnemy(s, e, dt);
   separate(s);
@@ -83,37 +157,66 @@ export function step(s, inp, dt) {
   updateDecoys(s, dt);
   updateProps(s, dt);
   s.enemies = s.enemies.filter((e) => (e.hp > 0 ? true : (kill(s, e), false)));
-  if (p.alive && p.hp <= 0) {
-    if (p.st.revive > 0) { p.st.revive = 0; p.hp = p.maxHp * 0.5; p.st.invuln = 1.5; ev(s, 'revive', { x: p.x, z: p.z }); }
-    else { p.alive = false; p.hp = 0; s.mode = 'dead'; ev(s, 'playerDeath', { x: p.x, z: p.z }); }
+  for (const p of s.players) {
+    if (!p.alive || p.hp > 0) continue;
+    if (p.st.revive > 0) { p.st.revive = 0; p.hp = p.maxHp * 0.5; p.st.invuln = 1.5; ev(s, 'revive', { pid: p.id, x: p.x, z: p.z }); continue; }
+    p.alive = false; p.hp = 0; p.down = true; p.reviveT = 0; p.wind = null; p.dashT = 0; p.deadT = 0;
+    ev(s, 'playerDown', { pid: p.id, id: p.id, x: p.x, z: p.z });
+  }
+  if (s.players.length && s.players.every((q) => !q.alive) && s.mode === 'play') {
+    s.mode = 'dead';
+    const p = s.player ?? s.players[0];
+    ev(s, 'playerDeath', { pid: p.id, x: p.x, z: p.z });
   }
   s.remaining = s.spawnQ.length + s.enemies.length;
   return s.events;
 }
 
-// ---------------------------------------------------------------- actions
-function act(s, a, inp) {
-  if (a === 'pause') { if (s.mode === 'play') s.mode = 'paused'; else if (s.mode === 'paused') s.mode = 'play'; return; }
-  if (s.mode !== 'play' || !s.player.alive) return;
-  if (a.startsWith('el:')) return queueEl(s, a.slice(3));
-  if (a === 'clear') { if (s.player.queue.length) { s.player.queue = []; ev(s, 'clear', {}); } return; }
-  if (a === 'cast') return cast(s, inp, 'aim', false);
-  if (a === 'recast') return cast(s, inp, 'aim', true);
-  if (a === 'nova') return cast(s, inp, 'nova', false);
-  if (a === 'self') return cast(s, inp, 'self', false);
-  if (a === 'dodge') return dodge(s, inp);
+// A downed wizard is raised by a living ally standing close (R-080); the progress drains when nobody is near.
+function updateRevives(s, dt) {
+  for (const p of s.players) {
+    if (p.alive || !p.down) continue;
+    const near = s.players.filter((q) => q.alive && q !== p && Math.hypot(q.x - p.x, q.z - p.z) < P.reviveR).length;
+    if (near > 0) p.reviveT += dt * (1 + 0.5 * (near - 1));
+    else p.reviveT = Math.max(0, p.reviveT - dt * P.reviveDrain);
+    if (p.reviveT >= P.reviveT) raise(s, p, P.reviveHp);
+  }
 }
 
-function queueEl(s, el) {
-  const p = s.player;
+function raise(s, p, hpFrac) {
+  p.alive = true; p.down = false; p.reviveT = 0; p.deadT = 0;
+  p.hp = p.maxHp * hpFrac;
+  p.st = status();
+  p.st.invuln = 1.5;
+  ev(s, 'revived', { pid: p.id, id: p.id, x: p.x, z: p.z });
+}
+
+// ---------------------------------------------------------------- actions
+function act(s, p, a, inp) {
+  if (a === 'pause') {
+    if (s.coop) return; // the court does not wait for anyone
+    if (s.mode === 'play') s.mode = 'paused'; else if (s.mode === 'paused') s.mode = 'play';
+    return;
+  }
+  if (s.mode !== 'play' || !p.alive) return;
+  if (a.startsWith('el:')) return queueEl(s, p, a.slice(3));
+  if (a === 'clear') { if (p.queue.length) { p.queue = []; ev(s, 'clear', { pid: p.id }); } return; }
+  if (a === 'cast') return cast(s, p, inp, 'aim', false);
+  if (a === 'recast') return cast(s, p, inp, 'aim', true);
+  if (a === 'nova') return cast(s, p, inp, 'nova', false);
+  if (a === 'self') return cast(s, p, inp, 'self', false);
+  if (a === 'dodge') return dodge(s, p, inp);
+}
+
+function queueEl(s, p, el) {
   if (!ELEMENTS[el]) return;
   const opp = CANCELS[el];
   // Opposites cancel — unless the caster's role knows a spell for the clash.
   const i = opp && !rolePair(p.role, el, opp) ? p.queue.lastIndexOf(opp) : -1;
-  if (i >= 0) { p.queue.splice(i, 1); ev(s, 'cancel', { a: el, b: opp, x: p.x, z: p.z }); return; }
-  if (p.queue.length >= MAX_QUEUE) { ev(s, 'queueFull', {}); return; }
+  if (i >= 0) { p.queue.splice(i, 1); ev(s, 'cancel', { pid: p.id, a: el, b: opp, x: p.x, z: p.z }); return; }
+  if (p.queue.length >= MAX_QUEUE) { ev(s, 'queueFull', { pid: p.id }); return; }
   p.queue.push(el);
-  ev(s, 'queue', { el });
+  ev(s, 'queue', { pid: p.id, el });
 }
 
 // Matrix spells recharge on their own timer (R-055); areas and walls on their shape's (R-039).
@@ -125,26 +228,26 @@ function ownTimer(sp) {
   return null;
 }
 
-function cast(s, inp, mode, held) {
-  const p = s.player, st = p.st;
+function cast(s, p, inp, mode, held) {
+  const st = p.st;
   if (st.frozen > 0 || st.stun > 0 || p.wind || p.dashT > 0) return;
   let q = p.queue;
   if (held && q.length) return;
   if (!q.length) {
     if (mode === 'aim' && p.last) q = p.last;
-    else { if (!held) ev(s, 'fizzle', { x: p.x, z: p.z }); return; }
+    else { if (!held) ev(s, 'fizzle', { pid: p.id, x: p.x, z: p.z }); return; }
   }
   const slot = mode === 'aim' ? 'cast' : mode;
   if (p.cd[slot] > 0) return;
   const sp = resolveSpell(q, p.role);
-  if (!sp) { p.queue = []; ev(s, 'fizzle', { x: p.x, z: p.z }); return; }
+  if (!sp) { p.queue = []; ev(s, 'fizzle', { pid: p.id, x: p.x, z: p.z }); return; }
   const d = sp.def, own = mode === 'aim' ? ownTimer(sp) : null;
   if (own && p[own.bag][own.id] > 0) {
-    if (!held) ev(s, 'cooldown', { shape: d.shape, name: sp.name, spell: own.bag === 'spellCd', t: p[own.bag][own.id] });
+    if (!held) ev(s, 'cooldown', { pid: p.id, shape: d.shape, name: sp.name, spell: own.bag === 'spellCd', t: p[own.bag][own.id] });
     return;
   }
   const cost = Math.round(sp.cost * (mode === 'nova' ? 1.3 : mode === 'self' ? 0.5 : 1));
-  if (p.energy < cost) { if (!held) ev(s, 'noEnergy', { cost }); return; }
+  if (p.energy < cost) { if (!held) ev(s, 'noEnergy', { pid: p.id, cost }); return; }
   p.energy -= cost;
   const cd = mode === 'aim' ? Math.min(sp.cd, 0.45) : mode === 'nova' ? P.novaCd : P.selfCd;
   p.cd[slot] = cd; p.cdMax[slot] = cd;
@@ -160,36 +263,37 @@ function cast(s, inp, mode, held) {
   const hold = mode === 'self' ? 0 : 0.03 + 0.07 * Math.min(1, weight); // the held breath at full anticipation
   const t = t0 + hold;
   p.wind = { t, max: t, hold, sp, mode, fromQueue, isNew, style, weight };
-  ev(s, 'windup', { style, weight, t, hold, mode, shape: d.shape, x: p.x, z: p.z, dx: p.fx, dz: p.fz, els: sp.els, color: sp.color,
+  ev(s, 'windup', { pid: p.id, style, weight, t, hold, mode, shape: d.shape, x: p.x, z: p.z, dx: p.fx, dz: p.fz, els: sp.els, color: sp.color,
     key: sp.key, role: p.role, tier: sp.tier, name: sp.name });
 }
 
 // Release: the spell leaves the staff, aimed where the cursor is now.
-function release(s, inp) {
-  const p = s.player, st = p.st, w = p.wind, mode = w.mode;
+function release(s, p, inp) {
+  const st = p.st, w = p.wind, mode = w.mode;
+  s.who = p;
   p.wind = null;
   let sp = w.sp;
   const d = sp.def;
   if (st.amp > 0 && d.shape !== 'guard' && mode !== 'self') sp = { ...makeSpell(sp.els, d, sp.power * 1.35, sp.key, sp.name), amped: true };
   p.castT = p.castMax = STYLES[w.style].recoil * (0.7 + 0.5 * w.weight); p.castStyle = w.style; p.castW = w.weight;
   const distinct = sp.tier;
-  if (w.fromQueue && distinct >= 2) s.hitstop = Math.max(s.hitstop, w.isNew ? 0.16 : distinct >= 3 ? 0.07 : 0.035);
-  if (w.style === 'slam' && mode !== 'self') s.hitstop = Math.max(s.hitstop, 0.04 + 0.05 * w.weight);
+  if (w.fromQueue && distinct >= 2) stop(s, w.isNew ? 0.16 : distinct >= 3 ? 0.07 : 0.035);
+  if (w.style === 'slam' && mode !== 'self') stop(s, 0.04 + 0.05 * w.weight);
   const ax = inp.aim.x - p.x, az = inp.aim.z - p.z, aimDist = Math.hypot(ax, az);
   if (aimDist > 0.05) { p.fx = ax / aimDist; p.fz = az / aimDist; }
   const dx = p.fx, dz = p.fz;
-  ev(s, 'cast', { mode, shape: d.shape, name: sp.name, key: sp.key, sid: sp.sid, role: d.role, arch: d.arch, style: w.style, weight: w.weight,
+  ev(s, 'cast', { pid: p.id, mode, shape: d.shape, name: sp.name, key: sp.key, sid: sp.sid, role: d.role, arch: d.arch, style: w.style, weight: w.weight,
     els: sp.els, color: sp.color, x: p.x, z: p.z, dx, dz, fromQueue: w.fromQueue, isNew: w.isNew, distinct, tier: sp.tier,
     visual: d.visual, spear: !!d.spear, amped: !!sp.amped });
   if (sp.counts.lightning && st.wet > 0 && mode !== 'self') {
     hurt(s, p, 7 * sp.counts.lightning, 'lightning', { self: true, reason: 'Cast lightning while wet' });
     st.shock = Math.max(st.shock, 0.35);
   }
-  if (mode === 'self') return selfCast(s, sp);
-  if (d.revive) { st.revive = 1; ev(s, 'tag', { tag: 'blessing', x: p.x, z: p.z, id: 'player' }); }
+  if (mode === 'self') return selfCast(s, sp, p);
+  if (d.revive) { st.revive = 1; ev(s, 'tag', { tag: 'blessing', x: p.x, z: p.z, id: p.id }); }
   if (d.armor) st.armor = Math.max(st.armor, d.armor);
   if (d.reflectPlayer) st.reflect = Math.max(st.reflect, d.reflectPlayer);
-  if (mode === 'nova' && !MOVES.has(d.shape)) return nova(s, sp);
+  if (mode === 'nova' && !MOVES.has(d.shape)) return nova(s, sp, p);
   (CAST[d.shape] ?? CAST.bolt)(s, sp, p, dx, dz, Math.max(1.2, aimDist));
 }
 
@@ -209,7 +313,7 @@ const CAST = {
     for (const o of envList(s)) if (inside(o, o.r)) envHit(s, o, sp.els, false);
     if (d.deflect) for (const b of s.shots) if (b.owner === 'enemy' && inside(b, b.r)) { b.dead = true; ev(s, 'deflect', { x: b.x, z: b.z }); }
     if (d.pool) addPool(s, p.x + dx * range * 0.55, p.z + dz * range * 0.55, d.pool);
-    ev(s, 'cone', { x: p.x, z: p.z, dx, dz, range, arc: d.arc ?? 50, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
+    ev(s, 'cone', { pid: p.id, x: p.x, z: p.z, dx, dz, range, arc: d.arc ?? 50, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
   },
   bolt(s, sp, p, dx, dz) {
     const d = sp.def, n = d.count ?? 1, spread = ((d.spread ?? 0) * Math.PI) / 180, speed = d.speed ?? 20;
@@ -217,14 +321,14 @@ const CAST = {
       const a = n > 1 ? (i - (n - 1) / 2) * spread : 0, c = Math.cos(a), sn = Math.sin(a);
       const vx = dx * c + dz * sn, vz = -dx * sn + dz * c;
       const heavy = !!d.explode && (d.radius ?? 0.24) >= 0.3; // bombs lob in an arc and skip once
-      s.shots.push({ id: s.nid++, kind: d.spear ? 'spear' : 'bolt', owner: 'player', x: p.x + vx * 0.6, z: p.z + vz * 0.6, vx: vx * speed, vz: vz * speed,
+      s.shots.push({ id: s.nid++, kind: d.spear ? 'spear' : 'bolt', owner: 'player', pid: p.id, x: p.x + vx * 0.6, z: p.z + vz * 0.6, vx: vx * speed, vz: vz * speed,
         r: d.radius ?? 0.24, life: d.life ?? 1.2, pierce: d.pierce ?? 0, hits: [], sp, color: sp.color, els: sp.els,
         ...(heavy ? { arc: true, y: 1.15, vy: 2.6, bounces: 1 } : {}) });
     }
   },
   boulder(s, sp, p, dx, dz) {
     const speed = sp.def.speed ?? 11;
-    s.shots.push({ id: s.nid++, kind: 'boulder', owner: 'player', x: p.x + dx * 0.7, z: p.z + dz * 0.7, vx: dx * speed, vz: dz * speed,
+    s.shots.push({ id: s.nid++, kind: 'boulder', owner: 'player', pid: p.id, x: p.x + dx * 0.7, z: p.z + dz * 0.7, vx: dx * speed, vz: dz * speed,
       r: 0.4, life: 1.7, pierce: 0, hits: [], sp, color: sp.color, els: sp.els, arc: true, y: 1.0, vy: 3.2, bounces: 2 });
   },
   chain(s, sp, p, dx, dz, aimDist) {
@@ -245,7 +349,7 @@ const CAST = {
       pts.push([ex, ez]);
       envAt(s, ex, ez, 0.9, sp.els, false);
     }
-    ev(s, 'chain', { pts, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
+    ev(s, 'chain', { pid: p.id, pts, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
   },
   area(s, sp, p, dx, dz, aimDist) {
     if (sp.def.self) return spawnArea(s, sp, p.x, p.z);
@@ -258,13 +362,13 @@ const CAST = {
       const self = d.around === 'self', L = Math.min(aimDist, P.aimRange);
       const [cx, cz] = self ? [p.x, p.z] : clampIn(p.x + dx * L, p.z + dz * L, BOUND - d.ring - 0.4);
       for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; addWall(s, cx + Math.sin(a) * d.ring, cz + Math.cos(a) * d.ring, sp); }
-      ev(s, 'wall', { x: cx, z: cz, mat, key: sp.key, dx, dz, n, ring: d.ring, self, els: sp.els, color: sp.color, arch: d.arch });
+      ev(s, 'wall', { pid: p.id, x: cx, z: cz, mat, key: sp.key, dx, dz, n, ring: d.ring, self, els: sp.els, color: sp.color, arch: d.arch });
       if (!self) explode(s, cx, cz, d.ring, sp.payload, { color: sp.color, els: sp.els, key: sp.key, tier: sp.tier });
       return;
     }
     const cx = p.x + dx * P.wallDist, cz = p.z + dz * P.wallDist;
     for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.95; addWall(s, cx - dz * o, cz + dx * o, sp); }
-    ev(s, 'wall', { x: cx, z: cz, mat, key: sp.key, dx, dz, n, els: sp.els, color: sp.color, arch: d.arch });
+    ev(s, 'wall', { pid: p.id, x: cx, z: cz, mat, key: sp.key, dx, dz, n, els: sp.els, color: sp.color, arch: d.arch });
   },
   beam(s, sp, p, dx, dz) {
     const d = sp.def, n = d.count ?? 1, spr = ((d.spread ?? 0) * Math.PI) / 180;
@@ -273,7 +377,7 @@ const CAST = {
       beamOne(s, sp, p, dx * c + dz * sn, -dx * sn + dz * c);
     }
   },
-  guard(s, sp) { guardCast(s, sp); },
+  guard(s, sp, p) { guardCast(s, sp, p); },
   blink(s, sp, p, dx, dz, aimDist) {
     const d = sp.def, L = Math.min(d.dist ?? 7, Math.max(2, aimDist)), x0 = p.x, z0 = p.z;
     [p.x, p.z] = clampIn(p.x + dx * L, p.z + dz * L, BOUND - p.r);
@@ -281,7 +385,7 @@ const CAST = {
     p.vx = p.vz = p.kvx = p.kvz = 0;
     p.st.invuln = Math.max(p.st.invuln, 0.3);
     if (d.ward) { p.st.ward = Math.max(p.st.ward, d.ward * sp.power); p.st.wardT = 5; }
-    ev(s, 'blink', { x0, z0, x1: p.x, z1: p.z, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, role: d.role });
+    ev(s, 'blink', { pid: p.id, x0, z0, x1: p.x, z1: p.z, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, role: d.role });
     const o = { color: sp.color, els: sp.els, key: sp.key, tier: sp.tier };
     if (d.burstFrom) explode(s, x0, z0, d.burstFrom, sp.payload, o);
     if (d.burstTo) explode(s, p.x, p.z, d.burstTo, sp.payload, o);
@@ -289,16 +393,16 @@ const CAST = {
   },
   dash(s, sp, p, dx, dz) {
     const d = sp.def, L = d.dist ?? 6, T = 0.18;
-    if (d.decoy) spawnDecoy(s, sp, p.x, p.z, d.decoy);
-    Object.assign(p, { dashT: T, dashVx: (dx * L) / T, dashVz: (dz * L) / T, dashSp: sp, dashW: d.width ?? 0.9, dashHit: new Set() });
-    ev(s, 'dash', { x: p.x, z: p.z, dx, dz, dist: L, t: T, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, role: d.role });
+    if (d.decoy) spawnDecoy(s, sp, p.x, p.z, d.decoy, p);
+    Object.assign(p, { dashT: T, dashVx: (dx * L) / T, dashVz: (dz * L) / T, dashSp: sp, dashW: d.width ?? 0.9, dashHit: [] });
+    ev(s, 'dash', { pid: p.id, x: p.x, z: p.z, dx, dz, dist: L, t: T, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, role: d.role });
   },
   // Doubles stand where you were (or fan out toward the enemy) while you slip back out of reach.
   decoy(s, sp, p, dx, dz) {
     const d = sp.def, n = d.count ?? 1;
     for (let i = 0; i < n; i++) {
       const o = n > 1 ? i - (n - 1) / 2 : 0;
-      const D = spawnDecoy(s, sp, p.x - dz * o * 1.3, p.z + dx * o * 1.3, d);
+      const D = spawnDecoy(s, sp, p.x - dz * o * 1.3, p.z + dx * o * 1.3, d, p);
       if (n > 1) { const a = o * 0.6, c = Math.cos(a), sn = Math.sin(a); D.vx = (dx * c + dz * sn) * 2.4; D.vz = (-dx * sn + dz * c) * 2.4; }
     }
     if (d.hop) {
@@ -306,7 +410,7 @@ const CAST = {
       [p.x, p.z] = clampIn(p.x - dx * d.hop, p.z - dz * d.hop, BOUND - p.r);
       collide(s, p);
       p.st.invuln = Math.max(p.st.invuln, 0.25);
-      ev(s, 'blink', { x0, z0, x1: p.x, z1: p.z, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, hop: true });
+      ev(s, 'blink', { pid: p.id, x0, z0, x1: p.x, z1: p.z, els: sp.els, color: sp.color, key: sp.key, arch: d.arch, hop: true });
     }
   },
   swap(s, sp, p, dx, dz, aimDist) {
@@ -324,12 +428,12 @@ const CAST = {
     p.vx = p.vz = p.kvx = p.kvz = 0;
     p.st.invuln = Math.max(p.st.invuln, 0.35);
     applyPayload(s, tg, { ...sp.payload, stun: Math.max(sp.payload.stun || 0, 0.9) }, {});
-    ev(s, 'swap', { x0, z0, x1: p.x, z1: p.z, id: tg.id, els: sp.els, color: sp.color, key: sp.key, arch: d.arch });
+    ev(s, 'swap', { pid: p.id, x0, z0, x1: p.x, z1: p.z, id: tg.id, els: sp.els, color: sp.color, key: sp.key, arch: d.arch });
   }
 };
 
-function guardCast(s, sp) {
-  const p = s.player, st = p.st, d = sp.def, pw = sp.power;
+function guardCast(s, sp, p) {
+  const st = p.st, d = sp.def, pw = sp.power;
   if (d.ward) { st.ward = Math.max(st.ward, d.ward * pw); st.wardT = 6; }
   if (d.armor) st.armor = Math.max(st.armor, d.armor);
   if (d.reflect) st.reflect = Math.max(st.reflect, d.reflect);
@@ -340,12 +444,12 @@ function guardCast(s, sp) {
   if (d.regen) { st.regen = Math.max(st.regen, d.regen); st.regenHp = Math.max(st.regenHp, 4 * pw); }
   if (d.rootSelf) st.root = Math.max(st.root, d.invuln ?? 1.5);
   if (d.cleanse) {
-    if (st.burn > 0 || st.chill > 0 || st.slow > 0 || st.curse > 0 || st.shock > 0) ev(s, 'tag', { tag: 'cleanse', x: p.x, z: p.z, id: 'player' });
+    if (st.burn > 0 || st.chill > 0 || st.slow > 0 || st.curse > 0 || st.shock > 0) ev(s, 'tag', { tag: 'cleanse', x: p.x, z: p.z, id: p.id });
     Object.assign(st, { burn: 0, kindled: false, chill: 0, slow: 0, frozen: 0, shock: 0, curse: 0, wet: 0 });
   }
-  if (d.heal) heal(s, d.heal * pw, true);
+  if (d.heal) heal(s, p, d.heal * pw, true);
   if (d.energy) p.energy = Math.min(p.maxEnergy, p.energy + d.energy);
-  if (d.revive) { st.revive = 1; ev(s, 'tag', { tag: 'blessing', x: p.x, z: p.z, id: 'player' }); }
+  if (d.revive) { st.revive = 1; ev(s, 'tag', { tag: 'blessing', x: p.x, z: p.z, id: p.id }); }
   if (d.near) {
     const pl = { ...sp.payload, parts: {}, knock: 3 };
     for (const k in sp.payload.parts) pl.parts[k] = sp.payload.parts[k] * 0.5;
@@ -353,30 +457,30 @@ function guardCast(s, sp) {
     if (d.confuse) pl.confuse = d.confuse;
     for (const e of live(s)) { const L = dist(e, p); if (L < d.near + e.r) applyPayload(s, e, pl, { kx: (e.x - p.x) / (L || 1), kz: (e.z - p.z) / (L || 1) }); }
   }
-  ev(s, 'guard', { x: p.x, z: p.z, arch: d.arch, els: sp.els, color: sp.color, key: sp.key, near: d.near ?? 0, ward: !!d.ward, invuln: !!d.invuln,
+  ev(s, 'guard', { pid: p.id, x: p.x, z: p.z, arch: d.arch, els: sp.els, color: sp.color, key: sp.key, near: d.near ?? 0, ward: !!d.ward, invuln: !!d.invuln,
     heal: !!(d.heal || d.regen), amp: !!d.amp, stone: !!d.stoneskin, reflect: !!d.reflect, revive: !!d.revive });
 }
 
-function spawnDecoy(s, sp, x, z, o) {
+function spawnDecoy(s, sp, x, z, o, owner = s.who ?? s.players[0]) {
   [x, z] = clampIn(x, z, BOUND - 0.5);
   const hp = (o.hp ?? 60) * sp.power;
   const D = { id: s.nid++, decoy: true, x, z, vx: 0, vz: 0, kvx: 0, kvz: 0, r: 0.42, mass: 1.5, hp, maxHp: hp, life: o.life ?? 5, max: o.life ?? 5,
-    burst: o.burst ?? 0, pulse: o.pulse ?? 0, pulseT: 0.4, heal: o.heal ?? 0, st: status(), sp, flash: 0, face: Math.atan2(s.player.fx, s.player.fz) };
+    burst: o.burst ?? 0, pulse: o.pulse ?? 0, pulseT: 0.4, heal: o.heal ?? 0, st: status(), sp, flash: 0, face: Math.atan2(owner.fx, owner.fz), pid: owner.id };
   s.decoys.push(D);
-  ev(s, 'decoy', { id: D.id, x, z, els: sp.els, color: sp.color, key: sp.key, arch: sp.def.arch, life: D.life, summon: !!D.pulse });
+  ev(s, 'decoy', { pid: owner.id, id: D.id, x, z, els: sp.els, color: sp.color, key: sp.key, arch: sp.def.arch, life: D.life, summon: !!D.pulse });
   return D;
 }
 
 function updateDecoys(s, dt) {
-  const p = s.player;
   for (const D of s.decoys) {
+    s.who = byId(s, D.pid);
     D.life -= dt; D.flash = Math.max(0, D.flash - dt);
     move(s, D, dt);
     const k = Math.exp(-0.8 * dt); D.vx *= k; D.vz *= k;
     if (!D.pulse || (D.pulseT -= dt) > 0) continue;
     D.pulseT = D.pulse;
     for (const e of live(s)) { const L = dist(e, D); if (L < 2.6 + e.r) applyPayload(s, e, D.sp.payload, { kx: (e.x - D.x) / (L || 1), kz: (e.z - D.z) / (L || 1) }); }
-    if (D.heal && p.alive && dist(D, p) < 3.4) heal(s, D.heal * D.pulse * 2, true);
+    if (D.heal) for (const p of s.players) if (p.alive && dist(D, p) < 3.4) heal(s, p, D.heal * D.pulse * 2, true);
     ev(s, 'decoyPulse', { id: D.id, x: D.x, z: D.z, r: 2.6, els: D.sp.els, color: D.sp.color, heal: !!D.heal });
   }
   const keep = [];
@@ -412,7 +516,7 @@ function beamOne(s, sp, p, dx, dz) {
       hits.push([e.x, e.z]);
     }
     for (const o of envList(s)) if (along(o, o.r)) envHit(s, o, sp.els, false);
-    ev(s, 'beam', { x: ox, z: oz, dx, dz, len, w: half * 2, els: sp.els, color: sp.color, key: sp.key, visual: d.visual, hits, stop, tier: sp.tier, arch: d.arch });
+    ev(s, 'beam', { pid: p.id, x: ox, z: oz, dx, dz, len, w: half * 2, els: sp.els, color: sp.color, key: sp.key, visual: d.visual, hits, stop, tier: sp.tier, arch: d.arch });
   }
 }
 
@@ -434,7 +538,7 @@ function chainWalk(s, sp, cur, jumps, pts, k, hit) {
 
 function scatterPt(a) {
   if (!a.scatter) return [a.x, a.z];
-  const ang = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * a.scatter;
+  const ang = rand() * Math.PI * 2, r = Math.sqrt(rand()) * a.scatter;
   return clampIn(a.x + Math.sin(ang) * r, a.z + Math.cos(ang) * r, BOUND - 0.5);
 }
 
@@ -445,7 +549,7 @@ function spawnArea(s, sp, x, z) {
     delay: d.delay ?? 0, delayMax: d.delay ?? 0, pull: d.pull ?? 0, burst: !!d.burst, hitsAll: !!d.hitsAll,
     heal: d.heal ?? 0, invuln: !!d.invulnerable, cleanse: !!d.cleanse, swallow: !!d.swallow, field: !!d.deflectField, repel: d.repel ?? 0,
     drainPct: d.drainPct ?? 0, repeat: d.repeat ?? 1, interval: d.interval ?? 0.35, scatter: d.scatter ?? 0, n: 0,
-    els: sp.els, color: sp.color, key: sp.key, name: sp.name, visual: d.visual, tier: sp.tier, sp };
+    els: sp.els, color: sp.color, key: sp.key, name: sp.name, visual: d.visual, tier: sp.tier, sp, pid: s.who?.id };
   [a.bx, a.bz] = scatterPt(a);
   s.areas.push(a);
   ev(s, 'area', { id: a.id, x, z, bx: a.bx, bz: a.bz, r: a.r, life: a.life, delay: a.delay, key: sp.key, els: sp.els, color: sp.color,
@@ -468,14 +572,14 @@ function addWall(s, x, z, sp, life) {
     chill: !!d.touchChill, touchT: 0, regen: d.regen ?? 0, reflect: !!d.reflect, touch: d.touch ? sp : null, tT: 0, sp };
   s.walls.push(w);
   for (const e of live(s)) pushOut(e, w);
-  if (s.player.alive) pushOut(s.player, w);
+  for (const q of s.players) if (q.alive) pushOut(q, w);
   return w;
 }
 
-function nova(s, sp) {
-  const p = s.player, d = sp.def;
+function nova(s, sp, p) {
+  const d = sp.def;
   const r = d.shape === 'area' ? d.radius ?? 3 : d.shape === 'wall' ? 2.2 : P.novaR;
-  ev(s, 'nova', { x: p.x, z: p.z, r, els: sp.els, color: sp.color, shape: d.shape, key: sp.key, tier: sp.tier });
+  ev(s, 'nova', { pid: p.id, x: p.x, z: p.z, r, els: sp.els, color: sp.color, shape: d.shape, key: sp.key, tier: sp.tier });
   if (d.shape === 'wall') {
     for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; addWall(s, p.x + Math.sin(a) * 2.2, p.z + Math.cos(a) * 2.2, sp); }
     return;
@@ -491,18 +595,17 @@ function nova(s, sp) {
   if (d.explode) applyPayload(s, p, sp.payload, { scale: 0.25, reason: 'Point-blank ' + sp.name });
 }
 
-function heal(s, amt, burst = false) {
-  const p = s.player;
-  if (!p.alive || amt <= 0) return 0;
+function heal(s, p, amt, burst = false) {
+  if (!p || !p.alive || amt <= 0) return 0;
   const a = Math.min(amt, p.maxHp - p.hp);
   if (a <= 0) return 0;
   p.hp += a; s.stats.healed += a; p.healAcc += a;
-  if (burst || p.healAcc >= 3) { ev(s, 'heal', { x: p.x, z: p.z, amt: p.healAcc }); p.healAcc = 0; }
+  if (burst || p.healAcc >= 3) { ev(s, 'heal', { pid: p.id, x: p.x, z: p.z, amt: p.healAcc }); p.healAcc = 0; }
   return a;
 }
 
-function selfCast(s, sp) {
-  const p = s.player, st = p.st;
+function selfCast(s, sp, p) {
+  const st = p.st;
   for (const [el, n] of Object.entries(sp.counts)) {
     const f = ELEMENTS[el].self;
     if (f.thaw) { st.frozen = 0; st.chill = 0; st.wet = 0; }
@@ -516,13 +619,13 @@ function selfCast(s, sp) {
     if (f.cleanse) { st.burn = 0; st.kindled = false; st.chill = 0; st.slow = 0; st.frozen = 0; }
     if (f.wet) st.wet = Math.max(st.wet, f.wet);
     if (f.regen) { st.regen = 4; st.regenHp = f.regen * n; }
-    if (f.heal) heal(s, f.heal * n, true);
+    if (f.heal) heal(s, p, f.heal * n, true);
     if (f.sacrifice) {
       const c = f.sacrifice * n;
       p.hp -= c; p.hurtT = 0.3; s.stats.taken += c; s.stats.selfDmg += c;
       p.energy = Math.min(p.maxEnergy, p.energy + 50 * n);
-      ev(s, 'hurt', { id: 'player', x: p.x, z: p.z, dmg: c, el: 'dark', self: true, reason: 'Dark pact' });
-      ev(s, 'tag', { tag: 'pact', x: p.x, z: p.z, id: 'player' });
+      ev(s, 'hurt', { id: p.id, x: p.x, z: p.z, dmg: c, el: 'dark', self: true, reason: 'Dark pact' });
+      ev(s, 'tag', { tag: 'pact', x: p.x, z: p.z, id: p.id });
     }
     if (f.gust) {
       const to = [];
@@ -533,14 +636,13 @@ function selfCast(s, sp) {
         e.kvx += ((e.x - p.x) / (L || 1)) * k; e.kvz += ((e.z - p.z) / (L || 1)) * k;
         to.push([e.x, e.z]);
       }
-      ev(s, 'tag', { tag: 'gust', x: p.x, z: p.z, id: 'player', to });
+      ev(s, 'tag', { tag: 'gust', x: p.x, z: p.z, id: p.id, to });
     }
   }
-  ev(s, 'selfcast', { els: sp.els, color: sp.color, x: p.x, z: p.z, key: sp.key });
+  ev(s, 'selfcast', { pid: p.id, els: sp.els, color: sp.color, x: p.x, z: p.z, key: sp.key });
 }
 
-function dodge(s, inp) {
-  const p = s.player;
+function dodge(s, p, inp) {
   if (p.cd.dodge > 0 || p.st.frozen > 0 || p.st.stun > 0) return;
   let dx = inp.move.x, dz = inp.move.z;
   if (!dx && !dz) { dx = p.fx; dz = p.fz; }
@@ -548,8 +650,8 @@ function dodge(s, inp) {
   p.ddx = dx / L; p.ddz = dz / L;
   p.dodge = P.dodgeTime; p.cd.dodge = P.dodgeCd; p.cdMax.dodge = P.dodgeCd;
   if (p.st.burn > 0) p.st.burn = Math.max(0, p.st.burn - 1.2);
-  if (p.st.root > 0) { p.st.root = 0; ev(s, 'tag', { tag: 'breakfree', x: p.x, z: p.z, id: 'player' }); }
-  ev(s, 'dodge', { x: p.x, z: p.z, dx: p.ddx, dz: p.ddz });
+  if (p.st.root > 0) { p.st.root = 0; ev(s, 'tag', { tag: 'breakfree', x: p.x, z: p.z, id: p.id }); }
+  ev(s, 'dodge', { pid: p.id, x: p.x, z: p.z, dx: p.ddx, dz: p.ddz });
 }
 
 // ---------------------------------------------------------------- damage
@@ -560,11 +662,11 @@ function freeze(t, dur) {
 
 function hurt(s, t, dmg, el, o = {}) {
   if (dmg <= 0 || t.hp <= 0) return 0;
-  const isP = t === s.player, st = t.st;
+  const isP = !!t.isPlayer, st = t.st;
   if (isP) {
     if (!t.alive) return 0;
-    if ((t.dodge > 0 || t.dashT > 0) && !o.dot) { ev(s, 'tag', { tag: 'evade', x: t.x, z: t.z, id: 'player' }); return 0; }
-    if (st.invuln > 0) { if (!o.dot) ev(s, 'tag', { tag: 'immune', x: t.x, z: t.z, id: 'player' }); return 0; }
+    if ((t.dodge > 0 || t.dashT > 0) && !o.dot) { ev(s, 'tag', { tag: 'evade', x: t.x, z: t.z, id: t.id }); return 0; }
+    if (st.invuln > 0) { if (!o.dot) ev(s, 'tag', { tag: 'immune', x: t.x, z: t.z, id: t.id }); return 0; }
     if (st.armor > 0) dmg /= 1.75;
     if (st.stoneskin > 0) dmg *= 0.5;
     if (st.ward > 0) {
@@ -609,7 +711,7 @@ function fan(s, src) {
 
 // The one place elements meet bodies (R-038, R-051). Order: water, fire, ice, nature, wind, light, damage, then dark.
 function applyPayload(s, t, pl, c = {}) {
-  const isP = t === s.player;
+  const isP = !!t.isPlayer;
   if (isP && (!t.alive || ((t.dodge > 0 || t.dashT > 0) && !c.area))) return 0;
   if (t.hp <= 0) return 0;
   const st = t.st, k = c.scale ?? 1, tags = [];
@@ -662,7 +764,7 @@ function applyPayload(s, t, pl, c = {}) {
     if (d > topV) { topV = d; top = el; }
     dmg += d;
   }
-  if (tags.some((g) => g.tag === 'shatter')) { st.frozen = 0; st.chill = 0; s.hitstop = Math.max(s.hitstop, 0.08); }
+  if (tags.some((g) => g.tag === 'shatter')) { st.frozen = 0; st.chill = 0; stop(s, 0.08); }
   if (pl.freeze) { if (st.frozen <= 0) tag('freeze', 'prison'); freeze(t, pl.freeze); }
   if (pl.shock && st.frozen <= 0) st.shock = Math.max(st.shock, pl.shock * (wasWet ? 2 : 1));
   if (pl.stun && st.frozen <= 0) { if (st.stun <= 0) tag('stun'); st.stun = Math.max(st.stun, pl.stun); }
@@ -679,7 +781,7 @@ function applyPayload(s, t, pl, c = {}) {
   if (dmg > 0.05) dealt = hurt(s, t, dmg, top, { self: isP, reason: c.reason, dot: !!c.area, crit: thermal, src: c.src });
   if (pl.curse && !purge) { if (st.curse <= 0) tag('curse'); st.curse = Math.max(st.curse, pl.curse); }
   const dr = c.drain ?? pl.drain;
-  if (dr && !isP && dealt > 0) heal(s, dealt * dr);
+  if (dr && !isP && dealt > 0) heal(s, s.who, dealt * dr);
   if (c.drained) c.drained.v += dealt;
   const seen = new Set();
   for (const g of tags) { if (seen.has(g.tag)) continue; seen.add(g.tag); ev(s, 'tag', { ...g, x: t.x, z: t.z, id: t.id }); }
@@ -692,16 +794,17 @@ function explode(s, x, z, R, pl, o = {}) {
     if (L > R + e.r) continue;
     applyPayload(s, e, pl, { scale: 1 - (0.5 * Math.max(0, L - e.r)) / R, kx: (e.x - x) / (L || 1), kz: (e.z - z) / (L || 1) });
   }
-  const p = s.player;
-  if (o.selfMul && p.alive) {
+  if (o.selfMul) for (const p of s.players) {
+    if (!p.alive) continue;
     const L = Math.hypot(p.x - x, p.z - z);
-    if (L < R + p.r) applyPayload(s, p, pl, { scale: (1 - (0.5 * Math.max(0, L - p.r)) / R) * o.selfMul,
+    const mul = o.selfMul * (o.pid === undefined || o.pid === p.id ? 1 : s.friendly); // allies take half of a friend's blast
+    if (L < R + p.r && mul > 0) applyPayload(s, p, pl, { scale: (1 - (0.5 * Math.max(0, L - p.r)) / R) * mul,
       kx: (p.x - x) / (L || 1), kz: (p.z - z) / (L || 1), reason: o.reason ?? 'Caught in your own blast' });
   }
   for (const w of s.walls) if (Math.hypot(w.x - x, w.z - z) < R + w.r) wallHit(s, w, pl, 0.8);
   envAt(s, x, z, R, pl.els, true);
   ev(s, 'explode', { x, z, r: R, els: o.els ?? pl.els, color: o.color ?? 0xffa040, big: !!o.big, key: o.key, tier: o.tier ?? 1, visual: o.visual });
-  if (o.big) s.hitstop = Math.max(s.hitstop, 0.05);
+  if (o.big) stop(s, 0.05);
 }
 
 function shieldBlocks(e, sx, sz) {
@@ -770,7 +873,7 @@ function envHit(s, o, els, blast) {
 
 function updateProps(s, dt) {
   const ents = live(s);
-  if (s.player.alive) ents.push(s.player);
+  for (const q of s.players) if (q.alive) ents.push(q);
   const inside = (o, e) => Math.hypot(e.x - o.x, e.z - o.z) < o.r * 0.92;
   let drained = false;
   for (const pd of s.props.puddles) {
@@ -824,7 +927,7 @@ function tickStatus(s, t, dt) {
   const st = t.st;
   if (st.burn > 0) {
     st.burn -= dt;
-    hurt(s, t, st.burnDps * dt, 'fire', { dot: true, self: t === s.player, reason: 'Burning' });
+    hurt(s, t, st.burnDps * dt, 'fire', { dot: true, self: !!t.isPlayer, reason: 'Burning' });
     if (st.burn <= 0) { st.burnDps = 0; st.kindled = false; }
   }
   if (st.wet > 0) st.wet -= dt;
@@ -833,30 +936,30 @@ function tickStatus(s, t, dt) {
   if (st.ward > 0) { st.wardT -= dt; if (st.wardT <= 0) st.ward = 0; }
 }
 
-function updatePlayer(s, inp, dt) {
-  const p = s.player, st = p.st;
+function updatePlayer(s, p, inp, dt) {
+  const st = p.st;
   tickStatus(s, p, dt);
-  if (st.regen > 0) heal(s, st.regenHp * dt);
+  if (st.regen > 0) heal(s, p, st.regenHp * dt);
   for (const k in p.cd) p.cd[k] = Math.max(0, p.cd[k] - dt);
   for (const bag of [p.shapeCd, p.spellCd]) for (const k in bag) bag[k] = Math.max(0, bag[k] - dt);
   p.energy = Math.min(p.maxEnergy, p.energy + P.regen * dt);
   p.castT = Math.max(0, p.castT - dt);
   p.hurtT = Math.max(0, p.hurtT - dt);
   if (p.wind) {
-    if (st.frozen > 0 || st.stun > 0) { p.wind = null; ev(s, 'tag', { tag: 'interrupt', x: p.x, z: p.z, id: 'player' }); }
-    else if ((p.wind.t -= dt) <= 0) release(s, inp);
+    if (st.frozen > 0 || st.stun > 0) { p.wind = null; ev(s, 'tag', { tag: 'interrupt', x: p.x, z: p.z, id: p.id }); }
+    else if ((p.wind.t -= dt) <= 0) release(s, p, inp);
   }
   const stunned = st.frozen > 0 || st.shock > 0 || st.stun > 0;
   if (p.dashT > 0) {
     p.dashT -= dt;
     p.vx = p.dashVx; p.vz = p.dashVz;
     const sp = p.dashSp, Lv = Math.hypot(p.dashVx, p.dashVz) || 1, sx = -p.dashVz / Lv, sz = p.dashVx / Lv;
-    for (const e of live(s)) if (!p.dashHit.has(e.id) && dist(e, p) < e.r + p.r + p.dashW * 0.5) {
-      p.dashHit.add(e.id);
+    for (const e of live(s)) if (!p.dashHit.includes(e.id) && dist(e, p) < e.r + p.r + p.dashW * 0.5) {
+      p.dashHit.push(e.id);
       const side = (e.x - p.x) * sx + (e.z - p.z) * sz >= 0 ? 1 : -1;
       applyPayload(s, e, sp.payload, { kx: sx * side, kz: sz * side });
     }
-    if (p.dashT <= 0) { p.vx *= 0.25; p.vz *= 0.25; ev(s, 'dashEnd', { x: p.x, z: p.z, dx: p.dashVx / Lv, dz: p.dashVz / Lv, els: sp.els, color: sp.color, key: sp.key, arch: sp.def.arch }); }
+    if (p.dashT <= 0) { p.vx *= 0.25; p.vz *= 0.25; ev(s, 'dashEnd', { pid: p.id, x: p.x, z: p.z, dx: p.dashVx / Lv, dz: p.dashVz / Lv, els: sp.els, color: sp.color, key: sp.key, arch: sp.def.arch }); }
   } else if (p.dodge > 0) {
     p.dodge -= dt;
     p.vx = p.ddx * P.dodgeSpeed; p.vz = p.ddz * P.dodgeSpeed;
@@ -908,8 +1011,12 @@ function updateWaves(s, dt) {
   if (s.enemies.length) return;
   if (s.waveT > 0) { s.waveT -= dt; if (s.waveT <= 0) startWave(s); return; }
   if (s.wave > 0) {
-    const p = s.player, amt = Math.round(p.maxHp * 0.35);
-    p.hp = Math.min(p.maxHp, p.hp + amt); p.energy = p.maxEnergy;
+    let amt = 0;
+    for (const p of s.players) {
+      if (p.down) { raise(s, p, 0.5); p.energy = p.maxEnergy; continue; } // a cleared wave raises the downed
+      amt = Math.round(p.maxHp * 0.35);
+      p.hp = Math.min(p.maxHp, p.hp + amt); p.energy = p.maxEnergy;
+    }
     ev(s, 'waveClear', { n: s.wave, heal: amt });
   }
   for (const b of s.props.barrels) { b.alive = true; b.fuse = 0; }
@@ -918,21 +1025,24 @@ function updateWaves(s, dt) {
 
 function startWave(s) {
   s.wave++;
-  s.waveInfo = waveRoster(s.wave);
+  s.waveInfo = waveRoster(s.wave, s.players.length || 1, rand);
   s.spawnQ = [...s.waveInfo.list];
   s.spawnT = 0.3;
   ev(s, 'wave', { n: s.wave, count: s.spawnQ.length });
 }
 
 function spawnEnemy(s, kind) {
-  const T = ENEMY_TYPES[kind], w = s.waveInfo, p = s.player;
+  const T = ENEMY_TYPES[kind], w = s.waveInfo;
+  // the three gates farthest from the party (the middle of the living wizards)
+  const crew = s.players.filter((q) => q.alive).length ? s.players.filter((q) => q.alive) : s.players;
+  const p = { x: crew.reduce((a, q) => a + q.x, 0) / crew.length, z: crew.reduce((a, q) => a + q.z, 0) / crew.length };
   const gates = [...GATES].sort((a, b) => Math.hypot(b.x - p.x, b.z - p.z) - Math.hypot(a.x - p.x, a.z - p.z)).slice(0, 3);
-  const g = gates[(Math.random() * gates.length) | 0];
-  const x = g.x + (Math.random() - 0.5) * 2.4, z = g.z + (Math.random() - 0.5) * 2.4;
+  const g = gates[(rand() * gates.length) | 0];
+  const x = g.x + (rand() - 0.5) * 2.4, z = g.z + (rand() - 0.5) * 2.4;
   const e = { id: s.nid++, kind, T, x, z, vx: 0, vz: 0, kvx: 0, kvz: 0, r: T.r, mass: T.mass,
     hp: T.hp * w.hpScale, maxHp: T.hp * w.hpScale, speed: T.speed * w.speedScale, resist: T.resist,
-    face: Math.atan2(-x, -z), st: status(), state: 'spawn', stateT: 0.9, atkCd: 0.6 + Math.random(),
-    flash: 0, dotAcc: 0, strafe: Math.random() < 0.5 ? 1 : -1, aimX: 0, aimZ: 1, slamX: 0, slamZ: 0, hitDone: false };
+    face: Math.atan2(-x, -z), st: status(), state: 'spawn', stateT: 0.9, atkCd: 0.6 + rand(),
+    flash: 0, dotAcc: 0, strafe: rand() < 0.5 ? 1 : -1, aimX: 0, aimZ: 1, slamX: 0, slamZ: 0, hitDone: false };
   collide(s, e);
   s.enemies.push(e);
   ev(s, 'spawn', { id: e.id, x: e.x, z: e.z, kind });
@@ -988,15 +1098,17 @@ function targetOf(s, e) {
     }
     if (best) return best;
   }
-  return s.player;
+  let best = null, bd = Infinity; // the nearest living wizard
+  for (const q of s.players) { if (!q.alive) continue; const d = dist(q, e); if (d < bd) { bd = d; best = q; } }
+  return best ?? s.players[0];
 }
 
 // An enemy attack landing on its target: sand makes it miss 60% (R-056), weaken cuts it by 40%.
 function strike(s, e, tg, dmg, kx, kz, knock) {
-  if (e.st.inaccurate > 0 && Math.random() < 0.6) { ev(s, 'tag', { tag: 'miss', x: tg.x, z: tg.z, id: tg.id }); return false; }
+  if (e.st.inaccurate > 0 && rand() < 0.6) { ev(s, 'tag', { tag: 'miss', x: tg.x, z: tg.z, id: tg.id }); return false; }
   if (e.st.weaken > 0) dmg *= 0.6;
   const d = hurt(s, tg, dmg, 'phys', { src: e });
-  if (d > 0 && knock) { const m = tg === s.player ? 1 : tg.mass; tg.kvx += (kx * knock) / m; tg.kvz += (kz * knock) / m; }
+  if (d > 0 && knock) { const m = tg.isPlayer ? 1 : tg.mass; tg.kvx += (kx * knock) / m; tg.kvz += (kz * knock) / m; }
   return d > 0;
 }
 
@@ -1028,7 +1140,7 @@ const AI = {
       if (e.stateT <= 0) { e.state = 'recover'; e.stateT = A.recover; }
     } else if (e.state === 'recover') {
       e.vx *= 0.85; e.vz *= 0.85;
-      if (e.stateT <= 0) { e.state = 'chase'; e.atkCd = 0.3 + Math.random() * 0.5; }
+      if (e.stateT <= 0) { e.state = 'chase'; e.atkCd = 0.3 + rand() * 0.5; }
     }
   },
   bulwark(s, e, dt, c) {
@@ -1045,8 +1157,10 @@ const AI = {
     } else if (e.state === 'windup') {
       e.vx *= 0.8; e.vz *= 0.8;
       if (e.stateT <= 0) {
-        const p = s.player, L = Math.hypot(p.x - e.slamX, p.z - e.slamZ);
-        if (p.alive && L < A.radius + p.r) strike(s, e, p, A.dmg, (p.x - e.slamX) / (L || 1), (p.z - e.slamZ) / (L || 1), A.knock);
+        for (const p of s.players) {
+          const L = Math.hypot(p.x - e.slamX, p.z - e.slamZ);
+          if (p.alive && L < A.radius + p.r) strike(s, e, p, A.dmg, (p.x - e.slamX) / (L || 1), (p.z - e.slamZ) / (L || 1), A.knock);
+        }
         for (const D of s.decoys) { const Ld = Math.hypot(D.x - e.slamX, D.z - e.slamZ); if (Ld < A.radius + D.r) strike(s, e, D, A.dmg, (D.x - e.slamX) / (Ld || 1), (D.z - e.slamZ) / (Ld || 1), A.knock); }
         if (e.st.confuse > 0) for (const o of live(s)) {
           const Lo = Math.hypot(o.x - e.slamX, o.z - e.slamZ);
@@ -1058,7 +1172,7 @@ const AI = {
       }
     } else if (e.state === 'recover') {
       e.vx *= 0.85; e.vz *= 0.85;
-      if (e.stateT <= 0) { e.state = 'chase'; e.atkCd = 0.6 + Math.random() * 0.6; }
+      if (e.stateT <= 0) { e.state = 'chase'; e.atkCd = 0.6 + rand() * 0.6; }
     }
   },
   hexcaller(s, e, dt, c) {
@@ -1069,7 +1183,7 @@ const AI = {
       let mx = 0, mz = 0;
       if (c.dist > T.keep[1]) { mx = c.ux; mz = c.uz; } else if (c.dist < T.keep[0]) { mx = -c.ux; mz = -c.uz; }
       mx += -c.uz * e.strafe * 0.8; mz += c.ux * e.strafe * 0.8;
-      if (Math.random() < dt * 0.4) e.strafe *= -1;
+      if (rand() < dt * 0.4) e.strafe *= -1;
       const L = Math.hypot(mx, mz) || 1;
       steer(s, e, mx / L, mz / L, c.spd, dt);
       e.atkCd -= dt;
@@ -1079,14 +1193,14 @@ const AI = {
       e.aimX = c.ux; e.aimZ = c.uz;
       if (e.stateT <= 0) {
         let ux = c.ux, uz = c.uz;
-        if (e.st.inaccurate > 0 && Math.random() < 0.6) {
-          const a = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4), ca = Math.cos(a), sa = Math.sin(a);
+        if (e.st.inaccurate > 0 && rand() < 0.6) {
+          const a = (rand() < 0.5 ? -1 : 1) * (0.35 + rand() * 0.4), ca = Math.cos(a), sa = Math.sin(a);
           [ux, uz] = [ux * ca + uz * sa, -ux * sa + uz * ca];
         }
         s.shots.push({ id: s.nid++, kind: 'orb', owner: 'enemy', x: e.x + ux * 0.6, z: e.z + uz * 0.6, vx: ux * A.speed, vz: uz * A.speed,
-          r: 0.3, life: 3, dmg: A.dmg * (e.st.weaken > 0 ? 0.6 : 1), hits: [], src: e, foe: c.t !== s.player && !c.t.decoy });
+          r: 0.3, life: 3, dmg: A.dmg * (e.st.weaken > 0 ? 0.6 : 1), hits: [], src: e, foe: !c.t.isPlayer && !c.t.decoy });
         e.state = 'recover'; e.stateT = A.recover;
-        e.atkCd = A.cd[0] + Math.random() * (A.cd[1] - A.cd[0]);
+        e.atkCd = A.cd[0] + rand() * (A.cd[1] - A.cd[0]);
       }
     } else if (e.state === 'recover') {
       e.vx *= 0.9; e.vz *= 0.9;
@@ -1102,7 +1216,7 @@ function updateEnemy(s, e, dt) {
   if (e.hp <= 0) return;
   const st = e.st, tg = targetOf(s, e);
   const dx = tg.x - e.x, dz = tg.z - e.z, L = Math.hypot(dx, dz) || 1;
-  const c = { t: tg, alive: tg === s.player ? tg.alive : tg.hp > 0, ux: dx / L, uz: dz / L, dist: L,
+  const c = { t: tg, alive: tg.isPlayer ? tg.alive : tg.hp > 0, ux: dx / L, uz: dz / L, dist: L,
     spd: e.speed * slowMul(st), can: st.blind <= 0 && st.silence <= 0 };
   const held = st.frozen > 0 || st.shock > 0 || st.stun > 0;
   if ((held || st.silence > 0) && (e.state === 'windup' || e.state === 'charge')) {
@@ -1122,16 +1236,27 @@ function separate(s) {
     a.x -= nx * push * wa; a.z -= nz * push * wa;
     b.x += nx * push * (1 - wa); b.z += nz * push * (1 - wa);
   }
-  const p = s.player;
-  if (!p.alive || p.dashT > 0) return;
-  for (const e of L) {
-    const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz), m = p.r + e.r;
-    if (d >= m || d < 1e-4) continue;
-    const push = m - d, wp = e.mass / (e.mass + p.mass);
-    p.x += (dx / d) * push * wp; p.z += (dz / d) * push * wp;
-    e.x -= (dx / d) * push * (1 - wp); e.z -= (dz / d) * push * (1 - wp);
+  for (const p of s.players) {
+    if (!p.alive || p.dashT > 0) continue;
+    for (const e of L) {
+      const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz), m = p.r + e.r;
+      if (d >= m || d < 1e-4) continue;
+      const push = m - d, wp = e.mass / (e.mass + p.mass);
+      p.x += (dx / d) * push * wp; p.z += (dz / d) * push * wp;
+      e.x -= (dx / d) * push * (1 - wp); e.z -= (dz / d) * push * (1 - wp);
+    }
+    collide(s, p);
   }
-  collide(s, p);
+  // wizards lean on each other a little, so a party never stacks on one spot
+  for (let i = 0; i < s.players.length; i++) for (let j = i + 1; j < s.players.length; j++) {
+    const a = s.players[i], b = s.players[j];
+    if (!a.alive || !b.alive || a.dashT > 0 || b.dashT > 0) continue;
+    const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = a.r + b.r;
+    if (d >= m || d < 1e-4) continue;
+    const push = (m - d) / 2;
+    a.x -= (dx / d) * push; a.z -= (dz / d) * push; b.x += (dx / d) * push; b.z += (dz / d) * push;
+    collide(s, a); collide(s, b);
+  }
 }
 
 // ---------------------------------------------------------------- projectiles
@@ -1154,6 +1279,7 @@ function updateShots(s, dt) {
   const keep = [];
   for (const b of s.shots) {
     if (b.dead) continue;
+    s.who = byId(s, b.pid);
     b.life -= dt;
     let ok = true;
     for (let i = 0; i < 3 && ok; i++) {
@@ -1196,9 +1322,9 @@ function shotStep(s, b) {
       impact(s, b, null); return false;
     }
     for (const D of s.decoys) if (Math.hypot(b.x - D.x, b.z - D.z) < b.r + D.r) { hurt(s, D, b.dmg, 'hex', {}); impact(s, b, null); return false; }
-    const p = s.player;
-    if (p.alive && Math.hypot(b.x - p.x, b.z - p.z) < b.r + p.r) {
-      if (p.dodge > 0 || p.dashT > 0) { if (!b.evaded) { b.evaded = true; ev(s, 'tag', { tag: 'evade', x: p.x, z: p.z, id: 'player' }); } return true; }
+    for (const p of s.players) {
+      if (!p.alive || Math.hypot(b.x - p.x, b.z - p.z) >= b.r + p.r) continue;
+      if (p.dodge > 0 || p.dashT > 0) { if (!b.evaded) { b.evaded = true; ev(s, 'tag', { tag: 'evade', x: p.x, z: p.z, id: p.id }); } return true; }
       hurt(s, p, b.dmg, 'hex', { src: b.src });
       p.kvx += b.vx * 0.3; p.kvz += b.vz * 0.3;
       impact(s, b, null); return false;
@@ -1231,7 +1357,7 @@ function shotStep(s, b) {
 function impact(s, b, target) {
   if (b.owner === 'enemy') { ev(s, 'impact', { x: b.x, z: b.z, color: 0x5cffb0, els: [], enemy: true }); return; }
   const sp = b.sp, d = sp.def, R = d.explode || d.splash || 0;
-  if (R) explode(s, b.x, b.z, R, sp.payload, { selfMul: d.explode ? 0.45 : 0.3, big: !!d.explode, color: sp.color, els: sp.els, key: sp.key, tier: sp.tier });
+  if (R) explode(s, b.x, b.z, R, sp.payload, { pid: b.pid, selfMul: d.explode ? 0.45 : 0.3, big: !!d.explode, color: sp.color, els: sp.els, key: sp.key, tier: sp.tier });
   else envAt(s, b.x, b.z, 0.5, sp.els, b.kind === 'boulder');
   if (d.chainOnImpact) {
     const hit = new Set(target ? [target.id] : []);
@@ -1245,8 +1371,8 @@ function impact(s, b, target) {
 
 // ---------------------------------------------------------------- areas & walls
 function updateAreas(s, dt) {
-  const p = s.player;
   for (const a of s.areas) {
+    s.who = byId(s, a.pid);
     if (a.swallow || a.field) for (const b of s.shots) {
       if (b.owner !== 'enemy' || b.dead || Math.hypot(b.x - a.x, b.z - a.z) >= a.r) continue;
       b.dead = true;
@@ -1272,23 +1398,26 @@ function updateAreas(s, dt) {
     }
     a.life -= dt;
     tug(s, a, dt);
-    const pin = p.alive && Math.hypot(p.x - a.x, p.z - a.z) < a.r;
-    if (pin && a.invuln) p.st.invuln = Math.max(p.st.invuln, 0.25);
+    const inside = s.players.filter((q) => q.alive && Math.hypot(q.x - a.x, q.z - a.z) < a.r); // wizards standing in it
+    if (a.invuln) for (const q of inside) q.st.invuln = Math.max(q.st.invuln, 0.25);
     a.tickT -= dt;
     if (a.tickT <= 0) {
       a.tickT = a.tick;
       const pl = { ...a.sp.payload, knock: 0 }, acc = { v: 0 };
       for (const e of live(s)) if (Math.hypot(e.x - a.x, e.z - a.z) < a.r + e.r * 0.5) applyPayload(s, e, pl, { area: true, drain: a.drainPct || undefined, drained: acc });
-      if (a.hitsAll && pin) applyPayload(s, p, pl, { area: true, reason: 'Standing in your own ' + a.name });
-      if (pin && a.heal) heal(s, a.heal * a.tick);
-      if (pin && a.cleanse) {
-        const st = p.st;
-        if (st.burn > 0 || st.chill > 0 || st.slow > 0 || st.stun > 0 || st.shock > 0) ev(s, 'tag', { tag: 'cleanse', x: p.x, z: p.z, id: 'player' });
-        st.burn = 0; st.kindled = false; st.chill = 0; st.slow = 0; st.stun = 0; st.shock = 0;
+      for (const p of inside) {
+        if (a.hitsAll) applyPayload(s, p, pl, { area: true, reason: 'Standing in your own ' + a.name });
+        if (a.heal) heal(s, p, a.heal * a.tick);
+        if (a.cleanse) {
+          const st = p.st;
+          if (st.burn > 0 || st.chill > 0 || st.slow > 0 || st.stun > 0 || st.shock > 0) ev(s, 'tag', { tag: 'cleanse', x: p.x, z: p.z, id: p.id });
+          st.burn = 0; st.kindled = false; st.chill = 0; st.slow = 0; st.stun = 0; st.shock = 0;
+        }
       }
       envAt(s, a.x, a.z, a.r * 0.8, a.els, false);
     }
   }
+  s.who = null;
   s.areas = s.areas.filter((a) => a.life > 0);
 }
 
@@ -1326,7 +1455,7 @@ function updateWalls(s, dt) {
   for (const g of s.regrow) {
     g.t -= dt;
     if (g.t > 0) continue;
-    const blocked = [...live(s), s.player].some((e) => Math.hypot(e.x - g.x, e.z - g.z) < e.r + 0.55);
+    const blocked = [...live(s), ...s.players].some((e) => Math.hypot(e.x - g.x, e.z - g.z) < e.r + 0.55);
     if (blocked) { g.t = 0.3; g.life -= 0.3; continue; }
     g.done = true;
     if (g.life > 0.5 && addWall(s, g.x, g.z, g.sp, g.life)) ev(s, 'regrow', { x: g.x, z: g.z, kind: 'wood' });

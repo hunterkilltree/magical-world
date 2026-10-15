@@ -24,6 +24,8 @@ export const GRIMOIRE = Object.entries(BOOK).map(([key, def]) => ({ key, sid: ke
 const isPair = (k) => { const p = k.split('+'); return p.length === 2 && p[0] !== p[1]; };
 // A role's book: its 45 pair spells replace the shared pairs; singles, doubles and triples stay shared.
 export const SHARED = GRIMOIRE.filter((g) => !isPair(g.key));
+// The combo def a spell key stands for (a role's own spell first): the network layer sends keys, not defs.
+export const lookupDef = (key, role) => (role ? ROLE_BOOK[role]?.[key] : undefined) ?? BOOK[key];
 export function grimoireFor(role) {
   const R = ROLE_BOOK[role];
   if (!R) return GRIMOIRE;
