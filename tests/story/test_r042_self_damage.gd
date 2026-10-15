@@ -33,7 +33,7 @@ func test_point_blank_explosive_around_you() -> void:
 
 
 func test_standing_in_your_own_field_freezes_you() -> void:
-	F.cast(s, ["ice", "water"], Vector2(0, 0), "nova")
+	F.cast(s, ["ice", "water", "water"], Vector2(0, 0), "nova")
 	F.run(s, 1.2)
 	assert_true(s.player.st.frozen > 0 or s.player.st.chill > 0, "Hoarfrost hits you too")
 

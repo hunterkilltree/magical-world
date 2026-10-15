@@ -2,7 +2,18 @@
   "_notes": "Sound effects for sim events (R-061). scripts/audio/sfx.gd picks keys from each event; one file is chosen at random and pitched within `pitch`. `db` is the volume, `throttle` the fewest seconds between two plays of a key, `bus` SFX (compressed) or UI, `positional` plays at the event on the ground. Long clips are cut at `len` seconds with a short fade, starting at a random point when `offset` is set. `silent` lists event types that make no sound of their own (their cast already does). Clips: Kenney CC0 packs, see audio/CREDITS.md.",
   "silent": [
     "cone",
-    "area"
+    "area",
+    "windup",
+    "guard",
+    "blink",
+    "dash",
+    "dashEnd",
+    "swap",
+    "decoy",
+    "decoyPulse",
+    "decoyEnd",
+    "decoyHit",
+    "bounce"
   ],
   "sounds": {
     "chime": {

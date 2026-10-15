@@ -66,7 +66,7 @@ func test_enemies_shots_areas_and_walls_appear() -> void:
 	assert_true(main.view.enemy_views.has(e.id), "enemy model")
 	assert_eq(main.view.shot_views.size(), 1, "bolt")
 	s.player.cd["cast"] = 0
-	M.frames(main, 1, {"aim": Vector2(4, 0), "actions": ["el:ice", "el:water", "cast"]})
+	M.frames(main, 1, {"aim": Vector2(4, 0), "actions": ["el:ice", "el:water", "el:water", "cast"]})
 	assert_eq(main.view.area_views.size(), 1, "area")
 	s.player.cd["cast"] = 0
 	M.frames(main, 1, {"aim": Vector2(-4, 0), "actions": ["el:earth", "el:earth", "cast"]})

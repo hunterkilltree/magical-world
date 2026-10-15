@@ -75,7 +75,7 @@ func test_aim_previews_take_the_spell_colour() -> void:
 	M.frames(main, 1, {"aim": Vector2(0, -6), "actions": ["el:fire"]})
 	assert_true(v._cone_prev.visible, "cone wedge for a spray")
 	assert_eq(Color(v._cone_prev.material_override.albedo_color, 1.0), SpellBook.color("fire"))
-	M.frames(main, 1, {"aim": Vector2(0, -6), "actions": ["clear", "el:ice", "el:water"]})
+	M.frames(main, 1, {"aim": Vector2(0, -6), "actions": ["clear", "el:ice", "el:water", "el:water"]})
 	assert_true(v._ret_area.visible and not v._cone_prev.visible, "area ring")
 	assert_true(absf(v._ret_area.scale.x - 3.0) < 0.01, "ring at the spell's radius")
 	M.frames(main, 1, {"aim": Vector2(0, -6), "actions": ["clear", "el:earth", "el:earth"]})
