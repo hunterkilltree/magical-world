@@ -29,7 +29,7 @@ func test_every_pair_and_double_has_a_spell() -> void:
 				continue
 			var k := SpellBook.norm(els[i] + "+" + els[j])
 			assert_true(SpellBook.book().has(k), "pair %s" % k)
-	assert_eq(SpellBook.grimoire().size(), 81)
+	assert_eq(SpellBook.grimoire().size(), 80)
 
 
 func test_the_original_recipes_come_back_by_name() -> void:

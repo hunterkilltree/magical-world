@@ -9,7 +9,6 @@ const K := preload("res://scripts/arena/mesh_kit.gd")
 const Particles := preload("res://scripts/vfx/vfx_particles.gd")
 const Textures := preload("res://scripts/vfx/vfx_textures.gd")
 const ScreenFx := preload("res://scripts/vfx/screen_fx.gd")
-const ImpactFrames := preload("res://scripts/vfx/impact_frames.gd")
 const Bolt := preload("res://scripts/vfx/lightning_bolt.gd")
 const WaveSheet := preload("res://scripts/vfx/wave_sheet.gd")
 const SpellBook := preload("res://scripts/core/spell_book.gd")
@@ -27,7 +26,6 @@ var view # ArenaView: shake(), camera
 var particles: Particles
 var textures: Textures
 var screen: ScreenFx
-var impact: ImpactFrames # R-074: two frames of contrast on the biggest hits
 var kick := Vector3.ZERO # camera push, decays exp(-10 dt)
 var fov := 0.0 # camera FOV offset in degrees, decays exp(-6 dt)
 var t := 0.0
@@ -70,8 +68,6 @@ func setup(arena_view) -> void:
 	particles.setup(textures.cloud())
 	screen = ScreenFx.new()
 	add_child(screen)
-	impact = ImpactFrames.new()
-	add_child(impact)
 	var P := Particles.presets()
 	_fx = P["element_fx"]
 	_ramps = P["fireball_ramps"]
@@ -1225,7 +1221,6 @@ func on_event(e: Dictionary, sim) -> void:
 	if sim != null and sim.player != null:
 		_book = sim.player.book
 	_school_accent(e)
-	_impact_frames(e)
 	match e["type"]:
 		"queue":
 			var p = sim.player
@@ -1374,25 +1369,6 @@ func on_event(e: Dictionary, sim) -> void:
 			screen.screen_flash(Color("#ef4444"), 0.12)
 
 
-# R-074: impact frames on a slam release of weight 0.85 or more, a combo's first cast, a big explosion,
-# a crit; the player's death ignores the limit.
-func _impact_frames(e: Dictionary) -> void:
-	match e["type"]:
-		"cast":
-			var slam: bool = e.get("style", "") == "slam" and e.get("mode", "") != "self" and float(e.get("weight", 0.0)) >= 0.85
-			var first: bool = e.get("from_queue", false) and e.get("is_new", false) and int(e.get("distinct", 1)) >= 2
-			if slam or first:
-				impact.trigger(e["color"])
-		"explode":
-			if e.get("big", false):
-				impact.trigger(e.get("color", Color.WHITE))
-		"hit":
-			if e.get("crit", false):
-				impact.trigger(Color("#ffd166"))
-		"playerDeath":
-			impact.trigger(Color("#ef4444"), true)
-
-
 # The circle a book stamps: its school's own (R-070), or the court's rune.
 func _circle(book: String) -> Texture2D:
 	var look := SchoolLooks.look_of(book)
@@ -1534,7 +1510,6 @@ func update(dt: float, sim, tip) -> void:
 	kick *= exp(-10 * dt)
 	fov *= exp(-6 * dt)
 	screen.update(dt, view.camera if view else null)
-	impact.update(dt)
 
 
 func _update_charge(dt: float, sim, tip) -> void:

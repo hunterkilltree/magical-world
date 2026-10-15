@@ -559,11 +559,13 @@ func _set_who() -> void:
 	if blurb_label:
 		blurb_label.text = w["blurb"]
 	if school_label:
-		var ro := SpellBook.role(SpellBook.role_of(wizard_id))
-		var sig: Array = ro.get("signature", [])
-		var sig_name: String = SpellBook.resolve(sig, wizard_id).get("name", "")
+		var sc := SpellBook.school(wizard_id)
+		var own := []
+		for mix in sc.get("signature", []):
+			own.append(sc["combos"][mix]["name"])
 		school_label.text = "%s: %s
-Signature: %s" % [ro.get("name", ""), ro.get("spec", ""), sig_name]
+%d of the 70 combos are their own, such as %s; the rest are court spells they keep." % [
+			sc.get("name", ""), sc.get("motto", ""), sc.get("combos", {}).size(), ", ".join(PackedStringArray(own))]
 		school_label.add_theme_color_override("font_color", Color(w["glow"]).lerp(INK, 0.35))
 
 
@@ -677,15 +679,12 @@ func update(s: ArenaSim, events: Array, dt: float) -> void:
 	cost_label.text = "%d energy" % sp["cost"] if not sp.is_empty() else ""
 	for k in tiles:
 		var f: float = p.cd[k] / maxf(0.001, p.cd_max[k]) if p.cd[k] > 0 else 0.0
-		var secs: float = p.cd[k]
 		if k == "cast" and not sp.is_empty():
-			var sh: String = ArenaSim.recharge_key(sp)
+			var sh: String = sp["def"]["shape"]
 			var c: float = p.shape_cd.get(sh, 0.0)
 			if c > 0:
 				f = maxf(f, c / maxf(0.001, p.shape_max.get(sh, 1.0)))
-				secs = maxf(secs, c)
 		tiles[k].value = 1.0 - f
-		tiles[k].remaining_text = "%.1f" % secs if secs > 0.05 else ""
 	_update_status(p)
 	_update_enemy_ghosts(s, dt)
 	overlay.queue_redraw()
@@ -791,20 +790,7 @@ func _fill_grimoire(found: Dictionary, book := "") -> void:
 		c.queue_free()
 	var n := 0
 	var grim := SpellBook.grimoire(book)
-	var role_id := SpellBook.role_of(book)
-	if role_id != "": # shared spells first, then the role's own pairs (R-075)
-		var shared := grim.filter(func(g): return not g["own"])
-		var own := grim.filter(func(g): return g["own"])
-		grim = shared + own
-	var group := ""
 	for g in grim:
-		if role_id != "" and group != ("own" if g["own"] else "shared"):
-			group = "own" if g["own"] else "shared"
-			var head := _label("Shared: singles, doubles and triples" if group == "shared" else "%s: %s" % [SpellBook.role(role_id)["name"], SpellBook.role(role_id)["spec"]], 15, INK)
-			head.set_meta("group", true)
-			grimoire_box.add_child(head)
-			grimoire_box.add_child(Control.new())
-			grimoire_box.add_child(Control.new())
 		var have: bool = found.has(g["key"])
 		if have:
 			n += 1
@@ -880,20 +866,10 @@ class RadialTile extends Control:
 				value = v
 				queue_redraw()
 
-	var remaining_text := "":
-		set(v):
-			if v != remaining_text:
-				remaining_text = v
-				queue_redraw()
-
 	func _draw() -> void:
 		var c := size / 2.0
 		var r := minf(size.x, size.y) / 2.0 - 2.0
 		draw_circle(c, r, Color(0, 0, 0, 0.5))
-		if remaining_text != "":
-			var font := ThemeDB.fallback_font
-			var w := font.get_string_size(remaining_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
-			draw_string(font, Vector2(c.x - w / 2.0, c.y + 4), remaining_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 1, 1, 0.9))
 		if value >= 0.999:
 			draw_arc(c, r, 0, TAU, 32, color, 2.5, true)
 			draw_circle(c, r * 0.32, color)

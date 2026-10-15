@@ -62,7 +62,6 @@ var enemy_views := {} # id -> {model, tele, spawn_ring, yaw, phase, arm, ice}
 var shot_views := {}
 var area_views := {}
 var wall_views := {}
-var decoy_views := {} # R-072: the caster's doubles
 var prop_views := {} # prop id -> {node, mat, ...}
 var pillar_views: Array = []
 var braziers: Array = []
@@ -75,7 +74,6 @@ var transients: Array = [] # {node, t, max, update: Callable}
 var corpses: Array = []
 var _reticle: Node3D
 var _ret_ring: MeshInstance3D
-var _wind_ring: MeshInstance3D # R-075: closes on the cursor while a cast winds up
 var _ret_area: MeshInstance3D
 var _cone_prev: MeshInstance3D
 var _cone_key := ""
@@ -352,8 +350,6 @@ func _floor_texture(radius: float) -> ImageTexture:
 func _build_reticle() -> void:
 	_reticle = K.group(self)
 	_ret_ring = K.put(_reticle, K.ring(0.8, 1.0, 40), K.flat(Color.WHITE, 0.85), [0, 0.04, 0], [-PI / 2, 0, 0], [0.34, 0.34, 1], false)
-	_wind_ring = K.put(_reticle, K.ring(0.9, 1.0, 48), K.flat(Color.WHITE, 0.9), [0, 0.05, 0], [-PI / 2, 0, 0], [1.6, 1.6, 1], false)
-	_wind_ring.visible = false
 	_ret_area = K.put(_reticle, K.ring(0.94, 1.0, 64), K.flat(Color.WHITE, 0.5), [0, 0.04, 0], [-PI / 2, 0, 0], null, false)
 	_cone_prev = K.put(self, K.wedge(5, 50), K.flat(Color.WHITE, 0.08), [0, 0.035, 0], null, null, false)
 	_wall_prev = K.put(self, K.box(1, 0.01, 0.5), K.flat(Color.WHITE, 0.18), [0, 0.04, 0], null, null, false)
@@ -364,7 +360,7 @@ func reset(sim: ArenaSim) -> void:
 	setup()
 	if prop_views.is_empty():
 		build_props(sim)
-	for m in [enemy_views, shot_views, area_views, wall_views, decoy_views]:
+	for m in [enemy_views, shot_views, area_views, wall_views]:
 		for v in m.values():
 			_free_view(v)
 		m.clear()
@@ -620,26 +616,6 @@ func consume(events: Array, sim: ArenaSim) -> void:
 			"slam":
 				ring_fx(e["pos"], e["r"], RED, 0.4)
 				shake = minf(1.2, shake + 0.4)
-			"windup":
-				ring_fx(e["pos"], 1.0 + 0.5 * e["weight"], e["color"], e["t"])
-			"bounce":
-				var sv = shot_views.get(e["id"])
-				if sv:
-					sv["squash"] = 1.0
-			"blink", "swap":
-				ring_fx(e["from"], 1.3, e["color"], 0.45)
-				ring_fx(e["to"], 1.6, e["color"], 0.5)
-				shake = minf(1.0, shake + 0.08)
-			"dash":
-				ring_fx(e["pos"], 1.2, e["color"], 0.35)
-			"dashEnd":
-				ring_fx(e["pos"], 1.0, e["color"], 0.3)
-			"guard":
-				ring_fx(e["pos"], maxf(1.4, e["near"]), e["color"], 0.6)
-			"decoyPulse":
-				ring_fx(e["pos"], e["r"], e["color"], 0.5)
-			"decoyEnd":
-				ring_fx(e["pos"], 1.4 if e["broken"] else 1.0, e["color"], 0.45)
 			"playerDeath":
 				shake = minf(1.2, shake + 0.5)
 
@@ -653,7 +629,6 @@ func render(sim: ArenaSim, dt: float, aim_point: Vector2) -> void:
 	_sync_shots(sim, dt)
 	_sync_areas(sim, dt)
 	_sync_walls(sim, dt)
-	_sync_decoys(sim, dt)
 	_sync_props(sim)
 	_update_reticle(sim)
 	for i in range(transients.size() - 1, -1, -1):
@@ -780,10 +755,8 @@ func _update_player(sim: ArenaSim, dt: float) -> void:
 		if not frozen:
 			_pv["phase"] += dt * WizardModel.blend_gait(k)["speed"]
 		wizard.animate(_pv["phase"], WizardModel.blend_gait(k), k < 0.1)
-		var c := p.cast_t / maxf(0.3, p.cast_max)
+		var c := p.cast_t / 0.3
 		wizard.root.rotation.x += sin(c * PI) * 0.22
-		if not p.wind.is_empty(): # leaning back into the windup (R-073)
-			wizard.root.rotation.x -= 0.3 * _ease(1.0 - p.wind["t"] / maxf(0.001, p.wind["max"]))
 		if p.dodge > 0:
 			var d := 1 - p.dodge / ArenaSim.TUNING["dodge_time"]
 			wizard.root.rotation.x += sin(d * PI) * 0.6
@@ -840,7 +813,6 @@ func _sync_enemies(sim: ArenaSim, dt: float) -> void:
 			var tele := _make_telegraph(e.kind)
 			v = {"model": model, "ice": ice, "spawn_ring": spawn_ring, "tele": tele["group"], "tele_d": tele,
 				"phase": randf() * 6, "yaw": e.face, "arm": 0.0,
-				"hit": {"lean": 0.0, "lean_v": 0.0, "roll": 0.0, "roll_v": 0.0, "sq": 0.0, "sq_v": 0.0, "smear": 0.0, "kprev": 0.0},
 				"burn": _emitter(model, "fire", 30, Vector3(0.25, model.height * 0.35, 0.25), model.height * 0.4),
 				"root": _emitter(model, "nature", 20, Vector3(model.ice_r * 0.6, 0.05, model.ice_r * 0.6), 0.05),
 				"curse": _emitter(model, "dark", 16, Vector3(0.3, model.height * 0.4, 0.3), model.height * 0.4),
@@ -910,11 +882,8 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 				model.arms[i].position.y = 1.22 + (0.25 * w if e.state == "charge" else sin(t * 3 + i) * 0.04)
 			model.sigil.rotation.z += dt * (6 if e.state == "charge" else 1.2)
 	var f: float = e.flash / 0.14
-	var h := _hit_react(v, e, dt)
-	model.body.rotation.x = lean - f * 0.3 + h["lean"]
-	model.body.rotation.z = h["roll"]
-	model.body.scale = Vector3(1 + f * 0.08 - h["sq"] * 0.05 + h["smear"] * 0.3, squash - f * 0.06 + h["sq"] * 0.12,
-		1 + f * 0.08 - h["sq"] * 0.05 + h["smear"])
+	model.body.rotation.x = lean - f * 0.3
+	model.body.scale = Vector3(1 + f * 0.08, squash - f * 0.06, 1 + f * 0.08)
 	var jitter := Vector2.ZERO
 	if st.shock > 0:
 		jitter = Vector2(randf() - 0.5, randf() - 0.5) * 0.08
@@ -964,32 +933,6 @@ func _update_enemy_view(v: Dictionary, e, dt: float, sim: ArenaSim) -> void:
 		m2.albedo_color.a = 0.22 * flick if on else 0.0
 
 
-# Hit reactions (R-074): a fresh shove squashes the enemy, and the upper body lags it on springs
-# (lean along the shove, roll across it) while the body smears along the knockback.
-func _hit_react(v: Dictionary, e, dt: float) -> Dictionary:
-	var h: Dictionary = v["hit"]
-	var kv: Vector2 = e.kvel
-	var kmag := kv.length()
-	if kmag > h["kprev"] + 0.5:
-		var fwd := Vector2(sin(v["yaw"]), cos(v["yaw"]))
-		var right := Vector2(cos(v["yaw"]), -sin(v["yaw"]))
-		h["lean_v"] += kv.dot(fwd) * 0.06 * 14.0
-		h["roll_v"] += kv.dot(right) * 0.05 * 14.0
-		h["sq_v"] += 14.0 * minf(1.0, kmag / 6.0)
-	h["kprev"] = kmag
-	var steps := maxi(1, ceili(dt / 0.008))
-	var sdt := dt / steps
-	for i in steps: # stiffness 120, damping 0.45 of critical
-		for k in ["lean", "roll", "sq"]:
-			h[k + "_v"] += (-120.0 * h[k] - 2.0 * sqrt(120.0) * 0.45 * h[k + "_v"]) * sdt
-			h[k] += h[k + "_v"] * sdt
-	h["lean"] = clampf(h["lean"], -0.5, 0.5)
-	h["roll"] = clampf(h["roll"], -0.4, 0.4)
-	h["sq"] = clampf(h["sq"], -1.0, 1.0)
-	h["smear"] = minf(0.35, kmag * 0.025)
-	return h
-
-
 func _sync_shots(sim: ArenaSim, dt: float) -> void:
 	var seen := {}
 	for b in sim.shots:
@@ -1017,27 +960,13 @@ func _sync_shots(sim: ArenaSim, dt: float) -> void:
 			trail.local_coords = false
 			trail.emitting = true
 			trail.initial_velocity_max = 0.5
-			v = {"obj": obj, "age": 0.0, "squash": 0.0}
+			v = {"obj": obj}
 			shot_views[b.id] = v
-		v["age"] += dt
 		var y := 0.95 if b.kind == "boulder" else 1.15
-		if b.arc:
-			y = b.y
 		v["obj"].position = ground(b.pos, y)
 		if b.kind == "boulder":
 			v["obj"].rotation.x += dt * 9
 			v["obj"].rotation.z += dt * 4
-			v["squash"] *= exp(-9.0 * dt) # squashes on a bounce
-			v["obj"].scale = Vector3(1 + v["squash"] * 0.28, 1 - v["squash"] * 0.34, 1 + v["squash"] * 0.28)
-		elif b.kind == "bolt":
-			# squashed wide at launch, then stretched along its flight (volume kept)
-			var spd: float = b.vel.length()
-			var k := _ease(v["age"] / 0.07)
-			var st := 1.0 + minf(2.2, spd * 0.05) * k
-			var xy := (1.0 + 0.45 * (1.0 - k)) / sqrt(st)
-			v["obj"].rotation.y = atan2(b.vel.x, b.vel.y)
-			v["obj"].rotation.x = -atan2(b.vy, spd) if b.arc else 0.0
-			v["obj"].scale = Vector3(xy, xy, st)
 	for id in shot_views.keys():
 		if not seen.has(id):
 			_free_view(shot_views[id])
@@ -1112,41 +1041,6 @@ func _sync_walls(sim: ArenaSim, dt: float) -> void:
 			wall_views.erase(id)
 
 
-# The caster's doubles (R-072): ghostly copies of the wizard that fade as their time runs out.
-func _sync_decoys(sim: ArenaSim, dt: float) -> void:
-	var seen := {}
-	for D in sim.decoys:
-		seen[D.id] = true
-		var v = decoy_views.get(D.id)
-		if v == null:
-			var model := WizardModel.new()
-			var spec := Roster.find(sim.player.wizard)
-			model.build(spec if not spec.is_empty() else Roster.all()[0])
-			add_child(model)
-			_ghost(model, 0.45)
-			var halo := K.put(model, K.ring(0.5, 0.7, 32), K.flat(D.sp["color"], 0.8, true), [0, 0.05, 0], [-PI / 2, 0, 0], null, false)
-			v = {"model": model, "halo": halo, "age": 0.0}
-			decoy_views[D.id] = v
-		v["age"] += dt
-		var model: Node3D = v["model"]
-		model.position = ground(D.pos)
-		model.rotation.y = D.face
-		model.scale = Vector3.ONE * (1.0 + (0.12 if D.flash > 0 else 0.0))
-		model.visible = D.life > 0.25 or fmod(v["age"], 0.2) < 0.1
-		v["halo"].rotation.z += dt * 2.0
-	for id in decoy_views.keys():
-		if not seen.has(id):
-			_free_view(decoy_views[id])
-			decoy_views.erase(id)
-
-
-func _ghost(n: Node, amount: float) -> void:
-	if n is GeometryInstance3D:
-		n.transparency = amount
-	for c in n.get_children():
-		_ghost(c, amount)
-
-
 func _sync_props(sim: ArenaSim) -> void:
 	for pd in sim.puddles:
 		var v = prop_views.get(pd.id)
@@ -1199,7 +1093,6 @@ func _update_reticle(sim: ArenaSim) -> void:
 	var p := sim.player
 	var playing: bool = (sim.mode == "play" or sim.mode == "paused") and p.alive
 	_reticle.visible = playing
-	_wind_ring.visible = false
 	_cone_prev.visible = false
 	_wall_prev.visible = false
 	_ret_area.visible = false
@@ -1226,12 +1119,6 @@ func _update_reticle(sim: ArenaSim) -> void:
 		_ret_area.scale = Vector3(r, r, 1)
 		_ret_area.material_override.albedo_color = Color(col, (0.6 if queued else 0.25) * dim)
 	_reticle.position = ground(at)
-	if not p.wind.is_empty():
-		var prog: float = 1.0 - p.wind["t"] / maxf(0.001, p.wind["max"])
-		var r := lerpf(1.6, 0.45, _ease(prog))
-		_wind_ring.visible = true
-		_wind_ring.scale = Vector3(r, r, 1)
-		_wind_ring.material_override.albedo_color = Color(p.wind["sp"]["color"], 0.9)
 	var yaw := atan2(u.x, u.y)
 	if shape == "cone":
 		var key := "%s:%s" % [sp["def"].get("range", 5), sp["def"].get("arc", 50)]

@@ -7,8 +7,8 @@ const F := preload("res://tests/support/arena_fixture.gd")
 func test_the_data_loads() -> void:
 	assert_eq(SpellBook.max_queue(), 3, "queue size")
 	assert_eq(SpellBook.data()["elements"].size(), 10, "elements")
-	assert_eq(SpellBook.data()["shapes"].size(), 12, "shapes")
-	assert_eq(SpellBook.grimoire().size(), 81, "combos")
+	assert_eq(SpellBook.data()["shapes"].size(), 7, "shapes")
+	assert_eq(SpellBook.grimoire().size(), 80, "combos")
 	for el in SpellBook.ORDER:
 		assert_true(not SpellBook.element(el).is_empty(), el)
 

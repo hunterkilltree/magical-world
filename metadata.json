@@ -1,0 +1,8 @@
+{
+  "name": "Court of Waves",
+  "description": "A 3D elemental arena game in the style of Magicka. Queue up to three of ten elements, cast, and survive waves of thralls, bulwarks and hexcallers in Grauhold Keep.",
+  "prompt": "Court of Waves: a 3D elemental arena game in the style of Magicka. Queue up to three elements, cast, and survive waves of enemies.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

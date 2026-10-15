@@ -22,7 +22,7 @@ func test_around_you_blasts_and_costs_more() -> void:
 
 
 func test_around_you_places_areas_and_rings_walls() -> void:
-	F.cast(s, ["ice", "water", "water"], Vector2(0, -6), "nova")
+	F.cast(s, ["ice", "water"], Vector2(0, -6), "nova")
 	assert_eq(s.areas.size(), 1)
 	assert_true(s.areas[0].pos.length() < 0.01, "centred on you")
 	F.run(s, F.DT)

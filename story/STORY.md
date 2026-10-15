@@ -342,7 +342,7 @@ and lightning, as in the court book), and each school wall holds as much as the
 court's median wall. `harness/calibrate_schools.gd` prints the `mult` a changed
 school spell needs.
 
-### R-067 [superseded] Each wizard casts their own combos
+### R-067 [done] Each wizard casts their own combos
 Core. Six schools (Aldric's Unwritten Canon, Brann's Cinderhand's Way, Vela's
 Quiet Rime, Old Morrow's Lore, Kessa's Voltmark Method, the Hollow Warden's
 Hollow Rite), each with a version of all 70 two- and three-element mixes:
@@ -389,69 +389,3 @@ quarters of the circle: earth and nature in the north (up the screen), air
 (wind, lightning) in the east, fire and light in the south, water and ice in
 the west, arcane and dark at the heart. A school combo stays within a third of
 the particle pools.
-
-## The five casting roles (Staff of the Cracked Rune)
-
-Handoff: `story/design/cracked_rune/README.md` (data in `data/roles.json`,
-`data/feel_presets.json`). Supersedes the six schools: a wizard now casts as one
-of five roles (the Hollow Warden and Vela are both Controllers), and the role,
-not the wizard, decides what a two-element mix makes. The wizard's own look
-(R-070) stays.
-
-### R-071 [done] Five casting roles make 225 spells
-Core. Destroyer, Controller, Guardian, Trickster and Arcanist
-(`data/roles.json`). Every wizard maps to a role (Brann Destroyer, Vela and the
-Hollow Warden Controller, Morrow Guardian, Kessa Trickster, Aldric Arcanist).
-Each role has a spell for all 45 pairs of the ten elements, 225 in all, ids like
-`FIRE_WATER_DESTROYER`; singles, doubles and the named triples stay shared with
-the court book. A role's pair spells replace the court's pairs in that wizard's
-book; the court book (`""`) is unchanged. Resolve order: named triple, three of
-a kind (its double x1.3), the role's pair (+30% per repeat), a shared distinct
-key, else the best-ranked pair with the third element riding along at x1.5.
-Opposites (fire/ice, light/dark) cancel only when the role has no spell for the
-pair. A role spell is found, recharged and drawn under `mix@role`. Damage and
-statuses come from the elements times `mult`; cost is elements x 8 x the
-shape's cost; cooldown is the spell's `cd` or its shape's.
-
-### R-072 [done] Guard, blink, dash, decoy and swap shapes
-Core. `guard` puts statuses on the caster (ward, armor, reflect, invulnerable,
-heal, regen, amp, energy, stoneskin, cleanse, revive, haste), with `near` hitting
-enemies close by. `blink` teleports toward the aim (clamped to the court) with
-0.3 s of invulnerability and optional bursts. `dash` moves the caster a
-distance in 0.18 s, hitting what it passes through (optionally leaving a
-decoy). `decoy` spawns doubles that enemies target, which burst, pulse or heal;
-`hop` moves the caster back. `swap` trades places with the nearest enemy ahead
-and stuns it for 0.9 s (a short blink when none is there). All 225 role spells
-cast aimed, as a nova and as a self-cast without an error.
-
-### R-073 [done] Casting has a windup, a hold, a release and a recoil
-Core. A cast no longer leaves the staff at once: the body winds up for
-`RoleBook.cast_timing` (the role's style: slam, sweep, plant, flick, thrust;
-heavier shapes and tiers wind up longer; at most 0.34 s), holds a beat, then
-releases, re-reading the aim, with the hit-stop of the handoff, then recoils.
-The sim emits `windup` when it starts and `cast` on release. The player cannot
-start another cast while winding up. Self-casts wind up for 0.08 s only.
-
-### R-074 [done] Impact frames, projectile squash and stretch, hit reactions
-Presentation. Two impact frames (the first inverted, the second hard
-black-and-white), at most one burst every 0.4 s, on a slam release of weight
-0.85 or more, a combo's first cast, a big explosion and a crit (the player's
-death ignores the limit). Bolts squash wide on launch, stretch along their
-flight (up to x3.2, volume kept); bombs (an exploding bolt with radius 0.3 or
-more) and boulders fly a ballistic arc and bounce (a bomb once, a boulder
-twice, losing a fifth of its speed each time); a bomb bursts on its last
-landing, a boulder rolls on. A shoved enemy squashes, and its upper body lags
-the shove on springs (lean and roll, capped) while it smears along the
-knockback. Numbers in `data/feel_presets.json`.
-
-### R-075 [done] HUD: windup ring, cooldown numbers, spells grouped by role
-Presentation. A ring closes on the cursor while a cast winds up; the cooldown
-tiles show the seconds left (and the cast tile follows a role spell's own
-recharge); the pause grimoire lists the shared spells, then the role's own,
-each under a heading.
-
-### R-076 [planned] Particle density and smoke breakup; the menu previews the role
-Presentation. Particle density 60% with each particle 20-25% larger; big
-smoke puffs (end size 1.4 m or more, 55% chance) split into two curling
-children instead of fading; the menu loops the selected wizard's role
-signature spell. Not yet watched live (see the handoff's fidelity notes).
