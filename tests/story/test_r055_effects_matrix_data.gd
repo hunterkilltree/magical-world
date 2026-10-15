@@ -33,7 +33,7 @@ func test_every_matrix_spell_has_a_recipe() -> void:
 
 func test_the_handoff_keeps_its_pairs() -> void:
 	var keep := {["fire", "water"]: "Scalding Steam", ["earth", "fire"]: "Molten Core", ["fire", "lightning"]: "Thunderflare",
-		["lightning", "water"]: "Storm Pool", ["ice", "water"]: "Hoarfrost Field", ["earth", "lightning"]: "Lodestone",
+		["lightning", "water"]: "Storm Pool", ["ice", "water"]: "Ice Spear", ["earth", "lightning"]: "Lodestone",
 		["earth", "water"]: "Mudslide"}
 	for els in keep:
 		assert_eq(SpellBook.resolve(els)["name"], keep[els], str(els))

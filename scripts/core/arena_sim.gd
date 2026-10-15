@@ -13,6 +13,8 @@ const SpellBook := preload("res://scripts/core/spell_book.gd")
 const EnemyTypes := preload("res://scripts/core/enemy_types.gd")
 
 const ARENA_R := 15.0
+const MOVES := ["guard", "blink", "dash", "decoy", "swap"] # shapes that move or protect the caster (R-072)
+const LONG := ["area", "wall", "guard", "blink", "dash", "decoy", "swap"] # a role spell of these recharges on its own timer
 const BOUND := ARENA_R - 0.9
 const TUNING := {
 	"r": 0.42, "speed": 5.4, "hp": 100.0, "energy": 100.0, "regen": 18.0, "dodge_speed": 13.5,
@@ -57,6 +59,7 @@ class Status:
 	var armor := 0.0 # player: takes damage / 1.75
 	var reflect := 0.0 # player: 50% of damage taken goes back to the attacker
 	var invuln := 0.0 # player: takes no damage
+	var amp := 0.0 # player: spells hit 35% harder (R-072)
 
 
 # The player and every enemy. Player-only fields sit unused on enemies.
@@ -104,6 +107,20 @@ class Body:
 	var cur_speed := 0.0
 	var dead_t := 0.0
 	var revives := 0 # player: World Tree revive charges
+	var wind := {} # player: the cast being wound up {t, sp, mode, from_queue, is_new, timing} (R-073)
+	var cast_max := 0.3 # player: how long the recoil lasts
+	var dash_t := 0.0 # player: a dash in progress (R-072)
+	var dash_v := Vector2.ZERO
+	var dash_sp := {}
+	var dash_w := 0.9
+	var dash_hit: Array = []
+	# decoys (kind "decoy"): enemies go for them
+	var life := 0.0
+	var pulse := 0.0
+	var pulse_t := 0.0
+	var burst := 0.0
+	var heal_amt := 0.0
+	var sp := {}
 
 
 class Shot:
@@ -121,6 +138,10 @@ class Shot:
 	var els: Array = []
 	var dmg := 0.0
 	var evaded := false
+	var arc := false # heavy shots fly a ballistic arc (R-074)
+	var y := 0.0
+	var vy := 0.0
+	var bounces := 0
 
 
 class Area:
@@ -199,6 +220,7 @@ var enemies: Array = []
 var shots: Array = []
 var areas: Array = []
 var walls: Array = []
+var decoys: Array = [] # doubles the caster left behind (R-072)
 var pillars: Array = []
 var puddles: Array = []
 var brush: Array = []
@@ -287,6 +309,7 @@ func step(inp: Dictionary, dt: float) -> Array:
 		_update_waves(dt)
 	for e in enemies:
 		_update_enemy(e, dt)
+	_update_decoys(dt)
 	_separate()
 	_update_shots(dt)
 	_update_areas(dt)
@@ -359,7 +382,7 @@ func queue_el(el: String) -> void:
 	if SpellBook.element(el).is_empty():
 		return
 	var opp := SpellBook.cancels(el)
-	var res := SpellBook.queue_element(p.queue, el)
+	var res := SpellBook.queue_element(p.queue, el, p.book)
 	if res == "cancel":
 		_ev("cancel", {"a": el, "b": opp, "pos": p.pos})
 	elif res == "full":
@@ -370,7 +393,7 @@ func queue_el(el: String) -> void:
 
 func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 	var p := player
-	if p.st.frozen > 0:
+	if p.st.frozen > 0 or p.st.stun > 0 or not p.wind.is_empty() or p.dash_t > 0:
 		return
 	var q: Array = p.queue
 	if held and not q.is_empty():
@@ -394,7 +417,7 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 	var timer_key := recharge_key(sp)
 	if cmode == "aim" and p.shape_cd.get(timer_key, 0.0) > 0:
 		if not held:
-			_ev("cooldown", {"shape": shape, "t": p.shape_cd[shape]})
+			_ev("cooldown", {"shape": shape, "name": sp["name"], "t": p.shape_cd[timer_key]})
 		return
 	var cost := roundi(sp["cost"] * (1.3 if cmode == "nova" else 0.5 if cmode == "self" else 1.0))
 	if p.energy < cost:
@@ -411,16 +434,48 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 		p.shape_max[timer_key] = sp["cd"]
 	var from_queue := not p.queue.is_empty()
 	var is_new: bool = not stats["found"].has(sp["key"])
-	var distinct: int = sp["counts"].size()
 	if from_queue:
 		p.last = p.queue.duplicate()
 	p.queue = []
-	p.cast_t = 0.3
 	stats["casts"] += 1
 	stats["found"][sp["key"]] = true
-	# A combo freezes time for a beat: longer the first time it is ever cast (VFX handoff, section 1).
-	if from_queue and distinct >= 2:
-		hitstop = maxf(hitstop, 0.16 if is_new else 0.035)
+	var role_id := SpellBook.role_of(p.book)
+	if role_id == "":
+		_release_spell(sp, inp, cmode, from_queue, is_new, {}) # the court book casts at once
+		return
+	# Anticipation: the body loads the spell before it leaves (R-073).
+	var tm := SpellBook.cast_timing(sp, role_id, cmode)
+	p.wind = {"t": tm["total"], "max": tm["total"], "sp": sp, "mode": cmode, "from_queue": from_queue,
+		"is_new": is_new, "timing": tm}
+	_ev("windup", {"style": tm["style"], "weight": tm["weight"], "t": tm["total"], "hold": tm["hold"], "mode": cmode,
+		"shape": shape, "pos": p.pos, "dir": p.f, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"role": role_id, "tier": sp["tier"], "name": sp["name"]})
+
+
+# Casts an already-resolved spell at once, with no queue, cost or windup (tests, tools).
+func cast_resolved(sp: Dictionary, inp: Dictionary, cmode := "aim") -> void:
+	_release_spell(sp, inp, cmode, false, false, {})
+
+
+# The spell leaves the staff, aimed where the cursor is now. `tm` is the windup timing ({} for none).
+func _release_spell(sp: Dictionary, inp: Dictionary, cmode: String, from_queue: bool, is_new: bool, tm: Dictionary) -> void:
+	var p := player
+	var def: Dictionary = sp["def"]
+	var shape: String = def["shape"]
+	if p.st.amp > 0 and shape != "guard" and cmode != "self":
+		sp = SpellBook.make_spell(sp["els"], def, sp["power"] * 1.35, sp["key"], sp["name"])
+		sp["amped"] = true
+	var distinct: int = sp["counts"].size()
+	if tm.is_empty():
+		p.cast_t = 0.3
+		p.cast_max = 0.3
+		# A combo freezes time for a beat: longer the first time it is ever cast (VFX handoff, section 1).
+		if from_queue and distinct >= 2:
+			hitstop = maxf(hitstop, 0.16 if is_new else 0.035)
+	else:
+		p.cast_t = tm["recoil"]
+		p.cast_max = tm["recoil"]
+		hitstop = maxf(hitstop, SpellBook.release_hitstop(sp, tm, from_queue, is_new, cmode))
 	var aim: Vector2 = inp.get("aim", p.pos + p.f)
 	var av := aim - p.pos
 	var aim_dist := av.length()
@@ -428,21 +483,41 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 		p.f = av / aim_dist
 	var d := p.f
 	_ev("cast", {"mode": cmode, "shape": shape, "name": sp["name"], "key": sp["key"], "els": sp["els"],
-		"color": sp["color"], "pos": p.pos, "dir": d, "from_queue": from_queue, "is_new": is_new, "distinct": distinct})
+		"color": sp["color"], "pos": p.pos, "dir": d, "from_queue": from_queue, "is_new": is_new, "distinct": distinct,
+		"role": def.get("role", ""), "arch": def.get("arch", ""), "style": tm.get("style", ""),
+		"weight": tm.get("weight", 0.0), "amped": sp.get("amped", false)})
 	if sp["counts"].has("lightning") and p.st.wet > 0 and cmode != "self":
 		_hurt(p, 7 * sp["counts"]["lightning"], "lightning", {"self": true, "reason": "Cast lightning while wet"})
 		p.st.shock = maxf(p.st.shock, 0.35)
 	if cmode == "self":
 		_self_cast(sp)
-	elif cmode == "nova":
+		return
+	if def.get("revive", false):
+		p.revives = maxi(p.revives, 1)
+		_ev("tag", {"tag": "blessing", "pos": p.pos})
+	if def.has("armor"):
+		p.st.armor = maxf(p.st.armor, float(def["armor"]))
+	if def.has("reflectPlayer"):
+		p.st.reflect = maxf(p.st.reflect, float(def["reflectPlayer"]))
+	if cmode == "nova" and not MOVES.has(shape):
 		_nova(sp)
 	else:
 		call("_cast_" + shape, sp, p, d, maxf(1.2, aim_dist))
 
 
+# The windup ran out: release (the player input decides the aim).
+func _release_wind(inp: Dictionary) -> void:
+	var w: Dictionary = player.wind
+	player.wind = {}
+	_release_spell(w["sp"], inp, w["mode"], w["from_queue"], w["is_new"], w["timing"])
+
+
 # Which recharge timer a spell uses: its own (spells with a matrix cooldown) or its shape's.
 static func recharge_key(sp: Dictionary) -> String:
-	return sp["key"] if sp["def"].has("cd") else sp["def"]["shape"]
+	var d: Dictionary = sp["def"]
+	if d.has("role") and LONG.has(d["shape"]):
+		return sp["key"]
+	return sp["key"] if d.has("cd") else d["shape"]
 
 
 func _cast_cone(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
@@ -507,6 +582,11 @@ func _cast_bolt(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
 		b.sp = sp
 		b.color = sp["color"]
 		b.els = sp["els"]
+		if sp["def"].has("explode") and b.r >= 0.3: # bombs lob in an arc and skip once
+			b.arc = true
+			b.y = 1.15
+			b.vy = 2.6
+			b.bounces = 1
 		shots.append(b)
 
 
@@ -521,6 +601,10 @@ func _cast_boulder(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> voi
 	b.sp = sp
 	b.color = sp["color"]
 	b.els = sp["els"]
+	b.arc = true
+	b.y = 1.0
+	b.vy = 3.2
+	b.bounces = 2
 	shots.append(b)
 
 
@@ -595,6 +679,226 @@ func _cast_wall(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
 		var o := (i - (n - 1) / 2.0) * 0.95
 		_add_wall(c + Vector2(-d.y, d.x) * o, sp)
 	_ev("wall", {"pos": c, "mat": sp["def"].get("mat", "stone"), "key": sp["key"], "dir": d, "n": n})
+
+
+# --- R-072: shapes that move or protect the caster.
+func _clamp_in(at: Vector2, r: float) -> Vector2:
+	var L := at.length()
+	return at * (r / L) if L > r else at
+
+
+func _cast_guard(sp: Dictionary, p: Body, _d: Vector2, _aim_dist: float) -> void:
+	var st := p.st
+	var def: Dictionary = sp["def"]
+	var pw: float = sp["power"]
+	if def.has("ward"):
+		st.ward = maxf(st.ward, float(def["ward"]) * pw)
+		st.ward_t = 6.0
+	for f in ["armor", "reflect", "invuln", "stoneskin", "haste", "amp"]:
+		if def.has(f):
+			st.set(f, maxf(st.get(f), float(def[f])))
+	if def.has("regen"):
+		st.regen = maxf(st.regen, float(def["regen"]))
+		st.regen_hp = maxf(st.regen_hp, 4.0 * pw)
+	if def.get("rootSelf", false):
+		st.root = maxf(st.root, float(def.get("invuln", 1.5)))
+	if def.get("cleanse", false):
+		if st.burn > 0 or st.chill > 0 or st.slow > 0 or st.curse > 0 or st.shock > 0:
+			_ev("tag", {"tag": "cleanse", "pos": p.pos})
+		st.burn = 0
+		st.chill = 0
+		st.slow = 0
+		st.frozen = 0
+		st.shock = 0
+		st.curse = 0
+		st.wet = 0
+	if def.has("heal"):
+		heal(float(def["heal"]) * pw, "Guard")
+	if def.has("energy"):
+		p.energy = minf(p.max_energy, p.energy + float(def["energy"]))
+	if def.get("revive", false):
+		p.revives = maxi(p.revives, 1)
+		_ev("tag", {"tag": "blessing", "pos": p.pos})
+	var near := float(def.get("near", 0.0))
+	if near > 0:
+		var pl: Dictionary = sp["payload"].duplicate(true)
+		pl["knock"] = 3.0
+		for k in pl["parts"]:
+			pl["parts"][k] *= 0.5
+		if def.has("blind"):
+			pl["blind"] = maxf(pl.get("blind", 0.0), float(def["blind"]))
+		if def.has("confuse"):
+			pl["confuse"] = float(def["confuse"])
+		for e in live():
+			var L: float = e.pos.distance_to(p.pos)
+			if L < near + e.r:
+				_apply_payload(e, pl, {"k": (e.pos - p.pos) / (L if L > 0 else 1.0)})
+	_ev("guard", {"pos": p.pos, "arch": def.get("arch", ""), "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"near": near, "ward": def.has("ward"), "invuln": def.has("invuln"), "heal": def.has("heal") or def.has("regen"),
+		"amp": def.has("amp"), "stone": def.has("stoneskin"), "reflect": def.has("reflect"), "revive": def.get("revive", false)})
+
+
+func _cast_blink(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
+	var def: Dictionary = sp["def"]
+	var L := minf(float(def.get("dist", 7.0)), maxf(2.0, aim_dist))
+	var from := p.pos
+	p.pos = _clamp_in(p.pos + d * L, BOUND - p.r)
+	_collide(p)
+	p.vel = Vector2.ZERO
+	p.kvel = Vector2.ZERO
+	p.st.invuln = maxf(p.st.invuln, 0.3)
+	if def.has("ward"):
+		p.st.ward = maxf(p.st.ward, float(def["ward"]) * sp["power"])
+		p.st.ward_t = 5.0
+	_ev("blink", {"from": from, "to": p.pos, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"arch": def.get("arch", ""), "role": def.get("role", "")})
+	var o := {"color": sp["color"], "els": sp["els"], "key": sp["key"]}
+	if def.has("burstFrom"):
+		_explode(from, float(def["burstFrom"]), sp["payload"], o)
+	if def.has("burstTo"):
+		_explode(p.pos, float(def["burstTo"]), sp["payload"], o)
+	if def.has("delayedFrom"):
+		var area_def := {"name": sp["name"], "shape": "area", "radius": def["delayedFrom"], "delay": 0.9, "life": 0.01,
+			"burst": true, "mult": def.get("mult", 1.0)}
+		_spawn_area(SpellBook.make_spell(sp["els"], area_def, sp["power"], sp["key"]), from)
+
+
+func _cast_dash(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
+	var def: Dictionary = sp["def"]
+	var L := float(def.get("dist", 6.0))
+	var T := 0.18
+	if def.has("decoy"):
+		var dd = def["decoy"]
+		_spawn_decoy(sp, p.pos, dd if dd is Dictionary else def)
+	p.dash_t = T
+	p.dash_v = d * L / T
+	p.dash_sp = sp
+	p.dash_w = float(def.get("width", 0.9))
+	p.dash_hit = []
+	_ev("dash", {"pos": p.pos, "dir": d, "dist": L, "t": T, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"arch": def.get("arch", ""), "role": def.get("role", "")})
+
+
+func _dash_step(dt: float) -> void:
+	var p := player
+	p.dash_t -= dt
+	p.vel = p.dash_v
+	var sp: Dictionary = p.dash_sp
+	var Lv: float = p.dash_v.length()
+	var side_v := Vector2(-p.dash_v.y, p.dash_v.x) / (Lv if Lv > 0 else 1.0)
+	for e in live():
+		if p.dash_hit.has(e.id) or e.pos.distance_to(p.pos) >= e.r + p.r + p.dash_w * 0.5:
+			continue
+		p.dash_hit.append(e.id)
+		var side := 1.0 if (e.pos - p.pos).dot(side_v) >= 0 else -1.0
+		_apply_payload(e, sp["payload"], {"k": side_v * side})
+	if p.dash_t <= 0:
+		p.vel *= 0.25
+		_ev("dashEnd", {"pos": p.pos, "dir": p.dash_v / (Lv if Lv > 0 else 1.0), "els": sp["els"], "color": sp["color"],
+			"key": sp["key"], "arch": sp["def"].get("arch", "")})
+
+
+func _cast_decoy(sp: Dictionary, p: Body, d: Vector2, _aim_dist: float) -> void:
+	var def: Dictionary = sp["def"]
+	var n := int(def.get("count", 1))
+	for i in n:
+		var o := (i - (n - 1) / 2.0) if n > 1 else 0.0
+		var D := _spawn_decoy(sp, p.pos + Vector2(-d.y, d.x) * o * 1.3, def)
+		if n > 1:
+			D.vel = d.rotated(o * 0.6) * 2.4
+	if def.has("hop"):
+		var from := p.pos
+		p.pos = _clamp_in(p.pos - d * float(def["hop"]), BOUND - p.r)
+		_collide(p)
+		p.st.invuln = maxf(p.st.invuln, 0.25)
+		_ev("blink", {"from": from, "to": p.pos, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+			"arch": def.get("arch", ""), "hop": true})
+
+
+func _cast_swap(sp: Dictionary, p: Body, d: Vector2, aim_dist: float) -> void:
+	var def: Dictionary = sp["def"]
+	var range_ := float(def.get("range", 10.0))
+	var tg: Body = null
+	var best := INF
+	for e in live():
+		var v: Vector2 = e.pos - p.pos
+		var L := v.length()
+		if L > range_ or v.dot(d) / (L if L > 0 else 1.0) < 0.8:
+			continue
+		if L < best:
+			best = L
+			tg = e
+	if tg == null:
+		var alt := def.duplicate()
+		alt["dist"] = 6.0
+		alt["burstTo"] = 1.6
+		var bl := sp.duplicate()
+		bl["def"] = alt
+		_cast_blink(bl, p, d, aim_dist)
+		return
+	var from := p.pos
+	p.pos = tg.pos
+	tg.pos = from
+	_collide(p)
+	_collide(tg)
+	p.vel = Vector2.ZERO
+	p.kvel = Vector2.ZERO
+	p.st.invuln = maxf(p.st.invuln, 0.35)
+	var pl: Dictionary = sp["payload"].duplicate(true)
+	pl["stun"] = maxf(pl.get("stun", 0.0), 0.9)
+	_apply_payload(tg, pl, {})
+	_ev("swap", {"from": from, "to": p.pos, "id": tg.id, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"arch": def.get("arch", "")})
+
+
+func _spawn_decoy(sp: Dictionary, at: Vector2, o: Dictionary) -> Body:
+	var D := Body.new()
+	D.id = _next_id()
+	D.kind = "decoy"
+	D.pos = _clamp_in(at, BOUND - 0.5)
+	D.r = 0.42
+	D.mass = 1.5
+	D.hp = float(o.get("hp", 60.0)) * sp["power"]
+	D.max_hp = D.hp
+	D.life = float(o.get("life", 5.0))
+	D.burst = float(o.get("burst", 0.0))
+	D.pulse = float(o.get("pulse", 0.0))
+	D.pulse_t = 0.4
+	D.heal_amt = float(o.get("heal", 0.0))
+	D.sp = sp
+	D.face = atan2(player.f.x, player.f.y)
+	decoys.append(D)
+	_ev("decoy", {"id": D.id, "pos": D.pos, "els": sp["els"], "color": sp["color"], "key": sp["key"],
+		"arch": sp["def"].get("arch", ""), "life": D.life, "summon": D.pulse > 0})
+	return D
+
+
+func _update_decoys(dt: float) -> void:
+	var p := player
+	var keep: Array = []
+	for D in decoys:
+		D.life -= dt
+		D.flash = maxf(0.0, D.flash - dt)
+		_move(D, dt)
+		D.vel *= exp(-0.8 * dt)
+		if D.pulse > 0:
+			D.pulse_t -= dt
+			if D.pulse_t <= 0:
+				D.pulse_t = D.pulse
+				for e in live():
+					var L: float = e.pos.distance_to(D.pos)
+					if L < 2.6 + e.r:
+						_apply_payload(e, D.sp["payload"], {"k": (e.pos - D.pos) / (L if L > 0 else 1.0)})
+				if D.heal_amt > 0 and p.alive and D.pos.distance_to(p.pos) < 3.4:
+					heal(D.heal_amt * D.pulse * 2.0, "Double")
+				_ev("decoyPulse", {"id": D.id, "pos": D.pos, "r": 2.6, "els": D.sp["els"], "color": D.sp["color"], "heal": D.heal_amt > 0})
+		if D.life > 0 and D.hp > 0:
+			keep.append(D)
+			continue
+		if D.burst > 0:
+			_explode(D.pos, D.burst, D.sp["payload"], {"color": D.sp["color"], "els": D.sp["els"], "key": D.sp["key"], "big": true})
+		_ev("decoyEnd", {"id": D.id, "pos": D.pos, "broken": D.hp <= 0, "els": D.sp["els"], "color": D.sp["color"]})
+	decoys = keep
 
 
 func _chain_walk(sp: Dictionary, cur: Body, jumps: int, pts: Array, k: float, hit: Dictionary) -> void:
@@ -809,12 +1113,17 @@ func _freeze(b: Body, dur: float) -> void:
 func _hurt(b: Body, dmg: float, el: String, o := {}) -> float:
 	if dmg <= 0 or b.hp <= 0:
 		return 0.0
+	if b.kind == "decoy":
+		b.hp -= dmg
+		b.flash = 0.14
+		_ev("decoyHit", {"id": b.id, "pos": b.pos, "dmg": dmg})
+		return dmg
 	var is_p := b == player
 	var dot: bool = o.get("dot", false)
 	if is_p:
 		if not b.alive:
 			return 0.0
-		if b.dodge > 0 and not dot:
+		if (b.dodge > 0 or b.dash_t > 0) and not dot:
 			_ev("tag", {"tag": "evade", "pos": b.pos})
 			return 0.0
 		if b.st.invuln > 0:
@@ -863,7 +1172,7 @@ func _hurt(b: Body, dmg: float, el: String, o := {}) -> float:
 # c: {scale, k (knockback direction), block, knock_mul, area (a damage-over-time tick), reason}.
 func _apply_payload(b: Body, pl: Dictionary, c := {}) -> float:
 	var is_p := b == player
-	if is_p and (not b.alive or (b.dodge > 0 and not c.get("area", false))):
+	if is_p and (not b.alive or ((b.dodge > 0 or b.dash_t > 0) and not c.get("area", false))):
 		return 0.0
 	if b.hp <= 0:
 		return 0.0
@@ -1213,7 +1522,7 @@ func _tick_status(b: Body, dt: float) -> void:
 	st.blind = maxf(0.0, st.blind - dt)
 	if st.slow <= 0:
 		st.slow_pct = 0.0
-	for k in ["stun", "silence", "weaken", "inaccurate", "confuse", "armor", "reflect", "invuln"]:
+	for k in ["stun", "silence", "weaken", "inaccurate", "confuse", "armor", "reflect", "invuln", "amp"]:
 		st.set(k, maxf(0.0, st.get(k) - dt))
 	st.curse = maxf(0.0, st.curse - dt)
 	if st.regen > 0:
@@ -1237,22 +1546,37 @@ func _update_player(inp: Dictionary, dt: float) -> void:
 	p.energy = minf(p.max_energy, p.energy + TUNING["regen"] * dt)
 	p.cast_t = maxf(0.0, p.cast_t - dt)
 	p.hurt_t = maxf(0.0, p.hurt_t - dt)
-	var stunned := st.frozen > 0 or st.shock > 0
+	if not p.wind.is_empty():
+		if st.frozen > 0 or st.stun > 0:
+			p.wind = {}
+			_ev("tag", {"tag": "interrupt", "pos": p.pos})
+		else:
+			p.wind["t"] -= dt
+			if p.wind["t"] <= 0:
+				_release_wind(inp)
+	var stunned := st.frozen > 0 or st.shock > 0 or st.stun > 0
 	var mv: Vector2 = inp.get("move", Vector2.ZERO)
-	if p.dodge > 0:
+	if p.dash_t > 0:
+		_dash_step(dt)
+	elif p.dodge > 0:
 		p.dodge -= dt
 		p.vel = p.dd * TUNING["dodge_speed"]
 	elif st.root > 0:
 		p.vel *= 0.5
 	elif not stunned:
-		var spd: float = TUNING["speed"] * slow_mul(st) * (1.4 if st.haste > 0 else 1.0)
+		var planted := 1.0
+		if not p.wind.is_empty():
+			planted = 0.75 if p.wind["timing"]["style"] == "flick" else 0.3
+		elif p.cast_t > p.cast_max * 0.55 and p.cast_max > 0.3:
+			planted = 0.55
+		var spd: float = TUNING["speed"] * slow_mul(st) * (1.4 if st.haste > 0 else 1.0) * planted
 		var target := mv.normalized() * spd if mv != Vector2.ZERO else Vector2.ZERO
 		p.vel += (target - p.vel) * minf(1.0, dt * 14)
 	else:
 		p.vel *= 0.8
 	_move(p, dt)
 	p.cur_speed = p.vel.length()
-	if not stunned:
+	if not stunned and p.dash_t <= 0:
 		var av: Vector2 = inp.get("aim", p.pos + p.f) - p.pos
 		if av.length() > 0.3:
 			p.f = av.normalized()
@@ -1550,7 +1874,14 @@ func _ai_hexcaller(e: Body, dt: float, c: Dictionary) -> void:
 # Who an enemy goes for: the player, or (confused) the nearest other enemy.
 func _target_of(e: Body) -> Body:
 	if e.st.confuse <= 0:
-		return player
+		var near: Body = null
+		var nd := INF
+		for D in decoys: # doubles draw the eye
+			var L: float = D.pos.distance_to(e.pos)
+			if L < nd:
+				nd = L
+				near = D
+		return near if near else player
 	var best: Body = null
 	var bd := 8.0
 	for o in live():
@@ -1650,7 +1981,10 @@ func _update_shots(dt: float) -> void:
 			if not ok:
 				break
 			b.pos += b.vel * dt / 3.0
-			ok = _shot_step(b)
+			if b.arc:
+				ok = _arc_step(b, dt / 3.0)
+			if ok:
+				ok = _shot_step(b)
 		if ok and b.life <= 0:
 			if b.owner == "player" and b.kind == "boulder":
 				_impact(b, null)
@@ -1658,6 +1992,27 @@ func _update_shots(dt: float) -> void:
 		if ok:
 			keep.append(b)
 	shots = keep
+
+
+# Heavy shots bounce, losing speed, and either roll on (boulders) or burst on the last landing.
+func _arc_step(b: Shot, h: float) -> bool:
+	b.vy -= 13.0 * h
+	b.y += b.vy * h
+	if b.y > b.r:
+		return true
+	b.y = b.r
+	if b.bounces > 0:
+		b.bounces -= 1
+		b.vy = absf(b.vy) * 0.42 + 1.2
+		b.vel *= 0.8
+		_ev("bounce", {"pos": b.pos, "kind": b.kind, "els": b.els, "color": b.color, "id": b.id})
+		return true
+	if b.kind != "boulder":
+		_impact(b, null)
+		return false
+	b.vy = 0.0
+	b.vel *= 0.97
+	return true
 
 
 func _shot_step(b: Shot) -> bool:
@@ -1691,9 +2046,14 @@ func _shot_step(b: Shot) -> bool:
 				w.hp -= b.dmg * 1.5
 				_impact(b, null)
 				return false
+		for D in decoys:
+			if b.pos.distance_to(D.pos) < b.r + D.r:
+				_hurt(D, b.dmg, "hex")
+				_impact(b, null)
+				return false
 		var p := player
 		if p.alive and b.pos.distance_to(p.pos) < b.r + p.r:
-			if p.dodge > 0:
+			if p.dodge > 0 or p.dash_t > 0:
 				if not b.evaded:
 					b.evaded = true
 					_ev("tag", {"tag": "evade", "pos": p.pos})

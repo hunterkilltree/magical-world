@@ -122,7 +122,7 @@ func test_the_reticle_dims_when_the_spell_cannot_be_cast() -> void:
 	assert_true(v.ret_dim, "too little energy dims it")
 	assert_true(v._ret_ring.material_override.albedo_color.a < bright * 0.6, "visibly")
 	main.sim.player.energy = 100
-	M.frames(main, 1, {"actions": ["clear", "el:ice", "el:water"]})
+	M.frames(main, 1, {"actions": ["clear", "el:ice", "el:water", "el:water"]})
 	M.frames(main, 1, {"aim": Vector2(0, -6), "actions": ["cast"]})
-	M.frames(main, 1, {"actions": ["el:ice", "el:water"]})
+	M.frames(main, 1, {"actions": ["el:ice", "el:water", "el:water"]})
 	assert_true(v.ret_dim, "a recharging area dims it too")

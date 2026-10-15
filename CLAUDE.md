@@ -69,18 +69,19 @@ a random or auto-generated name.
   is in `_apply_payload`, keep it that way), `spell_book` (data/spells.json: queue of 3, fire/ice cancel, resolve order,
   payloads, cost, colour; per-wizard books, below), `enemy_types` (data/enemies.json, `wave_roster(n, rng)`),
   `wizard_roster` (data/wizards.json: the six wizards' looks), `controls` (InputMap install, event -> sim action).
-- Wizard spell books (R-067, R-068): single elements are shared, but every two/three-element mix makes the caster's own
-  spell. `data/spells.json` is the court book; `data/schools.json` holds each wizard's school (name, motto, `signature`,
-  `combos`): 350 spells, and each court combo is kept unchanged by exactly one wizard (the one with no entry for it).
-  `SpellBook.book(id)` / `resolve(queue, id)` / `grimoire(id)`; `""` is the court book. School spells cast, recharge and
-  are found under `mix@wizard` keys (so the director's `_sig` signatures, keyed by court mixes, skip them: they draw from
-  shape, elements and `def.visual`). The sim casts from `player.book` (set from the wizard; `_on_pick` sets both); the
-  test fixtures (`arena_fixture`, `main_fixture`) use the court book so the court's spells stay tested, and the R-049 bot
-  plays Brann (who keeps Thunderflare). School numbers are held by `tests/support/spell_bench.gd` (five still, tough
-  dummies): damage per energy = the court's rate for the shape x how hard the elements hit (`Bench.target`); walls hold
-  the court's median health. After changing a school spell, `godot --headless --path . --script
-  res://harness/calibrate_schools.gd` prints the `mult` it needs. A school field must not both burn and root.
-- School looks (R-070, after Cunningham's elemental magic): each school's `look` in `schools.json` (`sigil`, `motif`,
+- Casting roles (R-071 to R-075, the Staff of the Cracked Rune handoff in `story/design/cracked_rune/`): every wizard casts
+  as one of five roles (`data/roles.json`: Destroyer Brann, Controller Vela and the Hollow Warden, Guardian Morrow,
+  Trickster Kessa, Arcanist Aldric). Singles, doubles and named triples are shared (`data/spells.json` is the court book);
+  every pair of two different elements makes the role's own spell (45 x 5 = 225, ids like `FIRE_WATER_DESTROYER`, found,
+  recharged and drawn under `mix@role`). `SpellBook.book(id)` / `resolve(queue, id)` / `grimoire(id)` / `role_of(id)` /
+  `role_spells(role)`; `""` is the court book (no role, so no windup: the test fixtures cast at once). An unnamed triple
+  rides its best pair at x1.5; opposites cancel only when the role has no spell for the pair. `data/schools.json` now
+  only holds each wizard's look (below). New shapes `guard blink dash decoy swap` are `_cast_*` in `arena_sim.gd` (decoys
+  are Bodies of kind "decoy" in `sim.decoys`; enemies target them); a cast is `_cast` (windup, `p.wind`) then `_release_spell`
+  (hit-stop, aim re-read, shape); `cast_resolved(sp, inp, mode)` casts a resolved spell at once (tests). Role spells of
+  the long shapes recharge on their own timer (`ArenaSim.recharge_key`, `LONG`). Heavy shots fly an arc (`Shot.arc`).
+  Impact frames: `scripts/vfx/impact_frames.gd` (director `impact`, stepped by `update(dt)`).
+- School looks (R-070, after Cunningham's elemental magic): each wizard's `look` in `schools.json` (`sigil`, `motif`,
   `tint` = the wizard's glow). `scripts/vfx/school_looks.gd` holds the recipes the director calls: the school's circle
   in place of the court rune for every multi-element cast (and on the queue, new-spell, area and nova stamps), the
   motif on the staff, along shots, beams and cones and where spells land, and `quarters` (every combo, any book: earth

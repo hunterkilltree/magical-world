@@ -45,7 +45,7 @@ func test_energy_is_spent_and_regenerates() -> void:
 
 
 func test_cooldowns_shared_and_per_shape() -> void:
-	F.cast(s, ["ice", "water"], Vector2(0, -6))
+	F.cast(s, ["ice", "water", "water"], Vector2(0, -6))
 	assert_eq(s.areas.size(), 1, "Hoarfrost Field placed")
 	assert_true(absf(s.player.cd["cast"] - 0.45) < 0.02, "shared cooldown min(2.2, 0.45)")
 	assert_true(absf(s.player.shape_cd["area"] - 2.2) < 0.02, "areas recharge on their own")

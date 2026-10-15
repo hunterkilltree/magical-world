@@ -27,11 +27,9 @@ static func look_of(book: String) -> Dictionary:
 	return SpellBook.school(book).get("look", {})
 
 
-# Whose book a sim event's spell came from: a school spell names it in its key ("mix@wizard"); a
-# court combo belongs to the caster, who keeps it; anything else (barrels, burning ground) has none.
+# Whose look an event's spell wears: the caster's, for any combo (a role spell's key is "mix@role");
+# anything else (barrels, burning ground) has none.
 static func book_of(key: String, caster_book: String) -> String:
-	if "@" in key:
-		return key.get_slice("@", 1)
 	return caster_book if "+" in key else ""
 
 

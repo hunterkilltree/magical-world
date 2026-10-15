@@ -28,7 +28,7 @@ func _cast(book: String, els: Array, n := 20, aim := Vector2(0, -3)) -> Array:
 		actions.append("el:" + el)
 	actions.append("cast")
 	M.frames(main, 1, {"actions": actions, "aim": aim})
-	M.frames(main, n, {"aim": aim})
+	M.frames(main, 25 + n, {"aim": aim}) # the windup (R-073), then the spell
 	var tr: Array = main.view.director.particles.trace
 	main.view.director.particles.trace = null
 	return tr
