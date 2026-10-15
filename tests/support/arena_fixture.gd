@@ -6,9 +6,11 @@ const SpellBook := preload("res://scripts/core/spell_book.gd")
 const DT := 1.0 / 60.0
 
 
-# A sim in play mode with the first wave held back. `bare` removes puddles, brush and barrels.
+# A sim in play mode with the first wave held back, casting from the court book (R-067).
+# `bare` removes puddles, brush and barrels.
 static func make(bare := true, seed_value := 7) -> ArenaSim:
 	var s := ArenaSim.new("ember_pyromancer", seed_value)
+	s.player.book = ""
 	s.mode = "play"
 	s.wave_t = 1e9
 	if bare:

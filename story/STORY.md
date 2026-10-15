@@ -324,3 +324,42 @@ along the arc, a jet rises a beat later, and foam spreads and settles into
 the pool. Droplets peel off the lip while it rides in. The crest is uneven
 and breaks unevenly. Torrent's wave is lower, faster and barely curls. A
 Tsunami stays within a third of the particle pools.
+
+## Each wizard's own spells
+
+Every wizard learned the combos their own way. The ten single-element spells
+are the same for everyone, but a mix of two or three elements makes that
+wizard's own spell: the same queue cast by Aldric and by Brann gives two
+different spells. The court book (`data/spells.json`) is not lost: each of its
+70 combos is kept, unchanged, by exactly one wizard, the one whose school it
+fits; the other five cast their own version (`data/schools.json`, 350 spells).
+The school spells are our own tuning, not playtested, but not tuned by feel
+either: on the spell bench (`tests/support/spell_bench.gd`, five tough dummies)
+each one deals the damage per energy the court's spells of its shape deal for
+elements that hit as hard as its own (so water and wind hit softer than fire
+and lightning, as in the court book), and each school wall holds as much as the
+court's median wall. `harness/calibrate_schools.gd` prints the `mult` a changed
+school spell needs.
+
+### R-067 [done] Each wizard casts their own combos
+Core. Six schools (Aldric's Unwritten Canon, Brann's Cinderhand's Way, Vela's
+Quiet Rime, Old Morrow's Lore, Kessa's Voltmark Method, the Hollow Warden's
+Hollow Rite), each with a version of all 70 two- and three-element mixes:
+single elements are shared; every court combo is kept by exactly one wizard;
+one mix makes six different spells (names unique across all 420, at least three
+shapes per mix). The resolve rules (three of a kind powers up the double,
+repeats add 30%, a third element rides the best pair, fire/ice and light/dark
+cancel) work the same in every book. A school spell casts, recharges and is
+found under its own key (`mix@wizard`). School spells use only mechanics the
+court's spells already have, never the protective ones (invulnerable, revive,
+armour, reflecting the caster); water+water deals no damage, so its versions
+push, pull or soak; no school field both burns and roots (kindling would
+compound every tick). Each damaging school spell lands within 25% of its bench
+target and its `mult` stays between 0.1 and 4.5; each school wall within 20%
+of the court's median wall health. Every school spell casts aimed and as a
+nova, and draws through the real view without an error.
+
+### R-068 [done] The HUD shows the wizard's own book
+Core. The menu card names the chosen wizard's school; the spell preview, the
+cast and the pause grimoire use that wizard's book, with their own spells and
+the court spells they keep, and "spells found" counts against it.

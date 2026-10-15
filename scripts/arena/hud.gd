@@ -66,6 +66,7 @@ var volume_slider: HSlider
 var dead_kicker: Label
 var dead_stats: GridContainer
 var blurb_label: Label
+var school_label: Label # R-068: the chosen wizard's school and a few of their own combos
 
 var vig := 0.0
 var toast_t := 0.0
@@ -425,6 +426,10 @@ func _build_menu() -> void:
 	blurb_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb_label.custom_minimum_size = Vector2(380, 40)
 	v.add_child(blurb_label)
+	school_label = _label("", 12)
+	school_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	school_label.custom_minimum_size = Vector2(380, 34)
+	v.add_child(school_label)
 	var ctl := GridContainer.new()
 	ctl.columns = 2
 	ctl.add_theme_constant_override("h_separation", 14)
@@ -546,6 +551,15 @@ func _set_who() -> void:
 		roster_buttons[id].button_pressed = id == wizard_id
 	if blurb_label:
 		blurb_label.text = w["blurb"]
+	if school_label:
+		var sc := SpellBook.school(wizard_id)
+		var own := []
+		for mix in sc.get("signature", []):
+			own.append(sc["combos"][mix]["name"])
+		school_label.text = "%s: %s
+%d of the 70 combos are their own, such as %s; the rest are court spells they keep." % [
+			sc.get("name", ""), sc.get("motto", ""), sc.get("combos", {}).size(), ", ".join(PackedStringArray(own))]
+		school_label.add_theme_color_override("font_color", Color(w["glow"]).lerp(INK, 0.35))
 
 
 # ---------------------------------------------------------------- per frame
@@ -612,7 +626,7 @@ func update(s: ArenaSim, events: Array, dt: float) -> void:
 	stat_labels["Kills"].text = str(s.kills)
 	stat_labels["Score"].text = str(s.score)
 	var queued := not p.queue.is_empty()
-	var sp := SpellBook.resolve(p.queue if queued else p.last)
+	var sp := SpellBook.resolve(p.queue if queued else p.last, p.book)
 	var combo: bool = _counts(p.queue).size() >= 2
 	_shake = maxf(0.0, _shake - dt)
 	for i in slots.size():
@@ -741,7 +755,7 @@ func _show_screens(s: ArenaSim, dt := 0.0) -> void:
 	hud.visible = s.mode != "menu"
 	if s.mode != _prev_mode:
 		if s.mode == "paused":
-			_fill_grimoire(s.stats["found"])
+			_fill_grimoire(s.stats["found"], s.player.book)
 		if s.mode != "dead":
 			_dead_filled = false
 			_dead_t = 0.0
@@ -752,7 +766,7 @@ func _show_screens(s: ArenaSim, dt := 0.0) -> void:
 		for c in dead_stats.get_children():
 			c.queue_free()
 		for row in [["Wave reached", s.wave], ["Kills", s.kills], ["Score", s.score], ["Damage dealt", roundi(s.stats["dealt"])],
-				["Self-inflicted", roundi(s.stats["self_dmg"])], ["Spells found", "%d / %d" % [s.stats["found"].size(), SpellBook.grimoire().size()]]]:
+				["Self-inflicted", roundi(s.stats["self_dmg"])], ["Spells found", "%d / %d" % [s.stats["found"].size(), SpellBook.grimoire(s.player.book).size()]]]:
 			dead_stats.add_child(_label(row[0], 15, DIM))
 			dead_stats.add_child(_label(str(row[1]), 18))
 	if dead:
@@ -763,11 +777,13 @@ func _show_screens(s: ArenaSim, dt := 0.0) -> void:
 			rows[i].modulate.a = clampf((_dead_t - 0.25 - (i / 2) * 0.18) / 0.2, 0.0, 1.0)
 
 
-func _fill_grimoire(found: Dictionary) -> void:
+# The caster's book (R-068): their own spells, and the court spells they keep tagged "court".
+func _fill_grimoire(found: Dictionary, book := "") -> void:
 	for c in grimoire_box.get_children():
 		c.queue_free()
 	var n := 0
-	for g in SpellBook.grimoire():
+	var grim := SpellBook.grimoire(book)
+	for g in grim:
 		var have: bool = found.has(g["key"])
 		if have:
 			n += 1
@@ -776,13 +792,14 @@ func _fill_grimoire(found: Dictionary) -> void:
 		for e in g["els"]:
 			dots.colors.append(SpellBook.color(e) if have else Color(SpellBook.color(e), 0.3))
 		grimoire_box.add_child(dots)
-		var nm := _label("%s  (%s)" % [g["def"]["name"], SpellBook.shape(g["def"]["shape"])["label"]], 13, SpellBook.mix_color(_counts(g["els"])) if have else DIM)
+		var court := "  - court" if book != "" and g["els"].size() > 1 and not g["own"] else ""
+		var nm := _label("%s  (%s)%s" % [g["def"]["name"], SpellBook.shape(g["def"]["shape"])["label"], court], 13, SpellBook.mix_color(_counts(g["els"])) if have else DIM)
 		grimoire_box.add_child(nm)
 		var d := _label(g["def"].get("desc", ""), 11, DIM)
 		d.custom_minimum_size = Vector2(380, 0)
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD
 		grimoire_box.add_child(d)
-	found_label.text = "   %d / %d cast" % [n, SpellBook.grimoire().size()]
+	found_label.text = "   %d / %d cast" % [n, grim.size()]
 
 
 func _counts(els: Array) -> Dictionary:

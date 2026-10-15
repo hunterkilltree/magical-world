@@ -24,6 +24,13 @@ failing test, then a fix, with one PR per item, following the story workflow in 
   - Make each protective effect's recharge longer than its duration. For example, World Tree lasts 6 s with a 15 s recharge, and its revive is granted at most once per wave.
   - Add a test rule: for every spell with `invulnerable`, `armor`, `reflectPlayer` or `revive`, `cd > duration`.
 
+### 1b. Kindling compounds without end (bug, found while building R-067)
+- **What's wrong:** `_apply_payload` multiplies `burn_dps` by 1.5 every time a burn lands on a rooted target
+  ("kindled"), so a field that both burns and roots each tick grows exponentially: on the spell bench Wildfire
+  deals about 918 damage per energy (the next court spell is Black Hole at 57).
+- **Do:** apply the x1.5 once to the incoming burn (`maxf(st.burn_dps, pl["burnDps"] * 1.5)`), add a test that
+  repeated kindling does not grow, and re-bench Wildfire. The school spells avoid burning-and-rooting fields until then.
+
 ### 2. Make verification actually run
 - **What's wrong:**
   - Godot isn't on PATH, so the Stop hook skips itself silently ("Godot not found").

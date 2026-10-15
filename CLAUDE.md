@@ -67,8 +67,19 @@ a random or auto-generated name.
   `arena_sim` (the whole fight, a line-for-line port of the prototype's sim.js: `step(input, dt)` at a fixed 60 Hz returns
   events; positions are `Vector2(x, z)` on the ground; facing angle `face` points along `(sin, cos)`; every element reaction
   is in `_apply_payload`, keep it that way), `spell_book` (data/spells.json: queue of 3, fire/ice cancel, resolve order,
-  payloads, cost, colour), `enemy_types` (data/enemies.json, `wave_roster(n, rng)`), `wizard_roster` (data/wizards.json:
-  the six wizards' looks; cosmetic only), `controls` (InputMap install, event -> sim action).
+  payloads, cost, colour; per-wizard books, below), `enemy_types` (data/enemies.json, `wave_roster(n, rng)`),
+  `wizard_roster` (data/wizards.json: the six wizards' looks), `controls` (InputMap install, event -> sim action).
+- Wizard spell books (R-067, R-068): single elements are shared, but every two/three-element mix makes the caster's own
+  spell. `data/spells.json` is the court book; `data/schools.json` holds each wizard's school (name, motto, `signature`,
+  `combos`): 350 spells, and each court combo is kept unchanged by exactly one wizard (the one with no entry for it).
+  `SpellBook.book(id)` / `resolve(queue, id)` / `grimoire(id)`; `""` is the court book. School spells cast, recharge and
+  are found under `mix@wizard` keys (so the director's `_sig` signatures, keyed by court mixes, skip them: they draw from
+  shape, elements and `def.visual`). The sim casts from `player.book` (set from the wizard; `_on_pick` sets both); the
+  test fixtures (`arena_fixture`, `main_fixture`) use the court book so the court's spells stay tested, and the R-049 bot
+  plays Brann (who keeps Thunderflare). School numbers are held by `tests/support/spell_bench.gd` (five still, tough
+  dummies): damage per energy = the court's rate for the shape x how hard the elements hit (`Bench.target`); walls hold
+  the court's median health. After changing a school spell, `godot --headless --path . --script
+  res://harness/calibrate_schools.gd` prints the `mult` it needs. A school field must not both burn and root.
 - Ten elements (R-050 to R-054): the handoff's six plus nature/wind/light/dark from the original Grauhold Reach list
   (keys 7, 8, 9, 0). The handoff's own spell numbers are untouched; the new elements, combos (74 in all; every pair and
   double has one) and enemy resists for them are our own tuning, not playtested. Combo keys that add status to a
@@ -129,7 +140,8 @@ a random or auto-generated name.
   emission low enough that nothing clips. Headless runs have a 64x64 viewport, so never assume window-size pixels in tests.
 - Nodes added to the root during a `--script` run get `_ready` late; scenes under test expose `start()` instead.
 - Avoid lambdas that capture an object which owns the signal's emitter (reference cycle -> leak warnings at exit).
-- `tests/support/arena_fixture.gd` (quiet sim, ticking helpers), `main_fixture.gd` (the real main scene in play mode),
+- `tests/support/arena_fixture.gd` (quiet sim on the court book, ticking helpers), `main_fixture.gd` (the real main scene
+  in play mode, court book until a wizard is picked), `spell_bench.gd` (damage per energy on still dummies),
   `arena_bot.gd` + `test_r049_bot_clears_waves.gd`: a bot (kite, Torrent then Arc, Thunderflare at range, dodge
   telegraphs, avoid puddles when it would cast lightning) clears wave 3 in about 53 s of game time with no self-damage
   (seed 11). Re-run it after any rules change. Not playtested by a human.

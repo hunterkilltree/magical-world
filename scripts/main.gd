@@ -75,6 +75,7 @@ func resume() -> void:
 func _on_pick(id: String) -> void:
 	wizard_id = id
 	sim.player.wizard = id
+	sim.player.book = id
 	view.set_wizard(id)
 
 
