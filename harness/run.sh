@@ -3,6 +3,7 @@
 #   harness/run.sh check          parse every .gd file
 #   harness/run.sh boot           boot the project headlessly, fail on engine errors
 #   harness/run.sh test [filter]  run tests/test_*.gd
+#   harness/run.sh web [filter]  run the web port's tests (tests/web/*.test.mjs, Node's test runner)
 #   harness/run.sh reqs           every active/done requirement in story/STORY.md has a test
 #   harness/run.sh story          run tests, regenerate story/progress.md
 #   harness/run.sh shot WHAT OUT render a frame to a PNG (a desktop, or xvfb-run); WHAT = menu | play | demo | wave | schools | pause | dead  [WIZARD_ID]
@@ -63,6 +64,13 @@ cmd_test() {
 
 source harness/reqs.sh
 
+# The web port's tests (node:test); the reporter prints PASS/FAIL lines like the Godot runner.
+cmd_web() {
+  command -v node >/dev/null 2>&1 || { echo "web: node not found" >&2; return 127; }
+  [ -d node_modules ] || npm install --silent --no-audit --no-fund >/dev/null 2>&1
+  node --test --test-reporter=./harness/web_reporter.mjs ${1:+--test-name-pattern="$1"} "tests/web/*.test.mjs"
+}
+
 cmd_shot() {
   local out="${2:-shot.png}"
   case "$out" in /*|[A-Za-z]:*) ;; *) out="$PWD/$out" ;; esac
@@ -78,9 +86,10 @@ case "${1:-all}" in
   check) cmd_check ;;
   boot)  cmd_boot ;;
   test)  shift; cmd_test "$@" ;;
+  web)   shift; cmd_web "$@" ;;
   reqs)  cmd_reqs ;;
   story) cmd_story ;;
   shot)  shift; cmd_shot "$@" ;;
   all)   cmd_check && cmd_boot && cmd_reqs && cmd_story ;;
-  *) echo "usage: $0 {check|boot|test [filter]|reqs|story|shot WHAT OUT|all}" >&2; exit 2 ;;
+  *) echo "usage: $0 {check|boot|test [filter]|web [filter]|reqs|story|shot WHAT OUT|all}" >&2; exit 2 ;;
 esac

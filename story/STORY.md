@@ -389,3 +389,49 @@ quarters of the circle: earth and nature in the north (up the screen), air
 (wind, lightning) in the east, fire and light in the south, water and ice in
 the west, arcane and dark at the heart. A school combo stays within a third of
 the particle pools.
+
+## Co-op (web port)
+
+Plan and tech choices: `story/COOP_PLAN.md`. Co-op lives in the browser port (`src/`);
+the Godot project is unchanged. Up to four wizards fight the same waves; an
+authoritative Node server runs `src/game/sim.js` and clients send input and render
+snapshots. Web tests are `tests/web/test_rNNN_<name>.test.mjs` (`harness/run.sh web`).
+
+### R-080 [done] The sim runs one to four wizards
+Core. `createCoopGame` makes a game with up to four players (ids `p1` to `p4`,
+each with their own wizard, role, queue, energy and cooldowns); `addPlayer` and
+`removePlayer` change the party; `step(game, {players: {id: input}}, dt)` drives
+them all, and the old single-input shape still drives player 0. Enemies go for
+the nearest living player; spawn gates are chosen far from the party; a wave has
+x(1 + 0.4(N-1)) health and x(1 + 0.5(N-1)) enemies. At 0 health a player is
+downed (not dead): a living ally within 1.8 m revives them in 3 s at 40% health,
+and a cleared wave raises everyone; the run ends only when every player is down.
+Your own explosions hurt allies at half the rate they hurt you; fields that hit
+everyone and barrels hit all. Fields that heal or ward help anyone standing in
+them. There is no pause and no hit-stop in co-op. Single-player behaviour is
+unchanged (a seeded run matches its recorded digest).
+
+### R-081 [done] A room server for up to four players
+Core. `server/` runs a Node WebSocket server. A player joins a room by its
+four-letter code (no code makes a new room); a fifth is refused (`room_full`).
+Players pick a wizard and role, ready up, and the host starts. The server steps
+each room's sim at 60 Hz from the latest input of each player and sends
+snapshots (20 Hz) with every event since the last one. It validates every
+message (shape, size, element/wizard/role whitelists) and clamps input; a player
+who leaves is removed (the host passes to the next player); an empty room is
+destroyed. Protocol in `src/net/protocol.js`.
+
+### R-082 [planned] The browser joins a room
+Presentation. Lobby screen (room code, names, wizard and role, ready); client
+networking that sends input and applies snapshots to a local game the renderer
+understands, with entity interpolation about 100 ms behind.
+
+### R-083 [planned] Four wizards on screen
+Presentation. One wizard rig per player with a name tag, the camera frames the
+party, a party strip with each wizard's health and energy, revive rings and a
+scoreboard on defeat.
+
+### R-084 [planned] Netcode polish
+Client prediction for the local wizard reconciled with `ack`, snapshot deltas
+(under 8 KB/s per client), reconnecting with the same id for 30 s, a ping
+display, per-player stats on the defeat screen.
