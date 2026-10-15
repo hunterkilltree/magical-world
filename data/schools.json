@@ -3,6 +3,7 @@
   "arcane_archmage": {
    "name": "The Unwritten Canon", "motto": "Every spell is read before it is cast: piercing quills, slow orreries and runes that go off a beat later.",
    "signature": ["fire+fire", "earth+fire+lightning", "ice+water"],
+   "look": {"sigil": "pentacle", "motif": "glyphs", "tint": "#9c72ff"},
    "combos": {
     "arcane+dark": {"name": "Eclipse Orrery", "desc": "A slow orb of arcane and dark that bursts where it lands.", "shape": "boulder", "speed": 9, "explode": 2.4, "mult": 1.57},
     "arcane+dark+water": {"name": "Inkwell Ray", "desc": "A long, thin beam of arcane, dark and water. Weakens.", "shape": "beam", "range": 13, "width": 0.7, "weaken": 2.0, "mult": 1.97},
@@ -68,6 +69,7 @@
   "ember_pyromancer": {
    "name": "Cinderhand's Way", "motto": "If it isn't burning, it isn't finished: everything he mixes goes bang, sometimes on him.",
    "signature": ["arcane+fire", "earth+earth+fire", "arcane+light+lightning"],
+   "look": {"sigil": "candles", "motif": "embers", "tint": "#ff7a2f"},
    "combos": {
     "arcane+arcane": {"name": "Hexkeg", "desc": "A lobbed bomb of pure arcane: a big blast.", "shape": "boulder", "speed": 10, "explode": 2.6, "mult": 1.55},
     "arcane+dark": {"name": "Witchsmoke Gout", "desc": "A wide gout of arcane and dark.", "shape": "cone", "range": 5.5, "arc": 70, "mult": 0.95},
@@ -133,6 +135,7 @@
   "rime_cryomancer": {
    "name": "The Quiet Rime", "motto": "Thin lances, still fields and a hush that freezes.",
    "signature": ["arcane+ice", "fire+water", "light+wind"],
+   "look": {"sigil": "snowflake", "motif": "frost", "tint": "#7dd3fc"},
    "combos": {
     "arcane+arcane": {"name": "Hushed Circle", "desc": "A quiet field of pure arcane that slows everything in it.", "shape": "area", "radius": 3.2, "life": 4.5, "tick": 0.5, "slow": 1.5, "slowPct": 0.4, "mult": 0.4},
     "arcane+dark": {"name": "Vesper Lance", "desc": "A long, thin beam of arcane and dark. Weakens.", "shape": "beam", "range": 12, "width": 0.7, "weaken": 2.0, "mult": 2.0},
@@ -198,6 +201,7 @@
   "stone_druid": {
    "name": "Old Morrow's Lore", "motto": "Boulders, walls, and ground that shoves back.",
    "signature": ["fire+nature", "ice+ice", "lightning+lightning"],
+   "look": {"sigil": "stones", "motif": "grit", "tint": "#76c04a"},
    "combos": {
     "arcane+arcane": {"name": "Crystal Cairn", "desc": "A wall of crystal raised from pure arcane. Reflects shots.", "shape": "wall", "segments": 5, "life": 10, "mat": "crystal", "reflect": true, "hp": 125},
     "arcane+dark": {"name": "Barrow Stomp", "desc": "A stamp, and the ground bursts with arcane and dark a moment later.", "shape": "area", "radius": 3.0, "delay": 0.35, "life": 0.01, "burst": true, "knock": 8, "mult": 4.05},
@@ -261,6 +265,7 @@
   "storm_conduit": {
    "name": "The Voltmark Method", "motto": "Everything conducts: long arcs, rails and relays.",
    "signature": ["fire+fire", "fire+lightning", "water+water"],
+   "look": {"sigil": "whorl", "motif": "sparks", "tint": "#f7e26b"},
    "combos": {
     "arcane+arcane": {"name": "Arcane Wire", "desc": "A long rail of pure arcane.", "shape": "beam", "range": 15, "width": 0.8, "mult": 2.0},
     "arcane+dark": {"name": "Hex Current", "desc": "Arcane and dark arcs between five foes.", "shape": "chain", "range": 9, "jumps": 4, "mult": 0.83},
@@ -325,6 +330,7 @@
   "void_necromancer": {
    "name": "The Hollow Rite", "motto": "What it touches is pulled in, held down or drained.",
    "signature": ["water+water", "wind+wind", "fire+fire"],
+   "look": {"sigil": "knots", "motif": "wisps", "tint": "#a855f7"},
    "combos": {
     "arcane+arcane": {"name": "Hollow Litany", "desc": "A wail of pure arcane that leaves its hearers confused.", "shape": "cone", "range": 6, "arc": 80, "confuse": 1.5, "cd": 1.8, "mult": 0.92},
     "arcane+earth": {"name": "Tomb Hex", "desc": "A slow hex of arcane and earth that bursts on impact.", "shape": "bolt", "speed": 14, "radius": 0.32, "explode": 2.0, "pierce": 1, "mult": 1.32},

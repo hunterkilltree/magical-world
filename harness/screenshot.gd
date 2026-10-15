@@ -1,5 +1,5 @@
 # Renders the main scene in a given state and saves a PNG. Needs a display (a desktop, or xvfb-run).
-# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|matrix|wave|dead|pause|live> <out.png> [wizard_id]
+# Usage: godot --path . --script res://harness/screenshot.gd -- <menu|play|demo|combos|matrix|wave|schools|dead|pause|live> <out.png> [wizard_id]
 # `wave` casts a Tsunami sideways across thralls (SHOT_FRAMES env: frames after the cast, default 22).
 # `live` starts a run and lets the real engine loop (input, physics, waves) go for five seconds.
 extends SceneTree
@@ -9,6 +9,10 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var what: String = args[0] if args.size() > 0 else "menu"
 	var out: String = args[1] if args.size() > 1 else "user://shot.png"
+	if what == "schools":
+		await _schools(out)
+		quit(0)
+		return
 	var main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	main.start()
@@ -128,3 +132,44 @@ func _initialize() -> void:
 	shot.save_png(out)
 	print("saved ", out, " ", shot.get_size())
 	quit(0)
+
+
+# R-070: the same mix cast by each of the six wizards, as a 3 x 2 sheet (SHOT_MIX env, default
+# "fire,water"; SHOT_FRAMES env, frames after the cast, default 10).
+func _schools(out: String) -> void:
+	var mix: String = OS.get_environment("SHOT_MIX") if OS.get_environment("SHOT_MIX") != "" else "fire,water"
+	var n := int(OS.get_environment("SHOT_FRAMES")) if OS.get_environment("SHOT_FRAMES") != "" else 10
+	var ids := ["arcane_archmage", "ember_pyromancer", "rime_cryomancer", "stone_druid", "storm_conduit", "void_necromancer"]
+	var sheet := Image.create(1920, 720, false, Image.FORMAT_RGBA8)
+	var dt := 1.0 / 60.0
+	for i in ids.size():
+		var main = load("res://scenes/main.tscn").instantiate()
+		root.add_child(main)
+		main.start()
+		main.hud._on_pick(ids[i])
+		await process_frame
+		main.new_game("play")
+		main.sim.wave_t = 1e9
+		main.sim.player.pos = Vector2(0, 3)
+		for at in [Vector2(-1, -2.5), Vector2(0.6, -3), Vector2(1.6, -2), Vector2(0, -4.5)]:
+			var e = main.sim.spawn("thrall", at)
+			e.atk_cd = 99
+			e.speed = 0
+		for k in 10:
+			main.tick(dt, {"aim": Vector2(0, -2.5)})
+		var acts := []
+		for el in mix.split(","):
+			acts.append("el:" + el)
+		acts.append("cast")
+		main.tick(dt, {"aim": Vector2(0, -2.5), "actions": acts})
+		for k in n:
+			main.tick(dt, {"aim": Vector2(0, -2.5)})
+		for k in 4:
+			await process_frame
+		var img := root.get_texture().get_image()
+		img.resize(640, 360)
+		sheet.blit_rect(img, Rect2i(0, 0, 640, 360), Vector2i((i % 3) * 640, (i / 3) * 360))
+		main.queue_free()
+		await process_frame
+	sheet.save_png(out)
+	print("saved ", out, " ", sheet.get_size())

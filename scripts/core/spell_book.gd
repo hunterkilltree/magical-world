@@ -9,7 +9,8 @@
 # Books (R-067): spells.json is the court book. Each wizard learned the combos their own way
 # (data/schools.json): single elements are the same for everyone, but every mix of two or three
 # makes that wizard's own spell. Each court spell is kept by exactly one wizard. A school spell's
-# key is "mix@wizard" so it is found, recharged and drawn as its own spell.
+# key is "mix@wizard" so it is found, recharged and drawn as its own spell. Every combo in a
+# wizard's book (their own and the court spells they keep) leans toward their colour (R-070).
 extends RefCounted
 
 const DATA_PATH := "res://data/spells.json"
@@ -17,6 +18,7 @@ const SCHOOLS_PATH := "res://data/schools.json"
 const ORDER := ["fire", "water", "ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"]
 const RANK := ["wall", "area", "beam", "boulder", "chain", "bolt", "cone"]
 # Combo keys that pass straight into the payload (status effects a spell adds on top of its elements).
+const TINT := 0.35 # how far a wizard's combos lean toward their school's tint (R-070)
 const DEF_PAYLOAD := ["slow", "root", "blind", "freeze", "trueDamage", "stun", "silence", "weaken", "inaccurate",
 	"confuse", "slowPct", "energyDrain", "drainPct"]
 
@@ -88,6 +90,12 @@ static func book(id := "") -> Dictionary:
 			var def: Dictionary = own[k].duplicate()
 			def["_key"] = norm(k) + "@" + id
 			b[norm(k)] = def
+		var tint: String = schools()[id].get("look", {}).get("tint", "")
+		if tint != "":
+			for k in b:
+				if "+" in k:
+					b[k] = b[k].duplicate()
+					b[k]["tint"] = tint
 		_books[id] = b
 	return _books[id]
 
@@ -183,7 +191,8 @@ static func make_spell(els: Array, def: Dictionary, power := 1.0, key := "", spe
 	return {
 		"key": key, "def": def, "name": spell_name, "els": sorted_els, "counts": counts, "power": power,
 		"payload": pl, "cost": roundi(sorted_els.size() * 8 * float(sh["cost"])),
-		"cd": float(def.get("cd", sh["cd"])), "color": mix_color(counts),
+		"cd": float(def.get("cd", sh["cd"])),
+		"color": mix_color(counts).lerp(Color(def["tint"]), TINT) if def.has("tint") else mix_color(counts),
 	}
 
 

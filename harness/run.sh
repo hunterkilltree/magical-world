@@ -5,7 +5,7 @@
 #   harness/run.sh test [filter]  run tests/test_*.gd
 #   harness/run.sh reqs           every active/done requirement in story/STORY.md has a test
 #   harness/run.sh story          run tests, regenerate story/progress.md
-#   harness/run.sh shot WHAT OUT render a frame to a PNG (a desktop, or xvfb-run); WHAT = menu | play | demo | wave | pause | dead  [WIZARD_ID]
+#   harness/run.sh shot WHAT OUT render a frame to a PNG (a desktop, or xvfb-run); WHAT = menu | play | demo | wave | schools | pause | dead  [WIZARD_ID]
 #   harness/run.sh all            check + boot + reqs + story
 # Set GODOT=/path/to/godot if it is not on PATH as godot or godot4.
 set -u
