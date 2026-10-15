@@ -67,6 +67,7 @@ var dead_kicker: Label
 var dead_stats: GridContainer
 var blurb_label: Label
 var school_label: Label # R-068: the chosen wizard's school and a few of their own combos
+var start_button: Button # "Enter the court", in the middle of the screen (R-047)
 
 var vig := 0.0
 var toast_t := 0.0
@@ -400,6 +401,7 @@ func _build_menu() -> void:
 	p.offset_right = -32
 	p.offset_top = -344
 	p.offset_bottom = 344
+	p.grow_vertical = Control.GROW_DIRECTION_BOTH # a long card stays centred instead of running off the bottom
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 5)
@@ -437,7 +439,12 @@ func _build_menu() -> void:
 		ctl.add_child(_label(pair[0], 11))
 		ctl.add_child(_label(pair[1], 11, DIM))
 	v.add_child(ctl)
-	v.add_child(_button("Enter the court", _on_start))
+	# The start button stands alone in the middle of the screen, not at the foot of the card.
+	start_button = _button("Enter the court", _on_start)
+	start_button.custom_minimum_size = Vector2(280, 64)
+	start_button.add_theme_font_size_override("font_size", 24)
+	menu_screen.add_child(start_button)
+	_center(start_button)
 	_set_who()
 
 

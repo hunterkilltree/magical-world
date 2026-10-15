@@ -24,6 +24,20 @@ func test_the_menu_picks_a_wizard_and_starts() -> void:
 	assert_eq(main.hud.who_name.text.strip_edges(), "Kessa Voltmark")
 
 
+func test_the_start_button_stands_in_the_middle_of_the_screen() -> void:
+	main = M.make(tree, "menu")
+	var b: Button = main.hud.start_button
+	assert_eq(b.get_parent(), main.hud.menu_screen, "on the screen itself, not at the foot of the wizard card")
+	for a in [b.anchor_left, b.anchor_right, b.anchor_top, b.anchor_bottom]:
+		assert_eq(a, 0.5, "anchored at the centre")
+	assert_eq(b.grow_horizontal, Control.GROW_DIRECTION_BOTH)
+	assert_eq(b.grow_vertical, Control.GROW_DIRECTION_BOTH)
+	assert_eq(b.text, "Enter the court")
+	b.pressed.emit()
+	M.frames(main, 1)
+	assert_eq(main.sim.mode, "play", "it starts the run")
+
+
 func test_the_hud_shows_queue_spell_and_numbers() -> void:
 	main = M.make(tree)
 	M.frames(main, 1, {"actions": ["el:fire", "el:lightning"]})
