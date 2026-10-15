@@ -80,6 +80,15 @@ a random or auto-generated name.
   dummies): damage per energy = the court's rate for the shape x how hard the elements hit (`Bench.target`); walls hold
   the court's median health. After changing a school spell, `godot --headless --path . --script
   res://harness/calibrate_schools.gd` prints the `mult` it needs. A school field must not both burn and root.
+- School looks (R-070, after Cunningham's elemental magic): each school's `look` in `schools.json` (`sigil`, `motif`,
+  `tint` = the wizard's glow). `scripts/vfx/school_looks.gd` holds the recipes the director calls: the school's circle
+  in place of the court rune for every multi-element cast (and on the queue, new-spell, area and nova stamps), the
+  motif on the staff, along shots, beams and cones and where spells land, and `quarters` (every combo, any book: earth
+  and nature north, air east, fire and light south, water and ice west, arcane and dark at the heart). Circles are
+  painted in `vfx_textures.sigil(kind)`. `SpellBook` leans every combo in a wizard's book 35% toward the tint; single
+  elements and the court book (`""`, so the old VFX tests) are unchanged. Motes carry `o.tag` (`school:<motif>`,
+  `quarter:<el>`) for tests; `director.last_sigil` names the last circle. `harness/run.sh shot schools OUT` (SHOT_MIX,
+  SHOT_FRAMES) renders one mix cast by all six wizards side by side.
 - Ten elements (R-050 to R-054): the handoff's six plus nature/wind/light/dark from the original Grauhold Reach list
   (keys 7, 8, 9, 0). The handoff's own spell numbers are untouched; the new elements, combos (74 in all; every pair and
   double has one) and enemy resists for them are our own tuning, not playtested. Combo keys that add status to a

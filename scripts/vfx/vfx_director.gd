@@ -12,6 +12,7 @@ const ScreenFx := preload("res://scripts/vfx/screen_fx.gd")
 const Bolt := preload("res://scripts/vfx/lightning_bolt.gd")
 const WaveSheet := preload("res://scripts/vfx/wave_sheet.gd")
 const SpellBook := preload("res://scripts/core/spell_book.gd")
+const SchoolLooks := preload("res://scripts/vfx/school_looks.gd")
 const FIREBALL := preload("res://shaders/fireball.gdshader")
 const DOME := preload("res://shaders/shockwave_dome.gdshader")
 const STRIP := preload("res://shaders/energy_strip.gdshader")
@@ -51,6 +52,8 @@ var _ramps: Dictionary = {}
 var _quad: PlaneMesh
 var _column: Mesh
 var _ready_done := false
+var _book := "" # the caster's spell book, set per event (R-070: their school's look)
+var last_sigil := "" # tests: the circle the last cast drew ("rune" or a school's sigil)
 
 
 func setup(arena_view) -> void:
@@ -379,7 +382,7 @@ func jet(x: float, z: float, r: float) -> void:
 
 # ---------------------------------------------------------------- primitives (wow.js)
 func rune(x: float, z: float, c: Color, r: float, life: float, opt := {}) -> MeshInstance3D:
-	var m := _additive(c, opt.get("k", 2.2), textures.rune())
+	var m := _additive(c, opt.get("k", 2.2), opt.get("tex", textures.rune()))
 	m.albedo_color.a = 0
 	var g := K.put(self, _quad, m, [x, opt.get("y", 0.05), z], [0, randf() * TAU, 0], null, false)
 	var spin: float = opt.get("spin", 2.5)
@@ -631,6 +634,11 @@ func release(e: Dictionary, tip, tier: float) -> void:
 		var at: Vector2 = e["pos"]
 		dust_ring(at.x, at.y, 1.2, roundi(8 + 4 * tier), 4 + tier, "mist" if els.has("ice") else "dust")
 		shell(Vector3(at.x, 0, at.y), 1.6 + tier * 0.4, c, 0.35, true, 1.6)
+	# the school's motif leaves the staff with the spell (R-070)
+	if e["els"].size() >= 2:
+		var look := SchoolLooks.look_of(_book)
+		if not look.is_empty():
+			SchoolLooks.motif(self, look, f, 5, 0.25)
 
 
 func blast(e: Dictionary) -> void:
@@ -878,12 +886,22 @@ func cast_fx(e: Dictionary) -> void:
 	var combo := distinct >= 2
 	var tier := tier_of(e)
 	var c: Color = e["color"]
+	# R-070: a wizard's combos draw their school's circle; single elements and the court book the rune
+	var look := SchoolLooks.look_of(_book) if e["els"].size() >= 2 else {}
 	if not e.get("from_queue", true):
-		if combo:
+		if not look.is_empty():
+			SchoolLooks.sigil(self, at, look, c, tier, true)
+		elif combo:
 			rune(at.x, at.y, c, 1.3, 0.35, {"a": 0.5, "spin": 5.0})
 		_sig(e["key"], "cast", e)
 		return
-	rune(at.x, at.y, c, 1.1 + tier * 0.45, 0.55 + tier * 0.1, {"spin": 4 + tier, "r0": 0.5})
+	if look.is_empty():
+		rune(at.x, at.y, c, 1.1 + tier * 0.45, 0.55 + tier * 0.1, {"spin": 4 + tier, "r0": 0.5})
+		last_sigil = "rune"
+	else:
+		SchoolLooks.sigil(self, at, look, c, tier)
+	if e["els"].size() >= 2:
+		SchoolLooks.quarters(self, at, e["els"])
 	if tier >= 1.3:
 		# lower intensity than other columns: it stacks with the rune, flare and sparks on the caster
 		column(at.x, at.y, c, 0.35 + 0.18 * tier, 4 + tier * 2.2, 0.4 + tier * 0.05, {"k": 1.4})
@@ -897,7 +915,7 @@ func cast_fx(e: Dictionary) -> void:
 	if combo and e.get("is_new", false):
 		screen.wave(Vector3(at.x, 1, at.y), 0.8)
 		punch(0.4, -2.5, 0.2)
-		rune(at.x, at.y, GOLD, 3.2, 1.1, {"spin": -2.0, "r0": 1.0, "a": 0.7})
+		rune(at.x, at.y, GOLD, 3.2, 1.1, {"spin": -2.0, "r0": 1.0, "a": 0.7, "tex": _circle(_book if not look.is_empty() else "")})
 	_sig(e["key"], "cast", e)
 
 
@@ -1200,6 +1218,9 @@ static func _distinct(els: Array) -> Array:
 
 # ---------------------------------------------------------------- events
 func on_event(e: Dictionary, sim) -> void:
+	if sim != null and sim.player != null:
+		_book = sim.player.book
+	_school_accent(e)
 	match e["type"]:
 		"queue":
 			var p = sim.player
@@ -1212,7 +1233,7 @@ func on_event(e: Dictionary, sim) -> void:
 					particles.spark(_spark_of(e["el"]), _last_tip, Vector3(cos(a), randf_range(0.2, 1), sin(a)) * 2.5)
 			var q: Array = p.queue
 			if _distinct(q).size() >= 2 and q[q.size() - 1] == e["el"]:
-				rune(p.pos.x, p.pos.y, SpellBook.resolve(q, p.book)["color"], 1.7, 0.45, {"r0": 0.6, "spin": 6.0, "a": 0.8})
+				rune(p.pos.x, p.pos.y, SpellBook.resolve(q, p.book)["color"], 1.7, 0.45, {"r0": 0.6, "spin": 6.0, "a": 0.8, "tex": _circle(p.book)})
 				punch(0.15)
 		"cast":
 			cast_fx(e)
@@ -1223,7 +1244,7 @@ func on_event(e: Dictionary, sim) -> void:
 			shell(Vector3(at.x, 0, at.y), e["r"] * 1.15, e["color"], 0.35, true)
 			screen.wave(Vector3(at.x, 0.5, at.y), 0.5)
 			punch(0.3, -1)
-			rune(at.x, at.y, e["color"], e["r"], 0.6, {"spin": 5.0})
+			rune(at.x, at.y, e["color"], e["r"], 0.6, {"spin": 5.0, "tex": _circle(SchoolLooks.book_of(String(e.get("key", "")), _book))})
 		"explode":
 			explode_fx(e)
 			blast(e)
@@ -1239,7 +1260,8 @@ func on_event(e: Dictionary, sim) -> void:
 			if e["key"] == "water_pool":
 				return # a Tsunami's pool: the wave's crash and foam already mark it (`wave`)
 			area_start(e)
-			rune(e["pos"].x, e["pos"].y, e["color"], e["r"], e["delay"] + 0.6, {"r0": e["r"] * 0.3, "spin": 3.0, "a": 0.7})
+			rune(e["pos"].x, e["pos"].y, e["color"], e["r"], e["delay"] + 0.6, {"r0": e["r"] * 0.3, "spin": 3.0, "a": 0.7,
+				"tex": _circle(SchoolLooks.book_of(String(e["key"]), _book))})
 			_sig(e["key"], "area", e)
 		"wall":
 			wall_fx(e)
@@ -1345,6 +1367,50 @@ func on_event(e: Dictionary, sim) -> void:
 			screen.wave(Vector3(e["pos"].x, 1, e["pos"].y), 1.0)
 			punch(0.8, 3)
 			screen.screen_flash(Color("#ef4444"), 0.12)
+
+
+# The circle a book stamps: its school's own (R-070), or the court's rune.
+func _circle(book: String) -> Texture2D:
+	var look := SchoolLooks.look_of(book)
+	return textures.rune() if look.is_empty() else SchoolLooks.circle_texture(self, look)
+
+
+# R-070: where a school's spell lands, its motif marks the spot a beat later; a beam or a cone also
+# carries the motif along its length.
+func _school_accent(e: Dictionary) -> void:
+	var type: String = e["type"]
+	if not type in ["impact", "explode", "beam", "chain", "cone", "area", "wall", "nova"] or e.get("enemy", false):
+		return
+	var look := SchoolLooks.look_of(SchoolLooks.book_of(String(e.get("key", "")), _book))
+	if look.is_empty():
+		return
+	match type:
+		"impact":
+			if e.get("r", 0.0) <= 0.0: # an exploding shot marks its blast instead
+				SchoolLooks.accent(self, look, Vector3(e["pos"].x, 1.0, e["pos"].y), 0.6)
+		"explode", "area", "nova":
+			if type != "area" or e.get("delay", 0.0) <= 0.0: # a delayed burst marks its blast
+				SchoolLooks.accent(self, look, Vector3(e["pos"].x, 0.6, e["pos"].y), e.get("r", 1.0) * 0.5)
+		"wall":
+			SchoolLooks.accent(self, look, Vector3(e["pos"].x, 0.6, e["pos"].y), 1.0)
+		"chain":
+			var pts: Array = e["pts"]
+			for i in range(1, mini(pts.size(), 5)):
+				SchoolLooks.accent(self, look, Vector3(pts[i].x, 1.0, pts[i].y), 0.5)
+		"beam":
+			var a: Vector2 = e["from"]
+			var b: Vector2 = e["to"]
+			for i in 5:
+				var k := (i + randf()) / 5.0
+				SchoolLooks.motif(self, look, Vector3(lerpf(a.x, b.x, k), 1.1, lerpf(a.y, b.y, k)), 1, 0.2)
+			SchoolLooks.accent(self, look, Vector3(b.x, 1.1, b.y), 0.6)
+		"cone":
+			var d: Vector2 = e["dir"]
+			var half := deg_to_rad(float(e["arc"])) / 2.0
+			for i in 5:
+				var a := atan2(d.y, d.x) + randf_range(-half, half)
+				var p: Vector2 = e["pos"] + Vector2(cos(a), sin(a)) * float(e["range"]) * randf_range(0.6, 0.95)
+				SchoolLooks.motif(self, look, Vector3(p.x, 0.8, p.y), 1, 0.2)
 
 
 func reset() -> void:
@@ -1516,7 +1582,8 @@ func _update_trails(sim, dt: float) -> void:
 			node.add_child(cm)
 			tr = {"pts": [], "node": node, "gm": gm, "cm": cm, "w": w, "dying": 0.0, "last": null,
 				"hot": player_shot and b.els.has("fire"), "arc": player_shot and b.els.has("arcane"), "dusty": b.kind == "boulder",
-				"prism": player_shot and b.sp.get("key", "") == "arcane+ice", "combo": player_shot and b.sp.get("counts", {}).size() >= 2}
+				"prism": player_shot and b.sp.get("key", "") == "arcane+ice", "combo": player_shot and b.sp.get("counts", {}).size() >= 2,
+				"look": SchoolLooks.look_of(SchoolLooks.book_of(String(b.sp.get("key", "")), sim.player.book)) if player_shot else {}}
 			trails[b.id] = tr
 		var at := Vector3(b.pos.x, y, b.pos.y)
 		tr["pts"].push_front(at)
@@ -1532,6 +1599,9 @@ func _update_trails(sim, dt: float) -> void:
 		if tr["dusty"] and not tr["hot"]:
 			for i in _rate(8.0, dt):
 				particles.sprite("dust", at - Vector3(0, 0.3, 0), Vector3(0, 0.3, 0), {"k": 0.5})
+		if not tr["look"].is_empty():
+			for i in _rate(20.0, dt):
+				SchoolLooks.motif(self, tr["look"], at, 1, 0.12)
 		if tr["prism"]:
 			for i in _rate(50.0, dt):
 				var c := Color.from_hsv(fmod(t * 1.5 + b.id * 0.13 + randf() * 0.2, 1.0), 0.6, 1.0)

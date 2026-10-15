@@ -364,3 +364,28 @@ nova, and draws through the real view without an error.
 Core. The menu card names the chosen wizard's school; the spell preview, the
 cast and the pause grimoire use that wizard's book, with their own spells and
 the court spells they keep, and "spells found" counts against it.
+
+## The look of each school
+
+The elemental-magic tradition (after Scott Cunningham's *Earth Power* and
+*Earth, Air, Fire & Water*: the four elements and spirit, their quarters and
+colours, and natural magic worked with stones, candles, ice, wind, written signs
+and knotted cords) gives each wizard's combos a look of their own, so the same
+mix cast by two wizards no longer looks the same. Single elements stay shared.
+
+### R-070 [done] Each school's spells look like that school
+Core. Each school has a look in `data/schools.json` (a circle, a motif and a
+tint, its wizard's glow): Aldric draws a five-pointed star for the five
+elements with three small runes circling it and leaves glyphs; Brann lights a
+ring of candle flames that gutter into smoke and leaves embers; Vela grows a
+six-fold frost crystal with a mirror glint and leaves frost; Morrow raises a
+ring of standing stones on a sand circle and leaves grit; Kessa spins a wind
+whorl that throws small forks and leaves sparks; the Hollow Warden draws a
+knotted cord that tightens inward and leaves sinking wisps. A combo's colour
+leans 35% toward its caster's glow (court spells they keep too); single
+elements keep the shared rune and colour. The motif rides the projectile and
+marks where the spell lands. Every combo, from any book, lights its elements'
+quarters of the circle: earth and nature in the north (up the screen), air
+(wind, lightning) in the east, fire and light in the south, water and ice in
+the west, arcane and dark at the heart. A school combo stays within a third of
+the particle pools.

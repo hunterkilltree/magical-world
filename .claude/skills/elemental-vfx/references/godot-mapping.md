@@ -14,6 +14,7 @@ the combinations-and-effects matrix work (R-055 to R-059).
 | Screen | `scripts/vfx/screen_fx.gd` | `wave` (shockwave distortion), `heat` (haze), `punch` (chromatic), `screen_flash` (capped by `FLASH_CAP` 0.18) |
 | Lightning | `scripts/vfx/lightning_bolt.gd` | Fractal bolt ribbons |
 | Matrix looks | `scripts/vfx/matrix_visuals.gd` | Per-area `def.visual` from `spells.json` |
+| School looks | `scripts/vfx/school_looks.gd` | Per-wizard circle, motif, landing accent and element quarters (R-070); `look` in `schools.json` |
 | Textures | `scripts/vfx/vfx_textures.gd` | Painted rune/glow/beam/decal textures |
 | View | `scripts/arena/arena_view.gd` | Camera, shake; VFX only reads the sim |
 
