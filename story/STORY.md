@@ -138,7 +138,8 @@ player, follows them and leans 15% toward the cursor; the mouse aims by a ray
 onto the ground. Pillars between the camera and the player fade.
 
 ### R-047 [done] HUD, menu, pause and death screens
-Core. The menu picks one of the six wizards and starts. The HUD shows health
+Core. The menu picks one of the six wizards and starts from a button in the
+middle of the screen. The HUD shows health
 and energy, the three queue slots, the spell the queue will cast (shape, name
 in its colour, cost), the element keys 1 to 6, cooldown tiles (cast, area,
 self, dodge), your statuses, and wave / left / kills / score; toasts explain
