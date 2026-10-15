@@ -42,8 +42,16 @@ export function createCastFx({ vfx, glow, flash, ringFx, body, api }) {
         for (let i = 0; i < 10; i++) S('pollen', x + rnd(-R, R) * 0.5, 0.2, z + rnd(-R, R) * 0.5, rnd(-1, 1), rnd(1, 2.5), rnd(-1, 1), { k: 1 });
         break;
       case 'wind':
-        vfx.dustRing(x, z, R * 0.8, 22, 9);
-        for (let i = 0; i < 24; i++) { const a = (i / 24) * 6.28; K('wind', x, 0.5, z, Math.sin(a) * 12, 0.3, Math.cos(a) * 12); }
+        vfx.dustRing(x, z, R * 1.0, 28, 12);
+        api.groundGlow(x, z, 0xeaf6ff, R * 1.2, 0.5, 1.2);
+        for (let i = 0; i < 32; i++) {
+          const a = (i / 32) * 6.28;
+          K('wind', x, 0.4, z, Math.sin(a) * (10 + 6 * k), 0.3, Math.cos(a) * (10 + 6 * k));
+        }
+        for (let i = 0; i < 14; i++) {
+          const a = Math.random() * 6.28, sp = 5 + Math.random() * 8;
+          puff('smoke', x, 0.6, z, Math.sin(a) * sp, 0.4 + Math.random() * 0.8, Math.cos(a) * sp, { size: 1.2, life: 0.45, c0: [0.9, 0.95, 1.0], c1: [0.8, 0.88, 0.95] });
+        }
         break;
       case 'light': api.beam(x, z, 0xfff1a8, R * 0.25, 6, 0.4, { k: 1.8 }); vfx.radialSparks('light', x, 0.3, z, Math.round(20 * k), 4, 11, 0.7); break;
       case 'dark':

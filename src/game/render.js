@@ -24,7 +24,11 @@ const STYLE = {
   smoke:     { sys: 'dust', mo: 3, life: [0.8, 1.5], size: [0.4, 1.3], grav: -1.8, drag: 1.5, cols: cols(0x3a3440, 0x2a2630), alpha: 0.5 },
   spark:     { sys: 'glow', life: [0.15, 0.35], size: [0.12, 0.02], grav: 9, drag: 1, cols: cols(0xffffff, 0xffe2a0) },
   blood:     { sys: 'dust', life: [0.4, 0.7], size: [0.14, 0.08], grav: 14, drag: 0.5, cols: cols(0x4a1f1f, 0x2e1414) },
-  rune:      { sys: 'glow', life: [0.5, 1.0], size: [0.22, 0.04], grav: -2, drag: 2, cols: cols(0xff5050, 0xff2a2a, 0xff8a6a) }
+  rune:      { sys: 'glow', life: [0.5, 1.0], size: [0.22, 0.04], grav: -2, drag: 2, cols: cols(0xff5050, 0xff2a2a, 0xff8a6a) },
+  wind:      { sys: 'dust', mo: 3, life: [0.5, 0.9], size: [0.4, 1.4], grav: -0.6, drag: 1.2, cols: cols(0xffffff, 0xeaf6ff, 0xcbe9ff), alpha: 0.7 },
+  nature:    { sys: 'glow', life: [0.4, 0.7], size: [0.22, 0.06], grav: 2, drag: 2, cols: cols(0xa8f590, 0x5cc84a, 0x2e8a20) },
+  light:     { sys: 'glow', life: [0.35, 0.7], size: [0.3, 0.05], grav: -1, drag: 2.5, cols: cols(0xffffff, 0xfff6c8, 0xffd966) },
+  dark:      { sys: 'glow', life: [0.45, 0.8], size: [0.32, 0.06], grav: -1, drag: 2.5, cols: cols(0xd8a0ff, 0x8a3ad0, 0x3a0a6a) }
 };
 const TAGS = {
   steam: ['STEAM', '#e8eef4'], freeze: ['FROZEN', '#a8ecff'], shatter: ['SHATTER', '#ffffff'], conduct: ['CONDUCTED ×2', '#f4e15c'],
