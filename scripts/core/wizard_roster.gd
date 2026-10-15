@@ -1,6 +1,6 @@
 # The six playable wizards (data/wizards.json): name, role, blurb and the look the 3D model is
-# built from (robe/trim/glow colours, hat, beard, held prop). The choice is cosmetic: every
-# wizard plays by the same rules.
+# built from (robe/trim/glow colours, hat, beard, held prop). The look is cosmetic; what a
+# wizard's combos make is their school's (R-067: SpellBook.book(id), data/schools.json).
 extends RefCounted
 
 const DATA_PATH := "res://data/wizards.json"

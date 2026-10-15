@@ -86,6 +86,7 @@ class Body:
 	var hit_done := false
 	# player
 	var wizard := ""
+	var book := "" # whose spell book the combos come from (R-067); "" is the court book
 	var alive := true
 	var energy := 0.0
 	var max_energy := 0.0
@@ -226,6 +227,7 @@ func _init(wizard_id := "ember_pyromancer", seed_value := -1) -> void:
 	player.id = 0
 	player.kind = "player"
 	player.wizard = wizard_id
+	player.book = wizard_id
 	player.pos = Vector2(0, 3.5)
 	player.r = TUNING["r"]
 	player.mass = 1.2
@@ -383,7 +385,7 @@ func _cast(inp: Dictionary, cmode: String, held: bool) -> void:
 	var slot := "cast" if cmode == "aim" else cmode
 	if p.cd[slot] > 0:
 		return
-	var sp := SpellBook.resolve(q)
+	var sp := SpellBook.resolve(q, p.book)
 	if sp.is_empty():
 		p.queue = []
 		_ev("fizzle", {"pos": p.pos})

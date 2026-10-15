@@ -5,9 +5,15 @@
 # every element (fire, fire, fire is Supernova at +30%), else the distinct elements' key with
 # +30% power per repeat, else (three distinct, no entry) the highest-ranked pair with the third
 # element riding along at x1.15. Fire and ice, and light and dark, cancel when queued.
+#
+# Books (R-067): spells.json is the court book. Each wizard learned the combos their own way
+# (data/schools.json): single elements are the same for everyone, but every mix of two or three
+# makes that wizard's own spell. Each court spell is kept by exactly one wizard. A school spell's
+# key is "mix@wizard" so it is found, recharged and drawn as its own spell.
 extends RefCounted
 
 const DATA_PATH := "res://data/spells.json"
+const SCHOOLS_PATH := "res://data/schools.json"
 const ORDER := ["fire", "water", "ice", "lightning", "earth", "arcane", "nature", "wind", "light", "dark"]
 const RANK := ["wall", "area", "beam", "boulder", "chain", "bolt", "cone"]
 # Combo keys that pass straight into the payload (status effects a spell adds on top of its elements).
@@ -16,6 +22,8 @@ const DEF_PAYLOAD := ["slow", "root", "blind", "freeze", "trueDamage", "stun", "
 
 static var _data: Dictionary = {}
 static var _book: Dictionary = {} # sorted "a+b" key -> combo def
+static var _schools = null
+static var _books: Dictionary = {} # wizard id -> its whole book (court book with its school's combos over it)
 
 
 static func data() -> Dictionary:
@@ -54,16 +62,47 @@ static func norm(key: String) -> String:
 	return "+".join(PackedStringArray(parts))
 
 
-static func book() -> Dictionary:
+# wizard id -> {name, motto, combos: {mix: def}} from data/schools.json.
+static func schools() -> Dictionary:
+	if _schools == null:
+		_schools = {}
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(SCHOOLS_PATH))
+		if parsed is Dictionary:
+			_schools = parsed["schools"]
+	return _schools
+
+
+static func school(id: String) -> Dictionary:
+	return schools().get(id, {})
+
+
+# The combos `id` casts from: sorted mix -> def. "" (or an unknown id) is the court book.
+static func book(id := "") -> Dictionary:
 	data()
-	return _book
+	if not schools().has(id):
+		return _book
+	if not _books.has(id):
+		var b := _book.duplicate()
+		var own: Dictionary = schools()[id]["combos"]
+		for k in own:
+			var def: Dictionary = own[k].duplicate()
+			def["_key"] = norm(k) + "@" + id
+			b[norm(k)] = def
+		_books[id] = b
+	return _books[id]
 
 
-# Every combo once, for the pause screen's grimoire: {key, els, def}.
-static func grimoire() -> Array:
+# The key a book's entry casts under: the mix for court spells, "mix@wizard" for school spells.
+static func key_of(b: Dictionary, mix: String) -> String:
+	return b[mix].get("_key", mix)
+
+
+# Every combo of a book once, for the pause screen's grimoire: {key, mix, els, def, own}.
+static func grimoire(id := "") -> Array:
 	var out := []
-	for k in book():
-		out.append({"key": k, "els": Array(k.split("+")), "def": book()[k]})
+	var b := book(id)
+	for k in b:
+		out.append({"key": key_of(b, k), "mix": k, "els": Array(k.split("+")), "def": b[k], "own": b[k].has("_key")})
 	return out
 
 
@@ -148,8 +187,8 @@ static func make_spell(els: Array, def: Dictionary, power := 1.0, key := "", spe
 	}
 
 
-# The spell `queue` casts, or {} if it makes none.
-static func resolve(queue: Array) -> Dictionary:
+# The spell `queue` casts from `book_id`'s book, or {} if it makes none.
+static func resolve(queue: Array, book_id := "") -> Dictionary:
 	if queue.is_empty():
 		return {}
 	var els := queue.duplicate()
@@ -160,14 +199,14 @@ static func resolve(queue: Array) -> Dictionary:
 		if not distinct.has(e):
 			distinct.append(e)
 	var dkey := "+".join(PackedStringArray(distinct))
-	var b := book()
+	var b := book(book_id)
 	if b.has(exact):
-		return make_spell(els, b[exact], 1.0, exact)
+		return make_spell(els, b[exact], 1.0, key_of(b, exact))
 	if els.size() == 3 and distinct.size() == 1 and b.has(els[0] + "+" + els[0]):
 		var pair: String = els[0] + "+" + els[0]
-		return make_spell(els, b[pair], 1.3, pair)
+		return make_spell(els, b[pair], 1.3, key_of(b, pair))
 	if b.has(dkey):
-		return make_spell(els, b[dkey], 1.0 + 0.3 * (els.size() - distinct.size()), dkey)
+		return make_spell(els, b[dkey], 1.0 + 0.3 * (els.size() - distinct.size()), key_of(b, dkey))
 	var best := ""
 	for i in distinct.size():
 		for j in range(i + 1, distinct.size()):
@@ -180,4 +219,4 @@ static func resolve(queue: Array) -> Dictionary:
 	for e in distinct:
 		if not best.split("+").has(e):
 			riders.append(element(e)["name"])
-	return make_spell(els, b[best], 1.15, best, "%s + %s" % [b[best]["name"], ", ".join(PackedStringArray(riders))])
+	return make_spell(els, b[best], 1.15, key_of(b, best), "%s + %s" % [b[best]["name"], ", ".join(PackedStringArray(riders))])

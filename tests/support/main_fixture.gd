@@ -1,4 +1,5 @@
-# Builds the real main scene under the test tree, in play mode with the first wave held back.
+# Builds the real main scene under the test tree, in play mode with the first wave held back,
+# casting from the court book (R-067) until a wizard is picked.
 extends RefCounted
 
 const DT := 1.0 / 60.0
@@ -10,6 +11,7 @@ static func make(tree: SceneTree, mode := "play"):
 	main.start()
 	main.new_game(mode)
 	main.sim.wave_t = 1e9
+	main.sim.player.book = ""
 	return main
 
 

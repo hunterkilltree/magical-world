@@ -1099,7 +1099,7 @@ func _update_reticle(sim: ArenaSim) -> void:
 	if not playing:
 		return
 	var queued := not p.queue.is_empty()
-	var sp := SpellBook.resolve(p.queue if queued else p.last)
+	var sp := SpellBook.resolve(p.queue if queued else p.last, p.book)
 	var col: Color = sp["color"] if not sp.is_empty() else Color.WHITE
 	ret_dim = not sp.is_empty() and (p.energy < sp["cost"] or p.shape_cd.get(ArenaSim.recharge_key(sp), 0.0) > 0)
 	var dim := 0.4 if ret_dim else 1.0

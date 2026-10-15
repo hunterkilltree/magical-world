@@ -1212,7 +1212,7 @@ func on_event(e: Dictionary, sim) -> void:
 					particles.spark(_spark_of(e["el"]), _last_tip, Vector3(cos(a), randf_range(0.2, 1), sin(a)) * 2.5)
 			var q: Array = p.queue
 			if _distinct(q).size() >= 2 and q[q.size() - 1] == e["el"]:
-				rune(p.pos.x, p.pos.y, SpellBook.resolve(q)["color"], 1.7, 0.45, {"r0": 0.6, "spin": 6.0, "a": 0.8})
+				rune(p.pos.x, p.pos.y, SpellBook.resolve(q, p.book)["color"], 1.7, 0.45, {"r0": 0.6, "spin": 6.0, "a": 0.8})
 				punch(0.15)
 		"cast":
 			cast_fx(e)
@@ -1451,7 +1451,7 @@ func _update_charge(dt: float, sim, tip) -> void:
 	var active: bool = p != null and (sim.mode == "play" or sim.mode == "paused") and p.alive
 	var q: Array = p.queue if active else []
 	var n := q.size()
-	var sp := SpellBook.resolve(q) if n > 0 else {}
+	var sp := SpellBook.resolve(q, p.book) if n > 0 else {}
 	var c: Color = sp["color"] if not sp.is_empty() else Color.WHITE
 	var combo := _distinct(q).size() >= 2
 	_charge_s += ([0.0, 0.95, 1.35, 1.8][mini(n, 3)] - _charge_s) * minf(1.0, dt * 12)
