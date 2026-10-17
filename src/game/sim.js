@@ -319,7 +319,8 @@ const CAST = {
     for (const o of envList(s)) if (inside(o, o.r)) envHit(s, o, sp.els, false);
     if (d.deflect) for (const b of s.shots) if (b.owner === 'enemy' && inside(b, b.r)) { b.dead = true; ev(s, 'deflect', { x: b.x, z: b.z }); }
     if (d.pool) addPool(s, p.x + dx * range * 0.55, p.z + dz * range * 0.55, d.pool);
-    ev(s, 'cone', { pid: p.id, x: p.x, z: p.z, dx, dz, range, arc: d.arc ?? 50, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
+    if (d.channel) sprayStart(s, sp, p);
+    ev(s, 'cone', { pid: p.id, x: p.x, z: p.z, dx, dz, range, arc: d.arc ?? 50, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier, channel: d.channel });
   },
   bolt(s, sp, p, dx, dz) {
     const d = sp.def, n = d.count ?? 1, spread = ((d.spread ?? 0) * Math.PI) / 180, speed = d.speed ?? 20;
@@ -339,6 +340,7 @@ const CAST = {
   },
   chain(s, sp, p, dx, dz, aimDist) {
     const d = sp.def, range = d.range ?? 7.5;
+    if (d.forks) return forkChain(s, sp, p, dx, dz, aimDist);
     let first = null, best = Infinity;
     for (const e of live(s)) {
       const vx = e.x - p.x, vz = e.z - p.z, L = Math.hypot(vx, vz);
@@ -548,6 +550,63 @@ function scatterPt(a) {
   return clampIn(a.x + Math.sin(ang) * r, a.z + Math.cos(ang) * r, BOUND - 0.5);
 }
 
+// Mines (area + mine): a rune that lies armed until an enemy comes near, then goes off after a short fuse as a normal burst.
+function updateMine(s, a, dt) {
+  a.life -= dt;
+  a.mine.arm -= dt;
+  if (a.mine.arm > 0 || a.life <= 0) return;
+  if (!live(s).some((e) => Math.hypot(e.x - a.x, e.z - a.z) < a.mine.trig + e.r)) return;
+  a.mine.fired = true;
+  a.delay = a.delayMax = a.mine.fuse;
+  ev(s, 'mineTrip', { id: a.id, x: a.x, z: a.z, r: a.r, key: a.key, els: a.els, color: a.color });
+}
+
+// Sprays (cone + channel): the jet follows the caster for a while, hurting what stands in the cone.
+function sprayStart(s, sp, p) {
+  const d = sp.def, range = d.range ?? 5;
+  s.areas.push({ id: s.nid++, x: p.x, z: p.z, r: 0.01, life: d.channel, max: d.channel, tick: d.tick ?? 0.12, tickT: d.tick ?? 0.12,
+    delay: 0, delayMax: 0, burst: false, repeat: 1, interval: 0, scatter: 0, n: 0, els: sp.els, color: sp.color, key: sp.key, name: sp.name,
+    tier: sp.tier, sp, pid: p.id, spray: { range, cos: Math.cos(((d.arc ?? 50) * Math.PI) / 360) } });
+}
+
+function updateSpray(s, a, dt) {
+  const p = byId(s, a.pid);
+  if (!p || !p.alive) { a.life = 0; return; }
+  a.life -= dt;
+  a.x = p.x; a.z = p.z;
+  a.tickT -= dt;
+  if (a.tickT > 0) return;
+  a.tickT = a.tick;
+  const { range, cos } = a.spray, pl = { ...a.sp.payload, knock: 0 };
+  for (const e of live(s)) {
+    const vx = e.x - p.x, vz = e.z - p.z, L = Math.hypot(vx, vz);
+    if (L > range + e.r || (L > e.r + 0.4 && (vx * p.fx + vz * p.fz) / L < cos)) continue;
+    applyPayload(s, e, pl, { area: true });
+  }
+  envAt(s, p.x + p.fx * range * 0.6, p.z + p.fz * range * 0.6, 1.2, a.els, false);
+}
+
+// Arcs (chain + forks): lightning leaves the staff as several bolts, each jumping on from its own first target.
+function forkChain(s, sp, p, dx, dz, aimDist) {
+  const d = sp.def, range = d.range ?? 8, start = [p.x + dx * 0.5, p.z + dz * 0.5];
+  const near = live(s).map((e) => {
+    const vx = e.x - p.x, vz = e.z - p.z, L = Math.hypot(vx, vz), dot = (vx * dx + vz * dz) / (L || 1);
+    return { e, score: L * (2.2 - dot), ok: L <= range + e.r && dot >= 0.5 };
+  }).filter((c) => c.ok).sort((a, b) => a.score - b.score).slice(0, d.forks);
+  const hit = new Set(near.map((c) => c.e.id)); // every fork keeps its own first target: no bolt jumps onto another fork's
+  if (!near.length) {
+    const L = Math.min(range, aimDist), ex = p.x + dx * L, ez = p.z + dz * L;
+    envAt(s, ex, ez, 0.9, sp.els, false);
+    ev(s, 'chain', { pid: p.id, pts: [start, [ex, ez]], els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
+    return;
+  }
+  for (const { e } of near) {
+    const pts = [start];
+    chainWalk(s, sp, e, d.jumps ?? 1, pts, 1, hit);
+    ev(s, 'chain', { pid: p.id, pts, els: sp.els, color: sp.color, key: sp.key, tier: sp.tier });
+  }
+}
+
 function spawnArea(s, sp, x, z) {
   const d = sp.def;
   [x, z] = clampIn(x, z, BOUND - 0.5);
@@ -555,11 +614,13 @@ function spawnArea(s, sp, x, z) {
     delay: d.delay ?? 0, delayMax: d.delay ?? 0, pull: d.pull ?? 0, burst: !!d.burst, hitsAll: !!d.hitsAll,
     heal: d.heal ?? 0, invuln: !!d.invulnerable, cleanse: !!d.cleanse, swallow: !!d.swallow, field: !!d.deflectField, repel: d.repel ?? 0,
     drainPct: d.drainPct ?? 0, repeat: d.repeat ?? 1, interval: d.interval ?? 0.35, scatter: d.scatter ?? 0, n: 0,
+    ...(d.mine ? { mine: { arm: d.arm ?? 0.7, trig: d.trig ?? 1.8, fuse: d.fuse ?? 0.25, fired: false } } : {}),
     els: sp.els, color: sp.color, key: sp.key, name: sp.name, visual: d.visual, tier: sp.tier, sp, pid: s.who?.id };
   [a.bx, a.bz] = scatterPt(a);
   s.areas.push(a);
   ev(s, 'area', { id: a.id, x, z, bx: a.bx, bz: a.bz, r: a.r, life: a.life, delay: a.delay, key: sp.key, els: sp.els, color: sp.color,
-    visual: d.visual, name: sp.name, pull: a.pull, tier: sp.tier, heal: a.heal });
+    visual: d.visual, name: sp.name, pull: a.pull, tier: sp.tier, heal: a.heal, mine: !!d.mine, storm: !!d.storm, scatter: a.scatter,
+    repeat: a.repeat, interval: a.interval, trig: a.mine?.trig });
 }
 
 // Tsunami's water pool (R-058) is a real puddle: it soaks, can be charged and frozen, then drains away.
@@ -1380,6 +1441,8 @@ function impact(s, b, target) {
 function updateAreas(s, dt) {
   for (const a of s.areas) {
     s.who = byId(s, a.pid);
+    if (a.spray) { updateSpray(s, a, dt); continue; }
+    if (a.mine && !a.mine.fired) { updateMine(s, a, dt); continue; }
     if (a.swallow || a.field) for (const b of s.shots) {
       if (b.owner !== 'enemy' || b.dead || Math.hypot(b.x - a.x, b.z - a.z) >= a.r) continue;
       b.dead = true;

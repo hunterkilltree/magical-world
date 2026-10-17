@@ -465,3 +465,15 @@ Presentation. Spell effects are drawn as layered 2D sprites (`fx2d.js` recipes, 
 casting language, `ice-spear.js`, `earth-fx.js`, `chain-fx.js`) on top of the older particles, whose density is
 cut to leave room for them. Every element, alone or mixed, maps to palettes that exist; fire+lightning is plasma,
 fire+earth magma, water+ice an ice field. Another wizard's casts in co-op use their own staff tip.
+
+### R-088 [done] Magicka-style spell forms: mines, storms, sprays, arcs
+Core and presentation, browser port only (the Godot game has no such forms; `src/game/forms.js` is not in
+`data/spells.json`). Twelve named three-element mixes, shared by every wizard like the other named triples; the
+numbers are our own tuning. A **mine** (area + `mine`) lies armed at the aim point, ignores an empty court,
+trips when an enemy comes within its trigger radius, goes off after a short fuse, and fizzles after 25 s; it never
+hurts its owner. A **storm** (area + `repeat`) marks the ground and strikes random points around it for several
+seconds, with a cloud and rain (and a sky bolt for lightning). A **spray** (cone + `channel`) follows the caster
+and their aim for 1.4 s, hurting what stands in its cone. An **arc** (chain + `forks`) leaves as several bolts, each
+jumping on from its own first target, and with no target still flashes one bolt along the aim. All of them ride the
+usual rules (energy, recharge, snapshots in co-op). Frost, Thunder and Blight Mine; Thunderstorm, Hailstorm and Ash
+Storm; Flamethrower, Frost Breath and Venom Spray; Forked Lightning, Conductive Net and Arcane Web.
