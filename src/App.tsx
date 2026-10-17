@@ -27,6 +27,12 @@ export const App: React.FC = () => {
           <div className="stat"><span className="k">Kills</span><b id="h-kills">0</b></div>
           <div className="stat"><span className="k">Score</span><b id="h-score">0</b></div>
         </div>
+        <div className="obj glass" id="h-obj" hidden>
+          <span className="k" id="h-obj-name"></span>
+          <b id="h-obj-val"></b>
+          <span className="bar"><i id="h-obj-bar"></i></span>
+          <small id="h-obj-hint"></small>
+        </div>
         <div className="tr">
           <button className="pausebtn glass" id="h-mute">Sound on <span>M</span></button>
           <button className="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>

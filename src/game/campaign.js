@@ -19,6 +19,9 @@ export class CampaignError extends Error {
   }
 }
 
+// Objectives that have rules in the sim (R-093). The rest are named in the plan and arrive with their chapters.
+export const OBJECTIVES_BUILT = ['survive', 'hold', 'burn', 'escape'];
+const REACH = 21; // objectives sit inside the walkable court
 const ID = /^[a-z][a-z0-9_]*$/;
 const KEY = /^[a-z0-9_.]+$/;
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -33,6 +36,34 @@ function lessonProblem(k) {
   if (bad) return `has an unknown element "${bad}"`;
   if (parts.join('+') !== [...parts].sort().join('+')) return `must be written in sorted order ("${[...parts].sort().join('+')}")`;
   return null;
+}
+
+const num = (v) => typeof v === 'number' && Number.isFinite(v);
+
+// The parameters of the built objectives, checked and given defaults (our own tuning, not playtested).
+function normalizeObjective(raw, bad) {
+  const type = raw.type;
+  if (type === 'survive') return { type };
+  if (!OBJECTIVES_BUILT.includes(type)) return { ...raw };
+  const field = (key, d, ok, why) => { const v = raw[key] ?? d; if (!ok(v)) bad(`objective.${key}`, `${why} (got ${JSON.stringify(raw[key])})`); return v; };
+  const inCourt = (v) => num(v) && Math.abs(v) <= REACH;
+  const name = field('name', type === 'hold' ? 'Structure' : type === 'burn' ? 'Target' : 'Dusk', str, 'must be a non-empty string');
+  const place = (dx, dz) => {
+    const x = field('x', dx, inCourt, `must be a number from -${REACH} to ${REACH}`), z = field('z', dz, inCourt, `must be a number from -${REACH} to ${REACH}`);
+    if (inCourt(x) && inCourt(z) && Math.hypot(x, z) > REACH) bad('objective.x', `and z must lie inside the court (radius ${REACH})`);
+    return { x, z };
+  };
+  if (type === 'hold') {
+    return { type, name, hp: field('hp', 240, (v) => num(v) && v > 0 && v <= 5000, 'must be a number above 0 and at most 5000'), ...place(0, -7),
+      healPct: field('healPct', 0.25, (v) => num(v) && v >= 0 && v <= 1, 'must be a fraction from 0 to 1') };
+  }
+  if (type === 'burn') {
+    return { type, name, ...place(6, -4), r: field('r', 1.6, (v) => num(v) && v >= 0.5 && v <= 4, 'must be a radius from 0.5 to 4'),
+      need: field('need', 5, (v) => num(v) && v > 0 && v <= 60, 'must be a number of seconds above 0 and at most 60') };
+  }
+  const exit = field('exit', { x: 0, z: 18, r: 2.5 }, (v) => isObj(v) && inCourt(v.x) && inCourt(v.z) && Math.hypot(v.x, v.z) <= REACH && num(v.r) && v.r >= 1 && v.r <= 6,
+    'must be {x, z, r} inside the court with a radius from 1 to 6');
+  return { type, name, seconds: field('seconds', 150, (v) => num(v) && v >= 10 && v <= 600, 'must be a number of seconds from 10 to 600'), exit: { ...exit } };
 }
 
 // Validates a parsed campaign file and returns { version, chapters, byId }. Throws a CampaignError naming every problem.
@@ -55,7 +86,9 @@ export function loadCampaign(data) {
     if (!(Number.isInteger(waveStart) && waveStart >= 1)) bad('waveStart', `must be a whole number of 1 or more (got ${JSON.stringify(c.waveStart)})`);
     const rules = c.rules ?? [];
     if (!Array.isArray(rules) || rules.some((r) => !(typeof r === 'string' && ID.test(r)))) bad('rules', 'must be a list of rule ids');
-    if (!isObj(c.objective) || !OBJECTIVES.includes(c.objective.type)) bad('objective.type', `${JSON.stringify(c.objective?.type)} is not one of ${OBJECTIVES.join(', ')}`);
+    const objOk = isObj(c.objective) && OBJECTIVES.includes(c.objective.type);
+    if (!objOk) bad('objective.type', `${JSON.stringify(c.objective?.type)} is not one of ${OBJECTIVES.join(', ')}`);
+    const objective = objOk ? normalizeObjective(c.objective, bad) : { type: 'survive' };
     const unlocks = c.unlocks ?? {}, elements = unlocks.elements ?? [], wizards = unlocks.wizards ?? [];
     if (!Array.isArray(elements) || elements.some((e) => !ELEMENTS[e])) bad('unlocks.elements', 'must be a list of known elements');
     if (!Array.isArray(wizards) || wizards.some((w) => !WIZARD_ROLE[w])) bad('unlocks.wizards', 'must be a list of known wizard ids');
@@ -64,7 +97,7 @@ export function loadCampaign(data) {
     else lessons.forEach((k, j) => { const why = lessonProblem(k); if (why) bad(`lessons[${j}]`, `${JSON.stringify(k)} ${why}`); });
     const story = isObj(c.story) ? c.story : {};
     for (const k of ['briefing', 'ending']) if (!(typeof story[k] === 'string' && KEY.test(story[k]))) bad(`story.${k}`, 'must be a story key (lower-case letters, digits, "_" and ".")');
-    chapters.push({ id: c.id, title: c.title, arena: c.arena, waves: c.waves, waveStart, rules: [...rules], objective: { ...c.objective },
+    chapters.push({ id: c.id, title: c.title, arena: c.arena, waves: c.waves, waveStart, rules: [...rules], objective,
       unlocks: { elements: [...elements], wizards: [...wizards] }, lessons: [...(Array.isArray(lessons) ? lessons : [])], story: { briefing: story.briefing, ending: story.ending } });
   });
   // The circle: the wizards who start. Absent, it is every wizard no chapter unlocks.

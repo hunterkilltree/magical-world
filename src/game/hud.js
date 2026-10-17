@@ -39,6 +39,7 @@ export function createHud(o) {
   const els = {
     hp: $('h-hp'), hpv: $('h-hpv'), en: $('h-en'), env: $('h-env'), enbar: $('h-enbar'), wave: $('h-wave'), left: $('h-left'), kills: $('h-kills'),
     score: $('h-score'), shape: $('h-shape'), spell: $('h-spell'), cost: $('h-cost'), status: $('h-status'), banner: $('banner'), toast: $('toast'),
+    obj: $('h-obj'), objName: $('h-obj-name'), objVal: $('h-obj-val'), objBar: $('h-obj-bar'), objHint: $('h-obj-hint'),
     vig: $('vignette'), name: $('h-name'), role: $('h-role'), cls: $('h-cls'), sw: $('h-sw'), queue: $('h-queue')
   };
   const slots = [...document.querySelectorAll('.slot')];
@@ -233,6 +234,24 @@ export function createHud(o) {
   const toast = (text) => { if (text === lastToast && toastT > 0) return; lastToast = text; toastT = 1.6; replay(els.toast, text); };
   const set = (n, v) => { if (n.textContent !== String(v)) n.textContent = v; };
 
+  // The chapter's objective and how far along it is (R-093).
+  function fillObjective(g) {
+    const c = g.campaign, ob = c?.obj, live = c && (c.phase === 'waves' || c.phase === 'climax') && ob && ob.type !== 'survive';
+    els.obj.hidden = !live;
+    if (!live) return;
+    let val = '', frac = 1, hint = '', low = false;
+    if (ob.type === 'hold') { val = `${Math.max(0, Math.ceil(ob.hp))} / ${ob.maxHp}`; frac = ob.hp / ob.maxHp; low = frac < 0.35; hint = 'Enemies go for it before they go for you'; }
+    else if (ob.type === 'burn') { val = ob.done ? 'Destroyed' : `${ob.progress.toFixed(1)} / ${ob.need}s`; frac = ob.progress / ob.need; hint = ob.done ? 'Done' : ob.progress > 0 ? 'Keep it burning · water puts it out' : 'Only fire destroys it'; }
+    else if (ob.type === 'escape') {
+      const t = Math.max(0, ob.t), m = Math.floor(t / 60), sec = Math.floor(t % 60);
+      val = `${m}:${String(sec).padStart(2, '0')}`; frac = t / ob.max; low = frac < 0.2;
+      hint = ob.open ? (ob.held > 0 ? 'Hold the ring…' : 'The way out is open · everyone into the ring') : 'Clear the waves before the light is gone';
+    }
+    els.objName.textContent = ob.name; els.objVal.textContent = val; els.objHint.textContent = hint;
+    els.objBar.style.transform = `scaleX(${Math.max(0, Math.min(1, frac))})`;
+    els.obj.classList.toggle('is-low', low);
+  }
+
   function showScreens(g) {
     const dead = g.mode === 'dead' && g.player.deadT > 1.0;
     screens.menu.classList.toggle('on', g.mode === 'menu');
@@ -265,6 +284,7 @@ export function createHud(o) {
     update(g, events, dt) {
       const p = g.player;
       showScreens(g);
+      fillObjective(g);
       const open = g.campaign?.chapter.elements, ok = open ? open.join() : '';
       if (ok !== lockKey) { lockKey = ok; ORDER.forEach((el, i) => row.children[i]?.classList.toggle('is-locked', !!open && !open.includes(el))); }
       for (const e of events) {
@@ -272,6 +292,9 @@ export function createHud(o) {
         else if (e.type === 'climax') replay(els.banner, `Final wave · ${e.n}`);
         else if (e.type === 'chapterClear') replay(els.banner, `Chapter cleared · ${e.title}`);
         else if (e.type === 'camp') toast('Press Enter to go on');
+        else if (e.type === 'objectiveFail') replay(els.banner, e.kind === 'hold' ? 'The structure is lost' : 'The light is gone');
+        else if (e.type === 'objectiveWait') replay(els.banner, e.kind === 'burn' ? 'The waves are done · set it alight' : 'The way out is open');
+        else if (e.type === 'objectiveDone') replay(els.banner, 'Destroyed');
         else if (e.type === 'retry') { replay(els.banner, `Again · wave ${e.wave}`); toast('You fell. The wave comes again.'); }
         else if (e.type === 'chapterFailed') toast('The chapter is lost. Press R to try again.');
         else if (e.type === 'wave') replay(els.banner, `Wave ${e.n}`);
