@@ -1,6 +1,7 @@
 // DOM HUD + menu/pause/death screens. Reads state; user intent goes back via callbacks.
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
+import { describeBest } from './profile.js';
 
 // Element glyphs (16px grid, stroked).
 const ICON = {
@@ -123,7 +124,14 @@ export function createHud(o) {
   }
   fillRoles();
 
+  // The best wave and score with the chosen wizard (R-091), on the menu.
+  function fillBest() {
+    const w = o.wizards.find((x) => x.id === wizardId), node = $('m-best');
+    if (node && w) node.textContent = describeBest(o.bestOf?.(wizardId), w.name);
+  }
+
   function setWho() {
+    fillBest();
     const w = o.wizards.find((x) => x.id === wizardId), R = ROLES[o.roleOf()];
     els.name.textContent = w.name;
     els.role.textContent = w.role;
@@ -228,9 +236,12 @@ export function createHud(o) {
     document.body.classList.toggle('in-menu', g.mode === 'menu');
     if (g.mode !== prevMode || (dead && !screens.dead.dataset.filled)) {
       if (g.mode === 'paused') fillGrimoire(g.stats.found, g.player.role);
+      if (g.mode === 'menu') fillBest();
       if (dead) {
         screens.dead.dataset.filled = '1';
         $('d-kick').textContent = `Fallen on wave ${g.wave}`;
+        const lr = o.lastRun?.(), me = o.wizards.find((x) => x.id === g.player.wizard);
+        $('d-best').textContent = lr && me && lr.wizard === g.player.wizard ? (lr.improved.wave || lr.improved.score ? 'New best! ' : '') + describeBest(o.bestOf?.(lr.wizard), me.name) : '';
         $('d-stats').innerHTML = [['Wave reached', g.wave], ['Kills', g.kills], ['Score', g.score], ['Damage dealt', Math.round(g.stats.dealt)],
           ['Self-inflicted', Math.round(g.stats.selfDmg)], ['Spells found', `${g.stats.found.size} / ${grimoireFor(g.player.role).length}`]]
           .map(([k, v]) => `<div><span class="k">${k}</span><b>${v}</b></div>`).join('');
