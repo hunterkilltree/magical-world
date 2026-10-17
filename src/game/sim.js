@@ -113,6 +113,62 @@ export function createCoopGame(slots = []) {
   return s;
 }
 
+// ---------------------------------------------------------------- campaign (R-090)
+// A chapter is a game with a `campaign` run on it: briefing -> waves -> climax -> reward -> camp -> done, or failed. Quick play
+// has no run (`campaign` is undefined) and every rule below keys off it, so a seeded quick-play run is unchanged.
+function newRun(chapter) {
+  return { chapter, phase: 'briefing', checkpoint: { wave: 0, kills: 0, score: 0 }, retries: 0, rewardT: 0 };
+}
+
+export function createCampaignGame(wizard, role, chapter) {
+  const s = createGame(wizard, role);
+  s.campaign = newRun(chapter);
+  s.theme = chapter.arena;
+  return s;
+}
+
+export function createCampaignCoopGame(slots, chapter) {
+  const s = createCoopGame(slots);
+  s.campaign = newRun(chapter);
+  s.theme = chapter.arena;
+  return s;
+}
+
+// Where a wizard stands at the start (the same spots addPlayer and createGame use).
+const homeOf = (id) => { const k = Math.max(0, (+String(id).replace(/D/g, '') || 1) - 1) % MAX_PLAYERS, a = (k * Math.PI) / 2; return [Math.sin(a) * 3.5, Math.cos(a) * 3.5]; };
+
+// Back to the last cleared wave: the court is emptied, everyone is whole and at the start, the wave comes again.
+function rewind(s) {
+  const c = s.campaign, cp = c.checkpoint;
+  c.retries++;
+  c.phase = 'waves';
+  s.wave = cp.wave; s.kills = cp.kills; s.score = cp.score;
+  s.enemies = []; s.spawnQ = []; s.spawnT = 0; s.waveInfo = null; s.waveT = 2.2; s.hitstop = 0;
+  s.shots = []; s.areas = []; s.walls = []; s.decoys = []; s.regrow = [];
+  for (const b of s.props.barrels) { b.alive = true; b.fuse = 0; }
+  for (const p of s.players) { const [x, z] = homeOf(p.id); Object.assign(p, makePlayer(p.id, p.wizard, p.role, x, z, p.name)); }
+  ev(s, 'retry', { id: c.chapter.id, wave: cp.wave + 1, retries: c.retries });
+}
+
+// A party that failed a chapter (co-op) chooses to try again from the checkpoint.
+export function retryChapter(s) {
+  s.events = [];
+  if (!s.campaign) return s.events;
+  rewind(s);
+  s.mode = 'play';
+  return s.events;
+}
+
+function campaignAct(s, a) {
+  const c = s.campaign;
+  if (!c || s.mode !== 'play') return;
+  if (a === 'begin' && c.phase === 'briefing') { c.phase = 'waves'; ev(s, 'chapterBegin', { id: c.chapter.id, title: c.chapter.title, waves: c.chapter.waves }); }
+  else if (a === 'continue' && c.phase === 'camp') { c.phase = 'done'; ev(s, 'chapterDone', { id: c.chapter.id, next: c.chapter.next }); }
+}
+
+// The wave number the difficulty tables see: a chapter can start part-way up them (waveStart), quick play never does.
+const waveIndex = (s) => s.wave + (s.campaign ? s.campaign.chapter.waveStart - 1 : 0);
+
 // Joins a wizard (null when the party is full). Ids are p1..p4; a free one is reused.
 export function addPlayer(s, { id, wizard, role, name } = {}) {
   if (s.players.length >= MAX_PLAYERS) return null;
@@ -170,9 +226,14 @@ export function step(s, inp, dt) {
     ev(s, 'playerDown', { pid: p.id, id: p.id, x: p.x, z: p.z });
   }
   if (s.players.length && s.players.every((q) => !q.alive) && s.mode === 'play') {
-    s.mode = 'dead';
-    const p = s.player ?? s.players[0];
-    ev(s, 'playerDeath', { pid: p.id, x: p.x, z: p.z });
+    const c = s.campaign, inWaves = c && (c.phase === 'waves' || c.phase === 'climax');
+    if (inWaves && !s.coop) rewind(s); // solo: the wave comes again, the chapter is kept
+    else {
+      if (inWaves) { c.phase = 'failed'; ev(s, 'chapterFailed', { id: c.chapter.id, wave: s.wave, checkpoint: c.checkpoint.wave }); }
+      s.mode = 'dead';
+      const p = s.player ?? s.players[0];
+      ev(s, 'playerDeath', { pid: p.id, x: p.x, z: p.z });
+    }
   }
   s.remaining = s.spawnQ.length + s.enemies.length;
   return s.events;
@@ -199,6 +260,7 @@ function raise(s, p, hpFrac) {
 
 // ---------------------------------------------------------------- actions
 function act(s, p, a, inp) {
+  if (a === 'begin' || a === 'continue') return campaignAct(s, a);
   if (a === 'pause') {
     if (s.coop) return; // the court does not wait for anyone
     if (s.mode === 'play') s.mode = 'paused'; else if (s.mode === 'paused') s.mode = 'play';
@@ -1070,6 +1132,11 @@ function pushOut(e, o) {
 
 // ---------------------------------------------------------------- waves
 function updateWaves(s, dt) {
+  const c = s.campaign;
+  if (c) {
+    if (c.phase === 'reward') { c.rewardT -= dt; if (c.rewardT <= 0) { c.phase = 'camp'; ev(s, 'camp', { id: c.chapter.id }); } }
+    if (c.phase !== 'waves' && c.phase !== 'climax') return; // briefing, reward, camp, done: the court is quiet
+  }
   if (s.spawnQ.length) {
     s.spawnT -= dt;
     if (s.spawnT <= 0) { spawnEnemy(s, s.spawnQ.shift()); s.spawnT = s.waveInfo.interval; }
@@ -1085,6 +1152,16 @@ function updateWaves(s, dt) {
       p.hp = Math.min(p.maxHp, p.hp + amt); p.energy = p.maxEnergy;
     }
     ev(s, 'waveClear', { n: s.wave, heal: amt });
+    if (c) {
+      c.checkpoint = { wave: s.wave, kills: s.kills, score: s.score };
+      if (s.wave >= c.chapter.waves) {
+        c.phase = 'reward'; c.rewardT = 3;
+        const ch = c.chapter;
+        ev(s, 'chapterClear', { id: ch.id, title: ch.title, unlocks: { elements: [...ch.unlocks.elements], wizards: [...ch.unlocks.wizards] }, lessons: [...ch.lessons],
+          retries: c.retries, kills: s.kills, score: s.score });
+        return;
+      }
+    }
   }
   for (const b of s.props.barrels) { b.alive = true; b.fuse = 0; }
   s.waveT = 3.5;
@@ -1092,10 +1169,11 @@ function updateWaves(s, dt) {
 
 function startWave(s) {
   s.wave++;
-  s.waveInfo = waveRoster(s.wave, s.players.length || 1, rand);
+  s.waveInfo = waveRoster(waveIndex(s), s.players.length || 1, rand);
   s.spawnQ = [...s.waveInfo.list];
   s.spawnT = 0.3;
   ev(s, 'wave', { n: s.wave, count: s.spawnQ.length });
+  if (s.campaign && s.wave >= s.campaign.chapter.waves) { s.campaign.phase = 'climax'; ev(s, 'climax', { id: s.campaign.chapter.id, n: s.wave }); }
 }
 
 function spawnEnemy(s, kind) {
@@ -1117,7 +1195,7 @@ function spawnEnemy(s, kind) {
 
 function kill(s, e) {
   s.kills++;
-  s.score += Math.round(e.T.score * (1 + 0.25 * (s.wave - 1)));
+  s.score += Math.round(e.T.score * (1 + 0.25 * (waveIndex(s) - 1)));
   ev(s, 'death', { id: e.id, x: e.x, z: e.z, kind: e.kind, frozen: e.st.frozen > 0, burning: e.st.burn > 0, cursed: e.st.curse > 0 });
 }
 

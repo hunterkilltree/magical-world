@@ -1,6 +1,7 @@
 // Wires input → sim → renderer/HUD on a fixed 60 Hz simulation step.
 // Co-op (R-082): in a room the sim runs on the server; this page sends input and draws snapshots.
-import { createGame, createCoopGame, step } from './sim.js';
+import { createGame, createCoopGame, createCampaignGame, step } from './sim.js';
+import { CAMPAIGN } from './campaign-data.js';
 import { createView } from './render.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
@@ -25,7 +26,18 @@ export function initGame() {
   const roleOf = () => roleId ?? WIZARD_ROLE[wizardId] ?? 'destroyer';
   const THEMES = ['court', 'forest'];
   let themeId = THEMES.includes(params.get('a')) ? params.get('a') : 'court';
-  const make = () => { const g = createGame(wizardId, roleOf()); g.theme = themeId; return g; };
+  // ?c=<chapter id> plays that campaign chapter (R-090); without it, quick play as always.
+  let chapterId = CAMPAIGN.byId[params.get('c')] ? params.get('c') : null;
+  const make = () => {
+    if (chapterId) return createCampaignGame(wizardId, roleOf(), CAMPAIGN.byId[chapterId]);
+    const g = createGame(wizardId, roleOf()); g.theme = themeId; return g;
+  };
+  // A cleared chapter leads to the next one's briefing (the menu), or back to quick play after the last.
+  const nextChapter = (next) => {
+    chapterId = next;
+    try { const q = new URLSearchParams(window.location.search); if (next) q.set('c', next); else q.delete('c'); history.replaceState(null, '', '?' + q.toString()); } catch (e) {}
+    newGame('menu');
+  };
   const saveUrl = () => {
     try {
       const q = new URLSearchParams(window.location.search);
@@ -101,7 +113,7 @@ export function initGame() {
     wizardId,
     roleOf,
     themeOf: () => themeId,
-    onArena(id) { themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
+    onArena(id) { if (game.campaign) return; themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
     onPick(id) {
       wizardId = id;
       game.player.wizard = id;
@@ -115,7 +127,7 @@ export function initGame() {
       roleId = id; game.player.role = id; demo.poke(); saveUrl();
       if (online?.client.me) online.client.pick(wizardId, roleId);
     },
-    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; input.focus(); },
+    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; if (game.campaign) input.push('begin'); input.focus(); },
     onResume() { if (game.mode === 'paused') game.mode = 'play'; input.focus(); },
     onPause() { if (!online?.drawing && game.mode === 'play') game.mode = 'paused'; },
     onRestart() { if (online) { if (online.client.isHost) online.client.start(); } else newGame('play'); },
@@ -180,6 +192,8 @@ export function initGame() {
       acc -= STEP;
     }
     if (actions.length) input.requeue(actions);
+    const done = events.find((e) => e.type === 'chapterDone');
+    if (done) { nextChapter(done.next); return; }
     const preview = demo.update(game, dt);
     if (preview.length) view.consume(preview, game);
     view.consume(events, game);

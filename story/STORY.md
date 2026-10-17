@@ -444,6 +444,57 @@ Client prediction for the local wizard reconciled with `ack`, snapshot deltas
 (under 8 KB/s per client), reconnecting with the same id for 30 s, a ping
 display, per-player stats on the defeat screen.
 
+## Campaign (R-090 to R-094)
+
+The design is in `story/CAMPAIGN_PLAN.md` (premise, eight chapters, features, the rest of the requirements to come:
+R-095 prologue and Hvítmark Tundra, then one chapter per requirement, the boss framework, Rune Mending, the Siege,
+co-op campaign, music). **Decision: build it in the browser port (`src/`) first, with all campaign content as
+engine-neutral JSON in `data/`** (`campaign.json`, `story/en.json`, `story/vi.json`, `campaign_enemies.json`), and port
+it to Godot afterwards. The campaign is a second door beside Quick play (the current menu, everything unlocked), so
+existing behaviour and the seeded digests do not change. New enemies, bosses, hazards and timers are our own tuning,
+not playtested, and never touch `spells.json` or `enemies.json`. Web tests are
+`tests/web/test_rNNN_<name>.test.mjs`.
+
+### R-090 [done] Campaign data and chapter runner
+Core. `data/campaign.json` lists the chapters in order; each has an id, a title, an arena theme, a number of waves,
+its ground rules, an objective, its unlocks and its story keys. A small state machine in the sim runs one chapter:
+briefing, waves, climax, reward, camp. A cleared wave is a checkpoint: in solo, dying restarts the wave and not the
+chapter; in co-op a downed wizard is revived as today and the chapter fails only when everyone is down. Chapter
+difficulty comes from the existing wave scaling (`waveRoster`, health and speed scale) and never from changing
+`enemies.json`. A malformed campaign file is refused with a clear error. Quick play is untouched: a seeded run
+matches its recorded digest.
+Built in `src/game/campaign.js` (validation, `loadCampaign`, `CampaignError`), the rules in `sim.js`
+(`createCampaignGame`, `createCampaignCoopGame`, `retryChapter`; actions `begin` and `continue`; events `chapterBegin`,
+`climax`, `chapterClear`, `camp`, `chapterDone`, `retry`, `chapterFailed`) and the data in `data/campaign.json`, which for now
+holds the prologue. In the browser, `?c=<chapter id>` plays a chapter; Enter leaves the camp.
+
+### R-091 [planned] Profile and save
+Core. A profile keeps what the player has earned: unlocked elements and wizards, grimoire pages found, chapters
+cleared and the choices made in them, and the best wave and score per wizard (IMPROVEMENT_PLAN item 7). It is stored in
+`localStorage` (the Godot port will use `user://`) as plain JSON with a version number. A missing, corrupt or newer
+save falls back to a fresh profile without losing the old one, and storage that throws (a private window) does not
+break the game. The menu and the defeat screen show the best wave and score.
+
+### R-092 [planned] Element and wizard unlocks
+Core and presentation. In the campaign the elements open by chapter (fire, water and earth in the prologue; ice and
+lightning; nature and wind; arcane; light; dark) and Thane Granitebrow, Ilsa Galesinger and the Hollow Warden open by
+chapter too. A locked element is greyed in the HUD, pressing it is refused with a toast and does not enter the queue,
+and no spell that needs it can be cast. Quick play has every element and wizard, as today.
+
+### R-093 [planned] Objectives: hold, burn, escape
+Core. The sim gains objectives besides "survive": **hold** (a structure with health that enemies attack before they
+attack you; at 0 the wave restarts), **burn** (a target that only fire destroys) and **escape** (a timer and an exit;
+the wave ends the chapter when the timer runs out). Each shows on the HUD with its progress. Structures and timers
+scale with the party size through the existing party factor. The braziers, cross and circle objectives come with the
+chapters that use them.
+
+### R-094 [planned] Story cards, barks, English and Vietnamese
+Presentation. Chapter briefing and ending cards, one-line barks in the quiet after a wave, and per-wizard lines come
+from one strings table: `data/story/en.json` and `data/story/vi.json`, keyed by id. Every key exists in both languages,
+no card or bark refers to a missing key, and a missing translation falls back to English. The language follows the
+browser and can be switched on the menu; the HUD's existing Vietnamese subtitles keep working. Vietnamese text is
+reviewed by a native speaker before release.
+
 ## Cracked Rune handoff in the browser (R-085 to R-087)
 
 The browser port takes the Staff of the Cracked Rune handoff (reference JS in `src/game/`). Gameplay numbers in
