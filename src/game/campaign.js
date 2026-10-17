@@ -54,7 +54,7 @@ function normalizeObjective(raw, bad) {
     return { x, z };
   };
   if (type === 'hold') {
-    return { type, name, hp: field('hp', 240, (v) => num(v) && v > 0 && v <= 5000, 'must be a number above 0 and at most 5000'), ...place(0, -7),
+    return { type, name, hp: field('hp', 240, (v) => num(v) && v > 0 && v <= 5000, 'must be a number above 0 and at most 5000'), ...place(-5, -3),
       healPct: field('healPct', 0.25, (v) => num(v) && v >= 0 && v <= 1, 'must be a fraction from 0 to 1') };
   }
   if (type === 'burn') {
