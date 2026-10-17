@@ -98,6 +98,10 @@ body.in-menu .hud { opacity: 0; }
 .elkey { pointer-events: auto; display: grid; justify-items: center; gap: 4px; width: 52px; padding: 6px 0 5px;
   border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: #f4f1ff; cursor: pointer; }
 .elkey:hover { border-color: var(--c); }
+.elkey.is-locked { opacity: .32; filter: grayscale(1); }
+.pick.is-locked { opacity: .45; cursor: not-allowed; }
+.pick.is-locked:hover { border-color: var(--line); }
+.gr.is-locked { opacity: .4; }
 .elkey .kbd { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--c); color: #161225; display: flex; align-items: center; justify-content: center; gap: 3px;
   font: 700 12px var(--font-display); }
 .elkey .nm { font-size: 10px; font-weight: 600; }

@@ -478,11 +478,16 @@ Built in `src/game/profile.js` (key `cow_profile`, version 1). A save the game c
 version wrote, is copied to a `cow_profile.backup` slot (up to six, never overwriting an older one) before anything new
 is saved. Runs are recorded when a quick-play run ends or is given up, pages and cleared chapters when they happen.
 
-### R-092 [planned] Element and wizard unlocks
+### R-092 [done] Element and wizard unlocks
 Core and presentation. In the campaign the elements open by chapter (fire, water and earth in the prologue; ice and
 lightning; nature and wind; arcane; light; dark) and Thane Granitebrow, Ilsa Galesinger and the Hollow Warden open by
 chapter too. A locked element is greyed in the HUD, pressing it is refused with a toast and does not enter the queue,
 and no spell that needs it can be cast. Quick play has every element and wizard, as today.
+Each chapter lists the elements it opens (`chapter.elements` is everything unlocked up to and including it, computed by
+`loadCampaign`); `data/campaign.json` names the `circle` of wizards who start (without it, every wizard no chapter
+unlocks), and `wizardsAvailable(campaign, profile.unlocked.wizards)` adds the ones cleared chapters have earned. The sim
+refuses a locked element with a `locked` event before the cancel rule runs. The Hollow Warden, Thane and Ilsa are earned,
+not given, so they stay locked in the campaign until the chapters that unlock them exist.
 
 ### R-093 [planned] Objectives: hold, burn, escape
 Core. The sim gains objectives besides "survive": **hold** (a structure with health that enemies attack before they

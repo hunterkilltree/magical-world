@@ -61,7 +61,7 @@ export function createNetClient({ url = defaultServerUrl(), WebSocketImpl = glob
 
 // Events that are about one wizard and only matter to that wizard's screen and ears (toasts, chimes,
 // the red vignette). The renderer still gets every event; the HUD and audio get forMe(events, me).
-const PERSONAL = new Set(['queue', 'queueFull', 'fizzle', 'noEnergy', 'cooldown', 'cancel', 'clear', 'heal']);
+const PERSONAL = new Set(['queue', 'queueFull', 'fizzle', 'noEnergy', 'cooldown', 'cancel', 'clear', 'heal', 'locked']);
 
 export function forMe(events, me) {
   return events.filter((e) => {

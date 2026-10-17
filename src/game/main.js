@@ -3,6 +3,7 @@
 import { createGame, createCoopGame, createCampaignGame, step } from './sim.js';
 import { CAMPAIGN } from './campaign-data.js';
 import { createProfileStore } from './profile.js';
+import { wizardsAvailable } from './campaign.js';
 import { createView } from './render.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
@@ -29,6 +30,10 @@ export function initGame() {
   let themeId = THEMES.includes(params.get('a')) ? params.get('a') : 'court';
   // ?c=<chapter id> plays that campaign chapter (R-090); without it, quick play as always.
   let chapterId = CAMPAIGN.byId[params.get('c')] ? params.get('c') : null;
+  const profile = createProfileStore(); // R-091: what the player has earned is kept between runs
+  // R-092: in the campaign you pick from the circle and the wizards cleared chapters have earned; quick play has all.
+  const wizardOpen = (id) => !chapterId || wizardsAvailable(CAMPAIGN, profile.profile.unlocked.wizards).includes(id);
+  if (!wizardOpen(wizardId)) wizardId = wizardsAvailable(CAMPAIGN, profile.profile.unlocked.wizards)[0];
   const make = () => {
     if (chapterId) return createCampaignGame(wizardId, roleOf(), CAMPAIGN.byId[chapterId]);
     const g = createGame(wizardId, roleOf()); g.theme = themeId; return g;
@@ -57,8 +62,6 @@ export function initGame() {
   let game = make();
   view.reset(game);
 
-  // R-091: what the player has earned is kept between runs: best wave and score per wizard, grimoire pages, cleared chapters.
-  const profile = createProfileStore();
   const rememberRun = (g) => {
     if (!g || !g.player || online?.drawing) return;
     if (g.stats?.found?.size) profile.recordPages([...g.stats.found]);
@@ -124,6 +127,7 @@ export function initGame() {
     roleOf,
     themeOf: () => themeId,
     bestOf: (id) => profile.bestOf(id),
+    wizardOpen,
     lastRun: () => profile.lastRun,
     onArena(id) { if (game.campaign) return; themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
     onPick(id) {
