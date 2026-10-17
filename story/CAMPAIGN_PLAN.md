@@ -1,9 +1,10 @@
 # Campaign plan: the Court of Waves, chapter by chapter
 
-Status: **direction approved; R-090 to R-094 are `planned` in `story/STORY.md`**, the rest (R-095 onward) are added as
-the work reaches them. Nothing is built yet. **Decision: the campaign is built in the browser port first, with all its
-content as engine-neutral JSON in `data/`, and ported to Godot later.** Each part becomes a requirement with its test, as
-`CLAUDE.md` says. This file is the design behind them, in the same way `COOP_PLAN.md` is for co-op.
+Status: **the foundation is built.** R-090 to R-094 (chapter runner, profile and save, unlocks, objectives, story cards and barks in
+English and Vietnamese) are `done` in `story/STORY.md`; the prologue is playable with `?c=prologue`. The chapters themselves
+(R-095 onward: Hvítmark Tundra first) are added as the work reaches them. **Decision: the campaign is built in the browser port
+first, with all its content as engine-neutral JSON in `data/`, and ported to Godot later.** Each part becomes a requirement with its
+test, as `CLAUDE.md` says. This file is the design behind them, in the same way `COOP_PLAN.md` is for co-op.
 
 ## Why a campaign
 
