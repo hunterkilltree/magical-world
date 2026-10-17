@@ -2,6 +2,7 @@
 // Co-op (R-082): in a room the sim runs on the server; this page sends input and draws snapshots.
 import { createGame, createCoopGame, createCampaignGame, step } from './sim.js';
 import { CAMPAIGN } from './campaign-data.js';
+import { createProfileStore } from './profile.js';
 import { createView } from './render.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
@@ -56,7 +57,16 @@ export function initGame() {
   let game = make();
   view.reset(game);
 
+  // R-091: what the player has earned is kept between runs: best wave and score per wizard, grimoire pages, cleared chapters.
+  const profile = createProfileStore();
+  const rememberRun = (g) => {
+    if (!g || !g.player || online?.drawing) return;
+    if (g.stats?.found?.size) profile.recordPages([...g.stats.found]);
+    if (!g.campaign && g.wave > 0) profile.recordRun({ wizard: g.player.wizard, wave: g.wave, score: g.score });
+  };
+
   function newGame(mode) {
+    rememberRun(game); // a run given up on counts too
     game = make();
     game.mode = mode;
     view.reset(game);
@@ -113,6 +123,8 @@ export function initGame() {
     wizardId,
     roleOf,
     themeOf: () => themeId,
+    bestOf: (id) => profile.bestOf(id),
+    lastRun: () => profile.lastRun,
     onArena(id) { if (game.campaign) return; themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
     onPick(id) {
       wizardId = id;
@@ -192,6 +204,10 @@ export function initGame() {
       acc -= STEP;
     }
     if (actions.length) input.requeue(actions);
+    for (const e of events) {
+      if (e.type === 'playerDeath') rememberRun(game);
+      else if (e.type === 'chapterClear') { profile.recordPages([...game.stats.found]); profile.recordChapter({ id: e.id, unlocks: e.unlocks, lessons: e.lessons, retries: e.retries, choices: {} }); }
+    }
     const done = events.find((e) => e.type === 'chapterDone');
     if (done) { nextChapter(done.next); return; }
     const preview = demo.update(game, dt);
@@ -208,6 +224,8 @@ export function initGame() {
     last = performance.now();
   };
   document.addEventListener('visibilitychange', onVisChange);
+  const onHide = () => rememberRun(game);
+  window.addEventListener('pagehide', onHide);
 
   // test hook
   window.__arena = { get game() { return online?.drawing ? online.game : game; }, step, createGame, input, get online() { return online; } };
@@ -217,6 +235,7 @@ export function initGame() {
     cancelAnimationFrame(rafId);
     dropOnline();
     document.removeEventListener('visibilitychange', onVisChange);
+    window.removeEventListener('pagehide', onHide);
     ['pointerdown', 'keydown'].forEach((t) => window.removeEventListener(t, initAudio, { capture: true }));
   };
 }

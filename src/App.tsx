@@ -85,6 +85,7 @@ export const App: React.FC = () => {
             <p className="lede">
               Hold the court against thralls, bulwarks and hexcallers. Queue up to three elements, then cast — the mix decides the spell, and careless mixes hurt you too.
             </p>
+            <p className="best" id="m-best"></p>
             <div className="label">Choose your wizard</div>
             <div className="roster" id="m-roster"></div>
             <div className="label"><span>Casting role · Role archetype</span></div>
@@ -161,6 +162,7 @@ export const App: React.FC = () => {
             <div className="kicker" id="d-kick">Fallen</div>
             <h1>The court holds</h1>
             <div className="dstats" id="d-stats"></div>
+            <p className="best" id="d-best"></p>
             <div className="actions">
               <button className="btn btn-primary" id="d-restart">Try again · R</button>
               <button className="btn btn-ghost" id="d-menu">Change wizard</button>

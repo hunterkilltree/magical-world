@@ -468,12 +468,15 @@ Built in `src/game/campaign.js` (validation, `loadCampaign`, `CampaignError`), t
 `climax`, `chapterClear`, `camp`, `chapterDone`, `retry`, `chapterFailed`) and the data in `data/campaign.json`, which for now
 holds the prologue. In the browser, `?c=<chapter id>` plays a chapter; Enter leaves the camp.
 
-### R-091 [planned] Profile and save
+### R-091 [done] Profile and save
 Core. A profile keeps what the player has earned: unlocked elements and wizards, grimoire pages found, chapters
 cleared and the choices made in them, and the best wave and score per wizard (IMPROVEMENT_PLAN item 7). It is stored in
 `localStorage` (the Godot port will use `user://`) as plain JSON with a version number. A missing, corrupt or newer
 save falls back to a fresh profile without losing the old one, and storage that throws (a private window) does not
 break the game. The menu and the defeat screen show the best wave and score.
+Built in `src/game/profile.js` (key `cow_profile`, version 1). A save the game cannot read, or that a newer
+version wrote, is copied to a `cow_profile.backup` slot (up to six, never overwriting an older one) before anything new
+is saved. Runs are recorded when a quick-play run ends or is given up, pages and cleared chapters when they happen.
 
 ### R-092 [planned] Element and wizard unlocks
 Core and presentation. In the campaign the elements open by chapter (fire, water and earth in the prologue; ice and
