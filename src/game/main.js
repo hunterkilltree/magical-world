@@ -2,7 +2,9 @@
 // Co-op (R-082): in a room the sim runs on the server; this page sends input and draws snapshots.
 import { createGame, createCoopGame, createCampaignGame, step } from './sim.js';
 import { CAMPAIGN } from './campaign-data.js';
-import { createProfileStore } from './profile.js';
+import { createProfileStore, browserStorage } from './profile.js';
+import { STORY } from './story-data.js';
+import { saveLanguage } from './story.js';
 import { wizardsAvailable } from './campaign.js';
 import { createView } from './render.js';
 import { createInput } from './input.js';
@@ -127,6 +129,9 @@ export function initGame() {
     roleOf,
     themeOf: () => themeId,
     bestOf: (id) => profile.bestOf(id),
+    story: STORY,
+    onLang(l) { STORY.setLang(l); saveLanguage(browserStorage(), l); },
+    onStoryGo(phase) { input.push(phase === 'briefing' ? 'begin' : 'continue'); input.focus(); },
     wizardOpen,
     lastRun: () => profile.lastRun,
     onArena(id) { if (game.campaign) return; themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
@@ -143,7 +148,7 @@ export function initGame() {
       roleId = id; game.player.role = id; demo.poke(); saveUrl();
       if (online?.client.me) online.client.pick(wizardId, roleId);
     },
-    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; if (game.campaign) input.push('begin'); input.focus(); },
+    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; input.focus(); }, // a campaign chapter waits for its briefing card
     onResume() { if (game.mode === 'paused') game.mode = 'play'; input.focus(); },
     onPause() { if (!online?.drawing && game.mode === 'play') game.mode = 'paused'; },
     onRestart() { if (online) { if (online.client.isHost) online.client.start(); } else newGame('play'); },
