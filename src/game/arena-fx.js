@@ -144,6 +144,7 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
     if (P.fire === 'ice' || P.zone === 'icefield') R.crystals([e.x, 0, e.z], e.ring ?? 0.6, Math.max(6, e.n), { life: 1.4, h: 0.8 });
   }
   let stones = null;
+  let spearTo = null; // the ice spear conjured during a Frozen Domain wind-up: its target is set when the spell is released
 
   return {
     onEvent(e, s) {
@@ -152,6 +153,13 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
       switch (e.type) {
         case 'windup':
           if (e.mode === 'self') break;
+          if (scene && e.key === 'ice+water' && e.name === 'Frozen Domain') {
+            // The showcase's signature: the spear forms over the shoulder through the wind-up and hold, and is thrown on release.
+            const to = spearTo = [e.x + (e.dx ?? 0) * 6, 0, e.z + (e.dz ?? 1) * 6];
+            const hold = e.hold ?? 0.05;
+            conjureSpear(fx, R, scene, { getHand: () => { const t = tip(); return [t[0], t[1] - 0.2, t[2]]; }, to, tForm: Math.max(0.12, e.t - hold), hold, flight: 0.3, scale: 1,
+              onImpact: (p) => { R.crystals(p, Math.min(1.6, (to.r ?? 3) * 0.45), 11, { life: 2.4 }); } });
+          }
           R.gather(tip, P.fire, e.t, { r: 1.0, orb: 0.25 + 0.25 * (e.weight ?? 0.5), rate: 45, tag: 'arena-gather' });
           fx.after(Math.max(0, e.t - (e.hold ?? 0.05)), () => R.flash(tip(), P.fire, 0.45, 0));
           if (EARTH && P.fire === 'dust' && (e.weight ?? 0.5) > 0.4) { const pl = () => [S?.player?.x ?? e.x, 0, S?.player?.z ?? e.z]; stones = EARTH.orbit(pl, 5, { r: 0.8, y: 1.15, dur: e.t + 0.1 }); }
@@ -182,6 +190,7 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           if (e.storm) { storm(e, P); break; }
           // Cryomancer's Water + Ice: the field is planted by a hurled ice spear (quick form — the sim field is already live).
           if (scene && e.key === 'ice+water' && e.name === 'Frozen Domain') {
+            if (spearTo) { spearTo[0] = e.x; spearTo[2] = e.z; spearTo.r = e.r; spearTo = null; break; } // the spear from the wind-up flies to the field
             conjureSpear(fx, R, scene, { getHand: () => { const t = tip(); return [t[0], t[1] - 0.2, t[2]]; }, to: [e.x, 0, e.z], tForm: 0.12, hold: 0.03, flight: 0.22, scale: 0.8,
               onImpact: (p) => { R.crystals(p, Math.min(1.6, (e.r ?? 3) * 0.45), 11, { life: 2.4 }); } });
             break;
