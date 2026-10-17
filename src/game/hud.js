@@ -39,6 +39,7 @@ export function createHud(o) {
   const els = {
     hp: $('h-hp'), hpv: $('h-hpv'), en: $('h-en'), env: $('h-env'), enbar: $('h-enbar'), wave: $('h-wave'), left: $('h-left'), kills: $('h-kills'),
     score: $('h-score'), shape: $('h-shape'), spell: $('h-spell'), cost: $('h-cost'), status: $('h-status'), banner: $('banner'), toast: $('toast'),
+    story: $('story'), sSpeaker: $('s-speaker'), sTitle: $('s-title'), sText: $('s-text'), sGo: $('s-go'), bark: $('h-bark'), barkWho: $('h-bark-who'), barkText: $('h-bark-text'),
     obj: $('h-obj'), objName: $('h-obj-name'), objVal: $('h-obj-val'), objBar: $('h-obj-bar'), objHint: $('h-obj-hint'),
     vig: $('vignette'), name: $('h-name'), role: $('h-role'), cls: $('h-cls'), sw: $('h-sw'), queue: $('h-queue')
   };
@@ -47,7 +48,7 @@ export function createHud(o) {
   const cdText = {};
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
-  let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', lockKey = '', wizardId = o.wizardId;
+  let storyKey = '', barkT = 0, vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', lockKey = '', wizardId = o.wizardId;
 
   const row = $('h-elements');
   ORDER.forEach((el) => {
@@ -62,6 +63,12 @@ export function createHud(o) {
   document.querySelectorAll('.controls').forEach((n) => {
     n.innerHTML = CONTROLS.map(([k, v]) => `<div class="ctl"><kbd>${k}</kbd><span>${v}</span></div>`).join('');
   });
+
+  // R-094: the language of the story cards and the wizards' lines.
+  const langBtns = [...document.querySelectorAll('#m-lang button')];
+  const markLang = () => langBtns.forEach((b) => b.classList.toggle('is-on', b.dataset.l === o.story?.lang));
+  langBtns.forEach((b) => b.addEventListener('click', () => { o.onLang?.(b.dataset.l); markLang(); storyKey = ''; }));
+  markLang();
 
   function fillRoster(node) {
     node.innerHTML = '';
@@ -234,6 +241,37 @@ export function createHud(o) {
   const toast = (text) => { if (text === lastToast && toastT > 0) return; lastToast = text; toastT = 1.6; replay(els.toast, text); };
   const set = (n, v) => { if (n.textContent !== String(v)) n.textContent = v; };
 
+  // The briefing before a chapter and the ending after it (R-094). A chapter without a card just goes on.
+  function showStory(g) {
+    const c = g.campaign, phase = c?.phase;
+    const want = c && g.mode === 'play' && (phase === 'briefing' || phase === 'camp') ? { phase, key: c.chapter.id + (phase === 'briefing' ? '.briefing' : '.ending') } : null;
+    const k = want ? want.key + '|' + (o.story?.lang ?? '') : '';
+    if (k === storyKey) return;
+    storyKey = k;
+    els.story.classList.toggle('on', false);
+    if (!want) return;
+    const card = o.story?.card(want.key);
+    if (!card) { o.onStoryGo?.(want.phase); return; } // no card, no waiting
+    els.sSpeaker.textContent = card.speaker ?? '';
+    els.sTitle.textContent = card.title ?? c.chapter.title;
+    els.sText.innerHTML = card.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('');
+    els.sGo.textContent = want.phase === 'briefing' ? 'Begin · Bắt đầu' : 'Continue · Tiếp tục';
+    els.sGo.onclick = () => { els.story.classList.remove('on'); o.onStoryGo?.(want.phase); }; // storyKey stays: the card is not shown again for this phase
+    els.story.classList.add('on');
+    els.sGo.focus();
+  }
+
+  // One line from a wizard (or from Bram) in the quiet after a wave.
+  function bark(g) {
+    const r = o.story?.bark(g.player.wizard, g.wave + g.campaign.chapter.index * 7);
+    if (!r) return;
+    const w = o.wizards.find((x) => x.id === r.speaker);
+    els.barkWho.textContent = w ? w.name : o.story.text('speaker.' + r.speaker) ?? '';
+    els.barkText.textContent = r.text;
+    els.bark.hidden = false;
+    barkT = 6;
+  }
+
   // The chapter's objective and how far along it is (R-093).
   function fillObjective(g) {
     const c = g.campaign, ob = c?.obj, live = c && (c.phase === 'waves' || c.phase === 'climax') && ob && ob.type !== 'survive';
@@ -285,10 +323,13 @@ export function createHud(o) {
       const p = g.player;
       showScreens(g);
       fillObjective(g);
+      showStory(g);
+      if (barkT > 0 && (barkT -= dt) <= 0) els.bark.hidden = true;
       const open = g.campaign?.chapter.elements, ok = open ? open.join() : '';
       if (ok !== lockKey) { lockKey = ok; ORDER.forEach((el, i) => row.children[i]?.classList.toggle('is-locked', !!open && !open.includes(el))); }
       for (const e of events) {
-        if (e.type === 'chapterBegin') replay(els.banner, e.title);
+        if (e.type === 'chapterBegin') replay(els.banner, o.story?.text(e.id + '.title') ?? e.title);
+        else if (e.type === 'waveClear' && g.campaign && g.campaign.phase !== 'reward') bark(g);
         else if (e.type === 'climax') replay(els.banner, `Final wave · ${e.n}`);
         else if (e.type === 'chapterClear') replay(els.banner, `Chapter cleared · ${e.title}`);
         else if (e.type === 'camp') toast('Press Enter to go on');

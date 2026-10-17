@@ -508,12 +508,19 @@ Parameters and their defaults are in `data/campaign.json` and are checked by `lo
 rules yet (braziers, cross, circle) cannot start; those come with the chapters that use them. Co-op snapshots do not carry the
 burn target yet (R-103).
 
-### R-094 [planned] Story cards, barks, English and Vietnamese
-Presentation. Chapter briefing and ending cards, one-line barks in the quiet after a wave, and per-wizard lines come
-from one strings table: `data/story/en.json` and `data/story/vi.json`, keyed by id. Every key exists in both languages,
-no card or bark refers to a missing key, and a missing translation falls back to English. The language follows the
-browser and can be switched on the menu; the HUD's existing Vietnamese subtitles keep working. Vietnamese text is
-reviewed by a native speaker before release.
+### R-094 [done] Story cards, barks, English and Vietnamese
+Presentation. Chapter briefing and ending cards, one-line barks in the quiet after a wave, and per-wizard lines come from one
+strings table: `data/story/en.json` and `data/story/vi.json`, keyed by id (engine-neutral; read by `src/game/story.js`).
+- **Cards.** A chapter's briefing card shows when it is entered and the chapter waits for "Begin"; its ending card shows at the
+  camp, with "Continue". A card has a speaker (Elder Bram), a title and one to six short paragraphs. A chapter with no card
+  does not wait. The prologue's two cards are written.
+- **Barks.** After a cleared wave (not the last) the wizard says one line of their own, or Bram one of the court's. Every
+  wizard has three; which one is chosen depends only on the wave and the chapter, so it is the same every time.
+- **Languages.** Every key exists in both languages with the same kind of value; no card refers to a missing key; a missing
+  translation falls back to English. The language follows the browser's first language, and EN / VI on the menu switches it
+  and remembers the choice (`cow_lang`). Only the story strings change: the HUD, and the Vietnamese subtitles already on it, stay
+  as they are.
+- **Review.** The Vietnamese text is a draft: it is reviewed by a native speaker before release.
 
 ## Cracked Rune handoff in the browser (R-085 to R-087)
 

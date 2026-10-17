@@ -1,0 +1,71 @@
+{
+  "_notes": "Chuỗi cốt truyện, tiếng Việt (R-094). BẢN NHÁP: cần người bản ngữ rà soát trước khi phát hành. Mọi khóa phải có trong en.json.",
+
+  "speaker.bram": "Lão Bram",
+
+  "prologue.title": "Đêm Rune Vỡ",
+  "prologue.briefing": {
+    "speaker": "bram",
+    "title": "Đêm Rune Vỡ",
+    "text": [
+      "Lời thề điểm phân, như đã được tuyên thệ trong sân này suốt ba trăm năm: hai nguyên tố đan vào nhau đúng thứ tự thì giữ được thủy triều. Một nguyên tố chỉ là tia lửa. Hai nguyên tố mới là phép thuật.",
+      "Thử một cặp đi. Lửa với nước là được. Nó sẽ tạo ra hơi nước, và ta sẽ giả vờ là đã tính trước.",
+      "Đừng đứng giữa phép của chính mình. Đó không phải truyền thống, chỉ là lẽ thường."
+    ]
+  },
+  "prologue.ending": {
+    "speaker": "bram",
+    "title": "Rune Nứt Vỡ",
+    "text": [
+      "Lẽ ra việc này chỉ mất một tiếng và một bữa trưa tử tế.",
+      "Cây trượng vừa nứt ngay trong tay ngươi. Nghe thấy không? Như tiếng chuông rơi xuống đáy giếng. Các cổng đã mở, và không chỉ bốn cổng chúng ta biết.",
+      "Cổng biển là lối thoát duy nhất. Chạy đi."
+    ]
+  },
+
+  "bark.any": [
+    "Thở đi. Đợt sau đã đang nghĩ đến ngươi rồi.",
+    "Đếm ngón tay trước, rồi đếm năng lượng.",
+    "Dù đó là gì, nó cũng được tính."
+  ],
+  "bark.ember_pyromancer": [
+    "Xin ghi nhận rằng phần lớn ngọn lửa vừa rồi là cố ý.",
+    "Cái mũ vẫn ổn. Nó từng trải qua tệ hơn.",
+    "Một ngày nào đó tôi sẽ thắng một trận mà không có khói."
+  ],
+  "bark.rime_cryomancer": [
+    "Yên lặng rồi. Tốt. Đếm chúng đi, rồi đếm lại lần nữa.",
+    "Cái lạnh nhớ từng đứa đã đứng ở đâu.",
+    "...Chưa đâu."
+  ],
+  "bark.stone_druid": [
+    "Cái cột nói không có gì. Tôi bảo nó chỉ là cái cột.",
+    "Đá không tha thứ. Nhưng đá nhớ. Cũng như nhau, chỉ chậm hơn.",
+    "Bên trái. Không, bên trái kia."
+  ],
+  "bark.storm_conduit": [
+    "Tóc tôi chưa phẳng lại từ đợt ba. Đừng nhìn.",
+    "Tôi cảm được đợt sau trong cây gậy. Nó kêu như ấm nước sôi.",
+    "Ai đang đứng trong nước thì làm ơn đừng."
+  ],
+  "bark.arcane_archmage": [
+    "Hắn sẽ lao tới ở nhịp thứ ba. Tôi không đứng chỗ đó đâu.",
+    "Tôi đã đọc đợt này rồi. Đoạn kết hơi lộn xộn.",
+    "Tôi biết điều gì đến tiếp theo. Tôi sẽ không nói. Nói ra thì hỏng phép."
+  ],
+  "bark.terra_geomancer": [
+    "Không, ta không cần giúp. Có, ngươi có thể đứng sau lưng ta.",
+    "Ông nội ta giữ tuyến này bằng một cái xẻng. Ta có đá tốt hơn.",
+    "Đây là chuyện của gia tộc."
+  ],
+  "bark.zephyr_galesinger": [
+    "Gió thôi ngồi lê đôi mách rồi. Vậy là nó đang lo.",
+    "Đừng nói xin lỗi với cây. Chúng chưa muốn tha thứ đâu.",
+    "Nghe không? Cơn gió đang ngân nga đáp lại."
+  ],
+  "bark.void_necromancer": [
+    "Ngươi vừa dùng một phép mới. Tốt. Ta chưa từng thấy phép đó.",
+    "Chúng không phải của ta. Chưa bao giờ. Chúng chỉ là những thứ chưa hoàn thành.",
+    "Cố thêm chút nữa. Ta cũng đang cố."
+  ]
+}

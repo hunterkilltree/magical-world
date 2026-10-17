@@ -1,0 +1,71 @@
+{
+  "_notes": "Story strings, English (R-094). Engine-neutral. A value is a string, a list of strings (barks), or a card {speaker, title, text[]}. Every key must exist in vi.json too. Tone: grim but wry.",
+
+  "speaker.bram": "Elder Bram",
+
+  "prologue.title": "The Night the Rune Cracked",
+  "prologue.briefing": {
+    "speaker": "bram",
+    "title": "The Night the Rune Cracked",
+    "text": [
+      "The equinox oath, as it has been sworn in this court for three hundred years: two elements, woven in the right order, hold the tide. One element is a spark. Two are a spell.",
+      "Try a pair. Fire and water will do. It will make steam, and I will pretend I meant it.",
+      "Do not stand in your own spells. That part is not tradition, only common sense."
+    ]
+  },
+  "prologue.ending": {
+    "speaker": "bram",
+    "title": "The Rune Cracks",
+    "text": [
+      "That was meant to take an hour and a good lunch.",
+      "The Staff split in your hand. Did you hear it? A bell dropped down a well. The gates are open, and not only the four we know.",
+      "The sea gate is the only way out. Run."
+    ]
+  },
+
+  "bark.any": [
+    "Breathe. The next one is already thinking about you.",
+    "Count your fingers, then your energy.",
+    "Whatever that was, it counted."
+  ],
+  "bark.ember_pyromancer": [
+    "I would like it noted that most of that fire was on purpose.",
+    "The hat is fine. The hat has seen worse.",
+    "One day I will win a fight without smoke."
+  ],
+  "bark.rime_cryomancer": [
+    "Quiet. Good. Count them, and then count them again.",
+    "The cold remembers where each of them stood.",
+    "...Not yet."
+  ],
+  "bark.stone_druid": [
+    "The pillar says you are welcome. I told it it was a pillar.",
+    "Rocks do not forgive. They do remember. Same thing, slower.",
+    "Left. No, the other left."
+  ],
+  "bark.storm_conduit": [
+    "My hair has not been flat since the third wave. Do not look at it.",
+    "I can feel the next one in the rod. It hums like a kettle.",
+    "Anyone standing in water, please stop."
+  ],
+  "bark.arcane_archmage": [
+    "He will charge on the third beat. I would not be standing there.",
+    "I have read this wave. The ending is untidy.",
+    "I know what comes next. I will not tell you. It spoils the casting."
+  ],
+  "bark.terra_geomancer": [
+    "No, I do not need help. Yes, you may stand behind me.",
+    "My grandfather held this line with a shovel. I have better stones.",
+    "It is a family matter."
+  ],
+  "bark.zephyr_galesinger": [
+    "The wind has stopped gossiping. That is how I know it is worried.",
+    "Do not say sorry to the trees. They are not in a forgiving mood.",
+    "Hear that? The gale is humming back."
+  ],
+  "bark.void_necromancer": [
+    "You cast a new one. Good. I have not seen that one.",
+    "They are not mine. They never were. They are unfinished.",
+    "Hold on a little longer. I am holding on too."
+  ]
+}
