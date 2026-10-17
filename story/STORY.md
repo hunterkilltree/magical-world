@@ -489,12 +489,24 @@ unlocks), and `wizardsAvailable(campaign, profile.unlocked.wizards)` adds the on
 refuses a locked element with a `locked` event before the cancel rule runs. The Hollow Warden, Thane and Ilsa are earned,
 not given, so they stay locked in the campaign until the chapters that unlock them exist.
 
-### R-093 [planned] Objectives: hold, burn, escape
-Core. The sim gains objectives besides "survive": **hold** (a structure with health that enemies attack before they
-attack you; at 0 the wave restarts), **burn** (a target that only fire destroys) and **escape** (a timer and an exit;
-the wave ends the chapter when the timer runs out). Each shows on the HUD with its progress. Structures and timers
-scale with the party size through the existing party factor. The braziers, cross and circle objectives come with the
-chapters that use them.
+### R-093 [done] Objectives: hold, burn, escape
+Core. The sim gains objectives besides "survive"; the waves still come as usual, and the objective decides what clearing
+the chapter means. Each shows on the HUD with its progress, and the court shows what it is about (the winch, the pile, the
+exit ring). Structures and timers scale with the party size through the existing party factor: structure health by the enemy
+count factor of `PARTY_SCALE`, the clock by half of it (our tuning, not playtested).
+- **Hold.** A structure with health stands where the chapter says. It is a decoy that is not yours to hurt (your spells pass it
+  by); every enemy goes for it, near or far, before it goes for you; a cleared wave mends it by `healPct`. When it falls the
+  attempt ends like a wipe: solo, the wave comes again with the structure whole; co-op, the chapter is lost.
+- **Burn.** A target in the environment that only fire destroys: fire, or a burning body standing in it, lights it; it burns for
+  `need` seconds and is gone; water or ice put it out and the burn starts over. The chapter is cleared when the last wave is
+  cleared and the target is gone, in either order. If the pile still stands after the last wave, the waves stop and the court waits.
+- **Escape.** A clock starts with the chapter. When the last wave is cleared the exit opens, and the chapter is cleared when every
+  living wizard has stood in its ring for a second. When the clock runs out the attempt ends like a wipe and the last wave is
+  played again.
+
+Parameters and their defaults are in `data/campaign.json` and are checked by `loadCampaign`. A chapter whose objective has no
+rules yet (braziers, cross, circle) cannot start; those come with the chapters that use them. Co-op snapshots do not carry the
+burn target yet (R-103).
 
 ### R-094 [planned] Story cards, barks, English and Vietnamese
 Presentation. Chapter briefing and ending cards, one-line barks in the quiet after a wave, and per-wizard lines come

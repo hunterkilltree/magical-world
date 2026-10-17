@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWizard, animateRig, GAIT, WIZARDS } from '../wizard-rig.js';
-import { buildArena, buildEnemy, buildWall } from './models.js';
+import { buildArena, buildEnemy, buildWall, buildObjective } from './models.js';
 import { createFx2d, recipes as fxRecipes } from './fx2d.js';
 import { createArenaFx } from './arena-fx.js';
 import { ELEMENTS, resolveSpell } from './spells.js';
@@ -409,6 +409,8 @@ export function createView(canvas, overlay) {
     for (const G of ghosts.splice(0)) dropGhost(G);
     for (const G of decoyViews.values()) dropGhost(G);
     decoyViews.clear();
+    for (const v of objViews.values()) { scene.remove(v.group); for (const m of v.mats) m.dispose?.(); }
+    objViews.clear();
     for (const v of others.values()) dropView(v);
     others.clear();
     texts.length = 0;
@@ -941,9 +943,57 @@ export function createView(canvas, overlay) {
     v.group.position.set(p.x + Math.sin(v.yaw) * P.slide, 0, p.z + Math.cos(v.yaw) * P.slide);
   }
 
+  // Objective props (R-093): the winch being held, the pile to burn, the exit once it is open.
+  const objViews = new Map();
+  function syncObjective(s, dt) {
+    const seen = new Set();
+    const view = (id, kind, x, z, scale = 1) => {
+      let v = objViews.get(id);
+      if (!v) {
+        const group = buildObjective(kind), mats = [];
+        group.position.set(x, 0, z);
+        group.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+        scene.add(group);
+        v = { group, mats };
+        objViews.set(id, v);
+      }
+      v.group.scale.set(scale, v.group.scale.y, scale);
+      seen.add(id);
+      return v;
+    };
+    for (const D of s.decoys) if (D.objective) {
+      const v = view('d' + D.id, 'winch', D.x, D.z), hit = D.flash > 0;
+      for (const m of v.mats) if (m.emissive) { m.emissive.setHex(hit ? 0xff5a3a : 0x000000); m.emissiveIntensity = hit ? 0.9 : 0; }
+      v.group.rotation.z = hit ? Math.sin(t * 70) * 0.03 : 0;
+      if (D.hp / D.maxHp < 0.35 && Math.random() < dt * 8) puff('smoke', D.x + (Math.random() - 0.5) * 0.9, 1.8, D.z + (Math.random() - 0.5) * 0.4, 0, 1, 0);
+    }
+    for (const T of s.props.targets ?? []) {
+      const v = view('t' + T.id, 'logpile', T.x, T.z, T.r / 1.6);
+      const burning = T.state === 'burning', ash = T.state === 'ash';
+      for (const m of v.mats) if (m.emissive) {
+        m.color.setHex(ash ? 0x2b2724 : burning ? 0x4a2a12 : 0x6b4423);
+        m.emissive.setHex(burning ? 0xff5a1a : 0x000000); m.emissiveIntensity = burning ? 0.8 + Math.sin(t * 18 + T.x) * 0.3 : 0;
+      }
+      v.group.scale.y = ash ? 0.3 : burning ? Math.max(0.45, 1 - 0.55 * (T.t / T.need)) : 1;
+      if (burning) {
+        for (let i = rate(70, dt); i--;) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * T.r; puff('fire', T.x + Math.sin(a) * r, 0.3, T.z + Math.cos(a) * r, 0, 1.4, 0, { size: 1.4 }); }
+        for (let i = rate(10, dt); i--;) puff('smoke', T.x + (Math.random() - 0.5) * T.r, 1.4, T.z + (Math.random() - 0.5) * T.r, 0, 1, 0);
+        if (Math.random() < dt * 4) flash(T.x, T.z, 0xff7a2f, 20);
+      }
+    }
+    const o = s.campaign?.obj;
+    if (o?.type === 'escape' && o.open) {
+      const v = view('exit', 'exit', o.exit.x, o.exit.z, o.exit.r);
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+      v.mats.forEach((m, i) => { m.opacity = (i === 0 ? 0.45 : 0.08) + (i === 0 ? 0.25 : 0.08) * pulse + (o.held > 0 ? 0.25 : 0); });
+    }
+    for (const [id, v] of objViews) if (!seen.has(id)) { scene.remove(v.group); for (const m of v.mats) m.dispose?.(); objViews.delete(id); }
+  }
+
   function syncDecoys(s, dt) {
     const seen = new Set();
     for (const D of s.decoys) {
+      if (D.objective) continue; // a structure is drawn by syncObjective, not as a ghost wizard
       seen.add(D.id);
       let G = decoyViews.get(D.id);
       if (!G) { G = ghost({ x: D.x, z: D.z, yaw: D.face, color: D.sp.color, persist: true, scale: D.pulse ? 1.22 : 1, view: others.get(D.pid) }); if (!G) continue; G.age = 0; decoyViews.set(D.id, G); }
@@ -1054,6 +1104,7 @@ export function createView(canvas, overlay) {
     syncAreas(s, dt);
     syncWalls(s, dt);
     syncDecoys(s, dt);
+    syncObjective(s, dt);
     syncProps(s, dt);
     updateReticle(s);
     for (let i = transients.length - 1; i >= 0; i--) {
