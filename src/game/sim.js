@@ -5,9 +5,10 @@ import { ELEMENTS, MAX_QUEUE, CANCELS, resolveSpell, makeSpell } from './spells.
 import { ENEMY_TYPES, waveRoster } from './enemies.js';
 import { ROLES, STYLES, SHAPE_WEIGHT, WIZARD_ROLE, rolePair } from './roles.js';
 
-export const ARENA_R = 15;
+export const ARENA_R = 24;
+const SC = ARENA_R / 15; // layout authored at R=15, scaled out
 export const BOUND = ARENA_R - 0.9;
-export const GATES = [0, 0.5, 1, 1.5].map((k) => ({ a: k * Math.PI, x: Math.sin(k * Math.PI) * 13.2, z: -Math.cos(k * Math.PI) * 13.2 }));
+export const GATES = [0, 0.5, 1, 1.5].map((k) => ({ a: k * Math.PI, x: Math.sin(k * Math.PI) * (ARENA_R - 1.8), z: -Math.cos(k * Math.PI) * (ARENA_R - 1.8) }));
 export const TUNING = { r: 0.42, speed: 5.4, hp: 100, energy: 100, regen: 18, dodgeSpeed: 13.5, dodgeTime: 0.26,
   dodgeCd: 1.0, novaCd: 3, selfCd: 1.4, novaR: 3.4, aimRange: 10, wallDist: 2.4, shoveR: 2.6, fanR: 2.5,
   friendly: 0.5, reviveR: 1.8, reviveT: 3, reviveHp: 0.4, reviveDrain: 0.5 };
@@ -56,13 +57,18 @@ const matFor = (els) => (els.includes('ice') ? 'ice' : els.includes('nature') ? 
 
 function makeProps() {
   return {
-    pillars: [[-6.2, -5.4, 0.75], [6.4, -5.0, 0.75], [-6.6, 5.2, 0.75], [6.0, 5.8, 0.75], [0, -7, 0.6]]
+    // Inner ring (original layout, spread ×SC) + an outer ring that fills the larger floor.
+    pillars: [[-6.2, -5.4, 0.75], [6.4, -5.0, 0.75], [-6.6, 5.2, 0.75], [6.0, 5.8, 0.75], [0, -7, 0.6]].map(([x, z, r]) => [x * SC, z * SC, r])
+      .concat([[-15.5, -6, 0.9], [15.8, -7.5, 0.9], [-14, 11, 0.85], [13.5, 12.5, 0.85], [-5, 17, 0.75], [6.5, -17.5, 0.75], [0, 9.5, 0.6]])
       .map(([x, z, r], i) => ({ id: 'pil' + i, x, z, r })),
-    puddles: [[-4.2, 1.6, 1.9], [4.4, -1.8, 2.0], [1.0, 8.4, 1.6], [-1.5, -10.2, 1.7]]
+    puddles: [[-4.2, 1.6, 1.9], [4.4, -1.8, 2.0], [1.0, 8.4, 1.6], [-1.5, -10.2, 1.7]].map(([x, z, r]) => [x * SC, z * SC, r * 1.2])
+      .concat([[-17, 2, 2.1], [17.5, 3.5, 2.0], [-10, -16, 1.8], [11, 18, 1.8]])
       .map(([x, z, r], i) => ({ id: 'pud' + i, type: 'puddle', x, z, r, state: 'water', t: 0, tickT: 0 })),
-    brush: [[4.8, 3.2, 1.6], [-5.0, -2.2, 1.5], [-9.4, 2.2, 1.6], [9.6, -1.4, 1.5], [2.4, -9.6, 1.4]]
+    brush: [[4.8, 3.2, 1.6], [-5.0, -2.2, 1.5], [-9.4, 2.2, 1.6], [9.6, -1.4, 1.5], [2.4, -9.6, 1.4]].map(([x, z, r]) => [x * SC, z * SC, r * 1.2])
+      .concat([[-12, 15.5, 1.7], [14.5, -14, 1.7], [-18, -10, 1.5], [19, 9, 1.5], [-3, -19, 1.4], [3.5, 19.5, 1.4]])
       .map(([x, z, r], i) => ({ id: 'bru' + i, type: 'brush', x, z, r, state: 'dry', t: 0, tickT: 0, spreadT: 0 })),
-    barrels: [[2.6, -3.6], [-3.2, -6.8], [-9.0, -6.0], [9.4, 6.0], [-2.2, 10.6]]
+    barrels: [[2.6, -3.6], [-3.2, -6.8], [-9.0, -6.0], [9.4, 6.0], [-2.2, 10.6]].map(([x, z]) => [x * SC, z * SC])
+      .concat([[-17.5, -3], [18, -1], [-8, 18.5], [9, -19], [16, 15.5], [-15.5, -15]])
       .map(([x, z], i) => ({ id: 'bar' + i, type: 'barrel', x, z, r: 0.42, alive: true, fuse: 0 }))
   };
 }
@@ -1215,6 +1221,7 @@ function updateEnemy(s, e, dt) {
   tickStatus(s, e, dt);
   if (e.hp <= 0) return;
   const st = e.st, tg = targetOf(s, e);
+  if (!tg) { e.vx *= 0.9; e.vz *= 0.9; move(s, e, dt); return; } // an empty court (everyone left): nobody to chase
   const dx = tg.x - e.x, dz = tg.z - e.z, L = Math.hypot(dx, dz) || 1;
   const c = { t: tg, alive: tg.isPlayer ? tg.alive : tg.hp > 0, ux: dx / L, uz: dz / L, dist: L,
     spd: e.speed * slowMul(st), can: st.blind <= 0 && st.silence <= 0 };

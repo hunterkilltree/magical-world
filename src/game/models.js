@@ -1,9 +1,34 @@
 // Procedural three.js models for the arena, enemies and props. No game logic.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const cache = {};
 export const mat = (name, o) => (cache[name] ||= new THREE.MeshStandardMaterial({ name, ...o }));
 const rng = (seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+
+// Static batching: bake every opaque, untextured, non-moving mesh under root into one mesh per material
+// (hundreds of trees, rocks, tufts and wall stones → a handful of draw calls). Call before adding dynamic props.
+function batchStatic(root) {
+  root.updateMatrixWorld(true);
+  const buckets = new Map(), drop = [];
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || !o.geometry || o.material.transparent || o.material.map || o.userData.dynamic) return;
+    const key = o.material.uuid + (o.castShadow ? 's' : '');
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    g.applyMatrix4(o.matrixWorld);
+    (buckets.get(key) || buckets.set(key, { m: o.material, cast: o.castShadow, list: [] }).get(key)).list.push(g);
+    drop.push(o);
+  });
+  for (const o of drop) o.parent.remove(o);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  for (const { m, cast, list } of buckets.values()) {
+    const geo = mergeGeometries(list, false); if (!geo) continue; geo.applyMatrix4(inv);
+    const mesh = new THREE.Mesh(geo, m); mesh.castShadow = cast; mesh.receiveShadow = true; mesh.name = 'static_' + (m.name || 'batch'); root.add(mesh);
+    list.forEach((g) => g.dispose());
+  }
+}
 
 function put(parent, geo, m, pos, rot, scale, shadow = true) {
   const o = new THREE.Mesh(geo, m);
@@ -50,13 +75,14 @@ function floorTexture(radius) {
   return t;
 }
 
-export function buildArena(R, props, gates) {
+export function buildArena(R, props, gates, theme = 'court') {
+  if (theme === 'forest') return buildForest(R, props, gates);
   const g = new THREE.Group();
   const rand = rng(31);
   put(g, new THREE.CircleGeometry(R + 1.2, 96), new THREE.MeshStandardMaterial({ map: floorTexture(R + 1.2), roughness: 0.9, metalness: 0.02 }),
     [0, 0, 0], [-Math.PI / 2, 0, 0], null, false);
   put(g, new THREE.CylinderGeometry(R + 1.2, R + 1.8, 1, 64, 1, true), mat('court_rim', { color: 0x231e2c, roughness: 1 }), [0, -0.5, 0], null, null, false);
-  put(g, new THREE.CircleGeometry(90, 48), mat('outer_ground', { color: 0x1b1824, roughness: 1 }), [0, -0.6, 0], [-Math.PI / 2, 0, 0], null, false);
+  put(g, new THREE.CircleGeometry(140, 48), mat('outer_ground', { color: 0x1b1824, roughness: 1 }), [0, -0.6, 0], [-Math.PI / 2, 0, 0], null, false);
 
   const stone = mat('wall_stone', { color: 0x5d566a, roughness: 0.95, flatShading: true });
   const stoneDark = mat('wall_stone_dark', { color: 0x463f52, roughness: 0.95, flatShading: true });
@@ -64,7 +90,7 @@ export function buildArena(R, props, gates) {
   const brass = mat('arena_brass', { color: 0xc9a227, roughness: 0.4, metalness: 0.45 });
   const coal = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff8a3a).multiplyScalar(2.2), toneMapped: false });
 
-  const N = 40, rr = R + 0.85;
+  const N = Math.round(40 * R / 15), rr = R + 0.85;
   for (let i = 0; i < N; i++) {
     const a = ((i + 0.5) / N) * Math.PI * 2;
     if (gates.some((gt) => Math.abs(Math.atan2(Math.sin(a - gt.a), Math.cos(a - gt.a))) < 0.15)) continue;
@@ -94,12 +120,12 @@ export function buildArena(R, props, gates) {
     for (let k = -4; k <= 4; k++) put(G, new THREE.BoxGeometry(0.08, 1.2, 0.08), iron, [k * 0.5, 3.0, -0.3]);
     put(G, new THREE.BoxGeometry(4.6, 0.1, 0.1), iron, [0, 2.45, -0.3]);
     put(G, new THREE.RingGeometry(1.1, 1.22, 40), new THREE.MeshBasicMaterial({ color: 0x8a2b2b, transparent: true, opacity: 0.6, depthWrite: false }),
-      [0, 0.015, rr - 13.2], [-Math.PI / 2, 0, 0], null, false);
+      [0, 0.015, rr - (R - 1.8)], [-Math.PI / 2, 0, 0], null, false);
   }
 
   const pine = mat('pine_dark', { color: 0x1c2a27, roughness: 1, flatShading: true });
-  for (let i = 0; i < 54; i++) {
-    const a = rand() * Math.PI * 2, r = R + 4 + rand() * 16, s = 1.3 + rand() * 1.8;
+  for (let i = 0; i < 80; i++) {
+    const a = rand() * Math.PI * 2, r = R + 4 + rand() * 22, s = 1.3 + rand() * 1.8;
     const x = Math.sin(a) * r, z = -Math.cos(a) * r;
     put(g, new THREE.ConeGeometry(0.9 * s, 2.6 * s, 7), pine, [x, 1.0 * s, z]);
     put(g, new THREE.ConeGeometry(0.65 * s, 2.0 * s, 7), pine, [x, 2.2 * s, z]);
@@ -124,9 +150,15 @@ export function buildArena(R, props, gates) {
     pillars.push({ p, mat: m, h });
   }
 
+  batchStatic(g);
+  return { group: g, braziers, pillars, ...buildProps(g, props, rand, stoneDark, brass, 0x9c8a4c) };
+}
+
+
+function buildProps(g, props, rand, stoneDark, brass, brushColor, waterColor = 0x24527c) {
   const puddles = new Map();
   for (const p of props.puddles) {
-    const m = new THREE.MeshStandardMaterial({ color: 0x24527c, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.9 });
+    const m = new THREE.MeshStandardMaterial({ color: waterColor, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.9 });
     const o = put(g, new THREE.CircleGeometry(p.r, 36), m, [p.x, 0.025, p.z], [-Math.PI / 2, 0, rand() * 3], [1.06, 0.94, 1], false);
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2 + rand();
@@ -137,7 +169,7 @@ export function buildArena(R, props, gates) {
 
   const brush = new Map();
   for (const b of props.brush) {
-    const m = new THREE.MeshStandardMaterial({ color: 0x9c8a4c, roughness: 0.95, flatShading: true });
+    const m = new THREE.MeshStandardMaterial({ color: brushColor, roughness: 0.95, flatShading: true });
     const G = new THREE.Group();
     G.position.set(b.x, 0, b.z);
     g.add(G);
@@ -163,7 +195,91 @@ export function buildArena(R, props, gates) {
     barrels.set(b.id, { group: G, rune: runeM });
   }
 
-  return { group: g, braziers, pillars, puddles, brush, barrels };
+  return { puddles, brush, barrels };
+}
+
+// ---------------------------------------------------------------- forest glade
+function grassTexture(radius) {
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d'), rand = rng(11), cx = S / 2, px = S / (radius * 2);
+  g.fillStyle = '#4f7a34'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 260; i++) { const x = rand() * S, y = rand() * S, r = 20 + rand() * 70;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); const h = 90 + rand() * 25, l = 26 + rand() * 14;
+    gr.addColorStop(0, `hsla(${h},45%,${l}%,.55)`); gr.addColorStop(1, `hsla(${h},45%,${l}%,0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  // worn dirt: a central clearing and a looping path, with soft ragged edges
+  const dirt = (x, y, r) => { const gr = g.createRadialGradient(x, y, r * 0.2, x, y, r); gr.addColorStop(0, 'rgba(176,140,88,.95)'); gr.addColorStop(0.7, 'rgba(160,126,78,.75)'); gr.addColorStop(1, 'rgba(150,118,72,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+  for (let i = 0; i < 110; i++) { const a = rand() * 6.28, r = rand() * 4.6 * px; dirt(cx + Math.cos(a) * r, cx + Math.sin(a) * r, (0.9 + rand() * 1.4) * px); }
+  for (let i = 0; i < 160; i++) { const a = (i / 160) * 6.28, rr = (8.4 * radius / 16.2 + Math.sin(a * 3) * 1.1 + rand() * 0.4) * px; dirt(cx + Math.cos(a) * rr, cx + Math.sin(a) * rr, (0.55 + rand() * 0.5) * px); }
+  for (const a0 of [0.4, 2.2, 3.9, 5.3]) for (let k = 0; k < 48; k++) { const rr = (3 + k * 0.27 * radius / 16.2) * px, a = a0 + Math.sin(k * 0.4) * 0.12; dirt(cx + Math.cos(a) * rr, cx + Math.sin(a) * rr, (0.45 + rand() * 0.35) * px); }
+  for (let i = 0; i < 14000; i++) { const x = rand() * S, y = rand() * S; g.fillStyle = rand() < 0.5 ? `rgba(30,60,18,${rand() * 0.35})` : `rgba(150,190,80,${rand() * 0.22})`; g.fillRect(x, y, 1.5, 3 + rand() * 4); }
+  for (let i = 0; i < 260; i++) { const x = rand() * S, y = rand() * S; g.fillStyle = ['#f4f1e6', '#f6d24a', '#e9a6c8'][i % 3]; g.beginPath(); g.arc(x, y, 1.6 + rand() * 1.4, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+
+function tree(parent, x, z, s, rand, mats, trunkMat) {
+  const G = new THREE.Group(); G.position.set(x, 0, z); G.rotation.y = rand() * 6.28; parent.add(G);
+  const T = trunkMat || mats.bark, h = 2.2 * s;
+  put(G, new THREE.CylinderGeometry(0.22 * s, 0.38 * s, h, 8), T, [0, h / 2, 0], [rand() * 0.08, 0, rand() * 0.08]);
+  for (let k = 0; k < 4; k++) { const a = (k / 4) * 6.28 + rand(); put(G, new THREE.ConeGeometry(0.16 * s, 0.6 * s, 5), T, [Math.cos(a) * 0.32 * s, 0.18 * s, Math.sin(a) * 0.32 * s], [Math.sin(a) * 1.1, 0, -Math.cos(a) * 1.1]); }
+  const leaves = [mats.leafA, mats.leafB, mats.leafC];
+  for (let k = 0; k < 5; k++) { const a = rand() * 6.28, rr = k ? 0.7 * s : 0, y = h + (k ? 0.2 + rand() * 0.6 : 0.9) * s, r = (k ? 0.9 + rand() * 0.4 : 1.25) * s;
+    put(G, new THREE.IcosahedronGeometry(r, 1), leaves[(k + Math.floor(rand() * 3)) % 3], [Math.cos(a) * rr, y, Math.sin(a) * rr], [rand(), rand(), rand()], [1, 0.8, 1]); }
+  return G;
+}
+
+function buildForest(R, props, gates) {
+  const g = new THREE.Group(), rand = rng(53);
+  put(g, new THREE.CircleGeometry(R + 1.2, 96), new THREE.MeshStandardMaterial({ map: grassTexture(R + 1.2), roughness: 0.95 }), [0, 0, 0], [-Math.PI / 2, 0, 0], null, false);
+  put(g, new THREE.CircleGeometry(140, 48), mat('forest_floor', { color: 0x2f4a22, roughness: 1 }), [0, -0.02, 0], [-Math.PI / 2, 0, 0], null, false);
+  const mats = { bark: mat('bark', { color: 0x5a3d26, roughness: 1, flatShading: true }), leafA: mat('leaf_a', { color: 0x3f7a2c, roughness: 0.9, flatShading: true }),
+    leafB: mat('leaf_b', { color: 0x5c9a34, roughness: 0.9, flatShading: true }), leafC: mat('leaf_c', { color: 0x2c5a24, roughness: 0.9, flatShading: true }) };
+  const rock = mat('moss_rock', { color: 0x7d7a6c, roughness: 0.95, flatShading: true }), moss = mat('moss', { color: 0x4f7a2a, roughness: 1, flatShading: true });
+  const wood = mat('fence_wood', { color: 0x7a5534, roughness: 0.9, flatShading: true }), brass = mat('arena_brass', { color: 0xc9a227, roughness: 0.4, metalness: 0.45 });
+  const lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc46a).multiplyScalar(2.4), toneMapped: false });
+  const nearGate = (a, w) => gates.some((gt) => Math.abs(Math.atan2(Math.sin(a - gt.a), Math.cos(a - gt.a))) < w);
+  // Boundary: a ring of trees, bushes and mossy boulders, open at the four paths.
+  const rr = R + 1.4;
+  for (let i = 0; i < 54; i++) { const a = ((i + 0.5) / 54) * 6.28 + (rand() - 0.5) * 0.08; if (nearGate(a, 0.2)) continue;
+    const r = rr + rand() * 1.2; tree(g, Math.sin(a) * r, -Math.cos(a) * r, 1.1 + rand() * 0.5, rand, mats); }
+  for (let i = 0; i < 74; i++) { const a = rand() * 6.28; if (nearGate(a, 0.12)) continue; const r = R + 0.6 + rand() * 0.6, s = 0.5 + rand() * 0.5;
+    put(g, new THREE.IcosahedronGeometry(s, 1), [mats.leafA, mats.leafB, mats.leafC][i % 3], [Math.sin(a) * r, s * 0.6, -Math.cos(a) * r], [rand(), rand(), rand()], [1.2, 0.8, 1.2]); }
+  for (let i = 0; i < 20; i++) { const a = rand() * 6.28; if (nearGate(a, 0.12)) continue; const r = R + 0.3 + rand() * 0.8, s = 0.45 + rand() * 0.5;
+    put(g, new THREE.DodecahedronGeometry(s, 0), rock, [Math.sin(a) * r, s * 0.5, -Math.cos(a) * r], [rand(), rand(), rand()], [1.3, 0.8, 1]);
+    put(g, new THREE.DodecahedronGeometry(s * 0.7, 0), moss, [Math.sin(a) * r, s * 0.95, -Math.cos(a) * r], [rand(), rand(), rand()], [1.4, 0.35, 1.1]); }
+  // Deep woods beyond.
+  for (let i = 0; i < 130; i++) { const a = rand() * 6.28, r = R + 4 + rand() * 22; tree(g, Math.sin(a) * r, -Math.cos(a) * r, 1.3 + rand() * 1.1, rand, mats); }
+  // Gates: timber arches with hanging lanterns (these are the warm lights the arena flickers).
+  const braziers = [];
+  for (const gt of gates) {
+    const G = new THREE.Group(); G.position.set(Math.sin(gt.a) * (R + 0.9), 0, -Math.cos(gt.a) * (R + 0.9)); G.rotation.y = -gt.a; g.add(G);
+    [-1, 1].forEach((sd) => {
+      put(G, new THREE.CylinderGeometry(0.16, 0.2, 3.4, 7), wood, [sd * 2.4, 1.7, 0], [0, 0, sd * 0.04]);
+      put(G, new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), wood, [sd * 1.9, 2.95, 0]);
+      put(G, new THREE.CylinderGeometry(0.16, 0.13, 0.32, 8), brass, [sd * 1.9, 2.55, 0]);
+      put(G, new THREE.SphereGeometry(0.11, 10, 8), lamp, [sd * 1.9, 2.55, 0], null, null, false);
+      const light = new THREE.PointLight(0xffb05a, 9, 9, 2); light.position.set(sd * 1.9, 2.4, 0.2); G.add(light);
+      braziers.push({ light, local: new THREE.Vector3(sd * 1.9, 2.55, 0), group: G });
+    });
+    put(G, new THREE.BoxGeometry(5.4, 0.28, 0.32), wood, [0, 3.25, 0], [0, 0, 0.02]);
+    put(G, new THREE.BoxGeometry(4.6, 0.18, 0.24), wood, [0, 2.95, 0]);
+    for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) put(G, new THREE.BoxGeometry(1.4, 0.1, 0.08), wood, [sd * (3.3 + k * 0.05), 0.55 + k * 0.32, 0.1], [0, sd * 0.25, 0]);
+    put(G, new THREE.RingGeometry(1.1, 1.22, 40), new THREE.MeshBasicMaterial({ color: 0x6b4a1b, transparent: true, opacity: 0.6, depthWrite: false }), [0, 0.015, R + 0.9 - (R - 1.8)], [-Math.PI / 2, 0, 0], null, false);
+  }
+  // Pillars become old trees: same collision, trunk and canopy fade together when they hide the player.
+  const pillars = [];
+  for (const p of props.pillars) {
+    const trunk = new THREE.MeshStandardMaterial({ color: 0x5f4129, roughness: 1, flatShading: true, transparent: true });
+    const leaf = new THREE.MeshStandardMaterial({ color: 0x467f2e, roughness: 0.9, flatShading: true, transparent: true });
+    const G = tree(g, p.x, p.z, 1.15 + p.r * 0.35, rand, { bark: trunk, leafA: leaf, leafB: leaf, leafC: leaf });
+    put(G, new THREE.CylinderGeometry(p.r * 0.95, p.r * 1.1, 0.25, 9), moss, [0, 0.1, 0]);
+    pillars.push({ p, mat: trunk, mats: [trunk, leaf], h: 4 });
+  }
+  // Grass tufts scattered across the glade (visual only).
+  const tuft = mat('tuft', { color: 0x6aa63a, roughness: 1, flatShading: true });
+  for (let i = 0; i < 380; i++) { const a = rand() * 6.28, r = 2 + Math.sqrt(rand()) * (R - 2.5), x = Math.sin(a) * r, z = -Math.cos(a) * r;
+    for (let k = 0; k < 3; k++) put(g, new THREE.ConeGeometry(0.05, 0.28 + rand() * 0.2, 3), tuft, [x + (rand() - 0.5) * 0.25, 0.14, z + (rand() - 0.5) * 0.25], [(rand() - 0.5) * 0.5, rand() * 3, (rand() - 0.5) * 0.5], null, false); }
+  batchStatic(g);
+  return { group: g, braziers, pillars, ...buildProps(g, props, rand, rock, brass, 0x8f8a4a, 0x3d86a3) };
 }
 
 export function buildEnemy(kind) {

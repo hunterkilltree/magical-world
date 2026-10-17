@@ -6,6 +6,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWizard, animateRig, GAIT, WIZARDS } from '../wizard-rig.js';
 import { buildArena, buildEnemy, buildWall } from './models.js';
+import { createFx2d, recipes as fxRecipes } from './fx2d.js';
+import { createArenaFx } from './arena-fx.js';
 import { ELEMENTS, resolveSpell } from './spells.js';
 import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
@@ -174,7 +176,7 @@ const POSE = {
 };
 const DASH_POSE = { lean: 0.55, crouch: 0.3, arm: 0.6, tilt: 1.3, trail: 0.8 };
 const CH = ['lean', 'twist', 'roll', 'crouch', 'lunge', 'arm', 'tilt', 'trail', 'flare', 'slide'];
-const PROP_RX = /^(staff|shard_|crystal_socket|skull|jaw|horn_|rod_tip|coil_|club_|orb)/;
+const PROP_RX = /^(staff|shard_|crystal_socket|skull|jaw|horn_|rod_tip|coil_|club_|orb|geo_core|wind_)/;
 function spring(sp, target, k, dt, zeta = 0.5) {
   const c = 2 * Math.sqrt(k) * zeta, n = Math.max(1, Math.ceil(dt * Math.sqrt(k) * 2)), h = dt / n;
   for (let i = 0; i < n; i++) { sp.v += (k * (target - sp.x) - c * sp.v) * h; sp.x += sp.v * h; }
@@ -206,13 +208,13 @@ export function createView(canvas, overlay) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1530);
   scene.fog = new THREE.Fog(0x1a1530, 30, 64);
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 160);
-  scene.add(new THREE.HemisphereLight(0xa49ce0, 0x2b2230, 1.35));
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 220);
+  const hemi = new THREE.HemisphereLight(0xa49ce0, 0x2b2230, 1.35); scene.add(hemi);
   const moon = new THREE.DirectionalLight(0xccd2ff, 2.2);
-  moon.position.set(-9, 22, 8);
+  moon.position.set(-12, 30, 10);
   moon.castShadow = true;
   moon.shadow.mapSize.set(2048, 2048);
-  Object.assign(moon.shadow.camera, { left: -19, right: 19, top: 19, bottom: -19, near: 1, far: 60 });
+  Object.assign(moon.shadow.camera, { left: -28, right: 28, top: 28, bottom: -28, near: 1, far: 80 });
   moon.shadow.bias = -0.0004;
   moon.shadow.normalBias = 0.02;
   scene.add(moon, moon.target);
@@ -231,7 +233,20 @@ export function createView(canvas, overlay) {
   let flashI = 0;
   const flash = (x, z, color, power = 40) => { const l = flashes[flashI++ % flashes.length]; l.color.setHex(color); l.intensity = power; l.position.set(x, 1.4, z); };
 
+  // Arena themes: lighting, sky and fog per location.
+  const THEMES = {
+    court:  { bg: 0x1a1530, fog: [42, 92], sky: 0xa49ce0, ground: 0x2b2230, hemi: 1.35, sun: 0xccd2ff, sunI: 2.2, exp: 1.1 },
+    forest: { bg: 0x9cc4b0, fog: [46, 100], sky: 0xe6f4ff, ground: 0x48612e, hemi: 1.5, sun: 0xfff0d2, sunI: 2.9, exp: 1.0 }
+  };
+  let theme = null;
+  function applyTheme(id) {
+    const T = THEMES[id] ?? THEMES.court;
+    scene.background.setHex(T.bg); scene.fog.color.setHex(T.bg); scene.fog.near = T.fog[0]; scene.fog.far = T.fog[1];
+    hemi.color.setHex(T.sky); hemi.groundColor.setHex(T.ground); hemi.intensity = T.hemi;
+    moon.color.setHex(T.sun); moon.intensity = T.sunI; renderer.toneMappingExposure = T.exp;
+  }
   let arena = null, pv = null, shake = 0, t = 0, camMode = 'menu', menuBlend = 1;
+  const others = new Map(); // co-op (R-082): player id -> the view of every wizard but your own
   const camTarget = new THREE.Vector3(0, 0, 3.5);
   const enemyViews = new Map(), shotViews = new Map(), areaViews = new Map(), wallViews = new Map();
   const corpses = [], transients = [], texts = [];
@@ -246,11 +261,12 @@ export function createView(canvas, overlay) {
   const camK = { p: new THREE.Vector3(), v: new THREE.Vector3() };
   const ghosts = [], decoyViews = new Map();
   function ghost(o) {
-    if (!pv) return null;
-    const mat = ghostMat(o.color ?? 0xffffff), g = pv.group.clone(true);
+    const V = o.view ?? pv;
+    if (!V) return null;
+    const mat = ghostMat(o.color ?? 0xffffff), g = V.group.clone(true);
     g.traverse((c) => { if (c.userData.fx) c.visible = false; if (c.isMesh) { c.material = mat; c.castShadow = false; c.receiveShadow = false; } });
-    g.position.set(o.x ?? pv.group.position.x, 0, o.z ?? pv.group.position.z);
-    g.rotation.y = o.yaw ?? pv.yaw;
+    g.position.set(o.x ?? V.group.position.x, 0, o.z ?? V.group.position.z);
+    g.rotation.y = o.yaw ?? V.yaw;
     g.scale.setScalar(o.scale ?? 1);
     mat.uniforms.uA.value = o.a ?? 1;
     scene.add(g);
@@ -338,6 +354,14 @@ export function createView(canvas, overlay) {
   // ---------------------------------------------------------------- setup
   function setWizard(id) {
     if (pv) scene.remove(pv.group, ...pv.motes);
+    pv = buildView(id);
+  }
+
+  const viewOf = (p, s) => (!p ? null : p === s.player ? pv : others.get(p.id) ?? null);
+  function dropView(v) { scene.remove(v.group, ...v.motes); }
+
+  // One wizard model, with its status shells and queue motes, added to the scene.
+  function buildView(id) {
     const w = WIZARDS.find((x) => x.id === id) || WIZARDS[0];
     const built = buildWizard({ ...w });
     const group = built.group, root = built.rig.root;
@@ -352,7 +376,7 @@ export function createView(canvas, overlay) {
     const hatCone = group.getObjectByName('hat_cone');
     scene.add(group);
     let tip = null;
-    for (const n of ['staff_gem', 'shard_0', 'skull', 'rod_tip', 'orb', 'club_rune', 'hat_tip']) { tip = group.getObjectByName(n); if (tip) break; }
+    for (const n of ['staff_gem', 'geo_core', 'wind_eye', 'shard_0', 'skull', 'rod_tip', 'orb', 'club_rune', 'hat_tip']) { tip = group.getObjectByName(n); if (tip) break; }
     const ice = new THREE.Mesh(ICE_GEO, ICE_MAT);
     ice.scale.set(0.7, 1.15, 0.7); ice.position.y = 1.0; ice.visible = false;
     group.add(ice);
@@ -371,7 +395,7 @@ export function createView(canvas, overlay) {
     ice.userData.fx = ward.userData.fx = stones.userData.fx = true;
     const motes = [0, 1, 2].map(() => { const m = new THREE.Mesh(SPHERE, glowMat(0xffffff)); m.scale.setScalar(0.09); scene.add(m); return m; });
     const pose = {}; for (const c of CH) pose[c] = { x: 0, v: 0 };
-    pv = { group, rig: built.rig, tip, ice, ward, stones, motes, phase: 0, yaw: Math.PI, w, pivot, hand, side, hatCone, hatX: hatCone?.rotation.x ?? 0,
+    return { group, rig: built.rig, tip, ice, ward, stones, motes, phase: 0, yaw: Math.PI, w, pivot, hand, side, hatCone, hatX: hatCone?.rotation.x ?? 0,
       pose, hat: { x: 0, v: 0 }, whip: { x: 0, v: 0 } };
   }
 
@@ -385,12 +409,15 @@ export function createView(canvas, overlay) {
     for (const G of ghosts.splice(0)) dropGhost(G);
     for (const G of decoyViews.values()) dropGhost(G);
     decoyViews.clear();
+    for (const v of others.values()) dropView(v);
+    others.clear();
     texts.length = 0;
   }
   function disposeView(v) { for (const o of v.objs || [v.obj]) if (o) scene.remove(o); }
 
   function reset(game) {
-    if (!arena) { arena = buildArena(ARENA_R, game.props, GATES); scene.add(arena.group); }
+    const th = game.theme ?? 'court';
+    if (!arena || theme !== th) { if (arena) scene.remove(arena.group); arena = buildArena(ARENA_R, game.props, GATES, th); scene.add(arena.group); theme = th; applyTheme(th); }
     clearViews();
     if (!pv || pv.w.id !== game.player.wizard) setWizard(game.player.wizard);
     camTarget.set(game.player.x, 0, game.player.z);
@@ -406,46 +433,56 @@ export function createView(canvas, overlay) {
   }
 
   // ---------------------------------------------------------------- events
-  function tipPos() {
-    if (pv?.tip) return pv.tip.getWorldPosition(_v).clone();
-    return pv ? pv.group.position.clone().add(new THREE.Vector3(0, 1.6, 0)) : new THREE.Vector3();
+  // Painterly fx2d layer (see fx-showcase.html) on top of the existing particles; arena keeps its own post chain.
+  const fx2 = createFx2d({ scene, camera, renderer, lights: 0, post: false }); fx2.S.density = 0.75;
+  const FX = fxRecipes(fx2);
+  const PAL_OF = (els) => { const has = (x) => els.includes(x);
+    if (has('fire') && has('lightning')) return { fire: 'plasma', smoke: 'smoke', crack: 'magma' };
+    if (has('fire') && has('earth')) return { fire: 'magma', smoke: 'smoke', crack: 'magma' };
+    for (const [el, o] of [['fire', { fire: 'fire', smoke: 'smoke', crack: 'magma' }], ['lightning', { fire: 'lightning', smoke: 'wind', crack: 'lightning' }],
+      ['ice', { fire: 'ice', smoke: 'frost', crack: 'icefield' }], ['water', { fire: 'water', smoke: 'frost', crack: 'water' }], ['earth', { fire: 'dust', smoke: 'dust', crack: 'earth' }],
+      ['light', { fire: 'light', smoke: 'frost', crack: 'light' }], ['dark', { fire: 'dark', smoke: 'smoke', crack: 'dark' }], ['arcane', { fire: 'arcane', smoke: 'smoke', crack: 'arcane' }],
+      ['nature', { fire: 'nature', smoke: 'dust', crack: 'nature' }], ['wind', { fire: 'wind', smoke: 'wind', crack: 'wind' }]]) if (has(el)) return o;
+    return { fire: 'fire', smoke: 'smoke', crack: 'magma' }; };
+
+  let fxTip = null; // another wizard's staff tip while their event is drawn (R-082)
+  function tipPos(v = pv) {
+    if (v?.tip) return v.tip.getWorldPosition(_v).clone();
+    return v ? v.group.position.clone().add(new THREE.Vector3(0, 1.6, 0)) : new THREE.Vector3();
   }
 
+  const afx = createArenaFx({ fx: fx2, R: FX, tipPos: () => fxTip ?? tipPos(), scene });
+
+  // Events about the wizard on this screen use its body; another wizard's casts use theirs (R-082).
+  const BODY_ONLY = new Set(['queue', 'windup', 'dash', 'dashEnd', 'dodge']);
   function consume(events, game) {
     for (const e of events) {
-      wow.onEvent(e, game);
+      const mine = !e.pid || !game.player || e.pid === game.player.id;
+      const ov = mine ? null : others.get(e.pid) ?? null;
+      if (mine) wow.onEvent(e, game);
+      else if (!BODY_ONLY.has(e.type)) wow.onEvent(e, game, ov ? tipPos(ov) : null);
+      if (mine) afx.onEvent(e, game);
+      else if (!BODY_ONLY.has(e.type)) { fxTip = ov ? tipPos(ov) : null; afx.onEvent(e, game); fxTip = null; }
       switch (e.type) {
         case 'cast': {
-          const tp = tipPos();
-          for (const el of e.els) burst(elStyle(el), tp.x, tp.y, tp.z, 10, 2.2);
+          const tp = tipPos(ov ?? pv);
+          for (const el of e.els) burst(elStyle(el), tp.x, tp.y, tp.z, 6, 2.2);
+          FX.flash([tp.x, tp.y, tp.z], PAL_OF(e.els).fire, 0.9, 0);
           flash(tp.x, tp.z, e.color, 14);
           break;
         }
-        case 'cone': {
-          const half = (e.arc * Math.PI) / 360, base = Math.atan2(e.dx, e.dz), steam = e.els.includes('fire') && e.els.includes('water');
-          const styles = steam ? ['steam', 'steam', 'fire'] : e.els.map(elStyle);
-          for (const st of styles) for (let i = 0; i < 14; i++) {
-            const a = base + (Math.random() * 2 - 1) * half, sp = e.range * (2.4 + Math.random() * 1.6);
-            puff(st, e.x + Math.sin(a) * 0.6, 1.0 + Math.random() * 0.3, e.z + Math.cos(a) * 0.6, Math.sin(a) * sp, (Math.random() - 0.3) * 1.5, Math.cos(a) * sp,
-              { life: (e.range / sp) * (1.0 + Math.random() * 0.5), drag: 0.6, grav: st === 'water' ? 3 : STYLE[st].grav * 0.3, size: st === 'steam' ? 0.9 : 1.3 });
-          }
-          break;
-        }
-        case 'chain': lightning(e.pts, e.color); flash(e.pts[e.pts.length - 1][0], e.pts[e.pts.length - 1][1], 0xf4e15c, 30); break;
         case 'explode': {
-          const m = addMat(e.color, 1.2, 0.55), m2 = flatMat(e.color, 0.8);
-          const sph = new THREE.Mesh(SPHERE, m), ring = new THREE.Mesh(RING, m2);
-          sph.position.set(e.x, 0.7, e.z); ring.position.set(e.x, 0.06, e.z);
-          const g = new THREE.Group(); g.add(ring);
-          transient(g, 0.5, (k) => { sph.scale.setScalar(e.r * (0.25 + 0.6 * ease(k * 1.6))); m.opacity = 0.55 * (1 - k) ** 3; ring.scale.setScalar(e.r * (0.3 + 0.9 * ease(k))); m2.opacity = 0.8 * (1 - k); });
-          for (const el of e.els) burst(elStyle(el), e.x, 0.8, e.z, 12, e.r * 4.5, { up: 0.8, size: 1.2 });
-          
+          { const P = PAL_OF(e.els); FX.explosion([e.x, 0, e.z], { r: Math.min(1.5, e.r * 0.5), pal: P.fire, smoke: P.smoke, crackPal: P.crack, scorch: e.big ? 4 : 2.5, smokeScale: 0.5, smokeAlpha: 0.75 });
+            if (e.els.includes('earth') && e.els.includes('fire')) FX.rockfire([e.x, 0, e.z], { r: Math.min(1.1, e.r * 0.4), life: 2.4, rocks: 9 });
+            else if (e.els.includes('earth') || e.els.includes('ice')) FX.debris([e.x, 0, e.z], e.els.includes('ice') ? 'ice' : 'earth', e.big ? 12 : 7, 6, 0.22); }
+
           flash(e.x, e.z, e.color, e.big ? 60 : 35);
           shake = Math.min(1.2, shake + (e.big ? 0.55 : 0.28));
           break;
         }
         case 'impact':
           if (e.enemy) { burst('hex', e.x, 1.1, e.z, 14, 3); break; }
+          { const P = PAL_OF(e.els); FX.flash([e.x, 1.0, e.z], P.fire, 0.8, 0); FX.sparks([e.x, 1.0, e.z], P.fire, 8, 5); }
           for (const el of e.els) burst(elStyle(el), e.x, 1.0, e.z, 6, 3.2);
           if (e.kind === 'boulder') { burst('earth', e.x, 0.6, e.z, 16, 4); shake = Math.min(1, shake + 0.12); }
           flash(e.x, e.z, e.color, 18);
@@ -506,7 +543,7 @@ export function createView(canvas, overlay) {
         }
         case 'nova': {
           ringFx(e.x, e.z, e.r, e.color, 0.45);
-          for (const el of e.els) for (let i = 0; i < 48; i++) { const a = Math.random() * 6.28, sp = e.r * (2.6 + Math.random()); puff(elStyle(el), e.x, 0.6, e.z, Math.sin(a) * sp, 0.6, Math.cos(a) * sp, { life: e.r / sp, drag: 0.4, grav: 0, size: 1.3 }); }
+          for (const el of e.els) for (let i = 0; i < 16; i++) { const a = Math.random() * 6.28, sp = e.r * (2.6 + Math.random()); puff(elStyle(el), e.x, 0.6, e.z, Math.sin(a) * sp, 0.6, Math.cos(a) * sp, { life: e.r / sp, drag: 0.4, grav: 0, size: 1.3 }); }
           flash(e.x, e.z, e.color, 40);
           break;
         }
@@ -778,7 +815,7 @@ export function createView(canvas, overlay) {
       else if (pd.state === 'charged') {
         m.color.setHex(0x3d7fbf); m.emissive.setHex(0xf4e15c); m.emissiveIntensity = 0.25 + Math.random() * 0.35; m.roughness = 0.1;
         for (let i = rate(50, dt); i--;) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * pd.r; puff('lightning', pd.x + Math.sin(a) * r, 0.08, pd.z + Math.cos(a) * r, (Math.random() - 0.5) * 2, 2 + Math.random() * 3, (Math.random() - 0.5) * 2); }
-      } else { m.color.setHex(0x24527c); m.emissive.setHex(0x000000); m.emissiveIntensity = 0; m.roughness = 0.08; }
+      } else { m.color.setHex(theme === 'forest' ? 0x3d86a3 : 0x24527c); m.emissive.setHex(0x000000); m.emissiveIntensity = 0; m.roughness = 0.08; }
     }
     for (const br of s.props.brush) {
       const v = arena.brush.get(br.id), m = v.mat;
@@ -789,7 +826,7 @@ export function createView(canvas, overlay) {
         for (let i = rate(8, dt); i--;) puff('smoke', br.x + (Math.random() - 0.5) * br.r, 1.2, br.z + (Math.random() - 0.5) * br.r, 0, 1, 0);
         if (Math.random() < dt * 4) flash(br.x, br.z, 0xff7a2f, 18);
       } else if (br.state === 'ash') { m.color.setHex(0x2b2724); m.emissive.setHex(0x000000); m.emissiveIntensity = 0; v.group.scale.y = 0.3; }
-      else { m.color.setHex(0x9c8a4c); m.emissive.setHex(0x000000); m.emissiveIntensity = 0; v.group.scale.y = 1; }
+      else { m.color.setHex(theme === 'forest' ? 0x8f8a4a : 0x9c8a4c); m.emissive.setHex(0x000000); m.emissiveIntensity = 0; v.group.scale.y = 1; }
     }
     for (const b of s.props.barrels) {
       const v = arena.barrels.get(b.id);
@@ -799,8 +836,22 @@ export function createView(canvas, overlay) {
     }
   }
 
-  function updatePlayerView(s, dt) {
-    const p = s.player, v = pv;
+  function updatePlayerViews(s, dt) {
+    const me = s.player;
+    if (me && (!pv || pv.w.id !== me.wizard)) setWizard(me.wizard);
+    if (me) updatePlayerView(s, me, pv, dt);
+    const seen = new Set();
+    for (const p of s.players ?? []) {
+      if (p === me) continue;
+      seen.add(p.id);
+      let v = others.get(p.id);
+      if (!v || v.w.id !== p.wizard) { if (v) dropView(v); v = buildView(p.wizard); others.set(p.id, v); }
+      updatePlayerView(s, p, v, dt);
+    }
+    for (const [id, v] of others) if (!seen.has(id)) { dropView(v); others.delete(id); }
+  }
+
+  function updatePlayerView(s, p, v, dt) {
     if (!v) return;
     v.group.position.set(p.x, 0, p.z);
     v.yaw = lerpAngle(v.yaw, s.mode === 'menu' ? 0 : Math.atan2(p.fx, p.fz), 1 - Math.exp(-18 * dt));
@@ -887,7 +938,7 @@ export function createView(canvas, overlay) {
     for (const D of s.decoys) {
       seen.add(D.id);
       let G = decoyViews.get(D.id);
-      if (!G) { G = ghost({ x: D.x, z: D.z, yaw: D.face, color: D.sp.color, persist: true, scale: D.pulse ? 1.22 : 1 }); if (!G) continue; G.age = 0; decoyViews.set(D.id, G); }
+      if (!G) { G = ghost({ x: D.x, z: D.z, yaw: D.face, color: D.sp.color, persist: true, scale: D.pulse ? 1.22 : 1, view: others.get(D.pid) }); if (!G) continue; G.age = 0; decoyViews.set(D.id, G); }
       G.age += dt;
       G.g.position.set(D.x, 0.04 + Math.sin(t * 3 + D.id) * 0.04 + (D.pulse ? 0.15 : 0), D.z);
       if (D.vx || D.vz) G.g.rotation.y = lerpAngle(G.g.rotation.y, Math.atan2(D.vx, D.vz), 1 - Math.exp(-6 * dt));
@@ -989,7 +1040,7 @@ export function createView(canvas, overlay) {
   // ---------------------------------------------------------------- frame
   function render(s, dt) {
     t += dt;
-    updatePlayerView(s, dt);
+    updatePlayerViews(s, dt);
     syncEnemies(s, dt);
     syncShots(s, dt);
     syncAreas(s, dt);
@@ -1013,7 +1064,7 @@ export function createView(canvas, overlay) {
     }
     for (const b of arena.braziers) {
       const flick = 0.82 + Math.sin(t * 13 + b.local.x) * 0.08 + Math.random() * 0.12;
-      b.light.intensity = 16 * flick;
+      b.light.intensity = (theme === 'forest' ? 9 : 16) * flick;
       if (Math.random() < dt * 24) {
         _v.copy(b.local); b.group.localToWorld(_v);
         puff('fire', _v.x + (Math.random() - 0.5) * 0.25, _v.y, _v.z + (Math.random() - 0.5) * 0.25, 0, 1.2, 0, { size: 1.1 });
@@ -1042,12 +1093,14 @@ export function createView(canvas, overlay) {
 
     for (const pl of arena.pillars) {
       const dz = pl.p.z - p.z, dx = Math.abs(pl.p.x - p.x);
-      const hide = menuBlend < 0.5 && dz > 0 && dz < 4.2 && dx < pl.p.r + 0.9;
-      pl.mat.opacity += ((hide ? 0.28 : 1) - pl.mat.opacity) * Math.min(1, dt * 10);
-      pl.mat.depthWrite = pl.mat.opacity > 0.95;
+      const hide = (menuBlend < 0.5 && dz > 0 && dz < 4.2 && dx < pl.p.r + 0.9) || Math.hypot(pl.p.x - camera.position.x, pl.p.z - camera.position.z) < 3.6;
+      const op = pl.mat.opacity + ((hide ? 0.28 : 1) - pl.mat.opacity) * Math.min(1, dt * 10);
+      for (const mm of pl.mats ?? [pl.mat]) { mm.opacity = op; mm.depthWrite = op > 0.95; }
     }
 
     wow.update(dt, s, pv ? tipPos() : null);
+    afx.update(s);
+    fx2.update(dt);
     composer.render();
     drawOverlay(s, dt);
   }
@@ -1090,6 +1143,30 @@ export function createView(canvas, overlay) {
     }
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
+    // co-op (R-082): every wizard's name, and how far a downed one's revive has got
+    if (s.coop) for (const p of s.players) {
+      const sc = project(p.x, p.alive ? 2.45 : 0.9, p.z);
+      if (!sc) continue;
+      const w = WIZARDS.find((x) => x.id === p.wizard) ?? WIZARDS[0], col = hexCss(w.glow);
+      ctx.font = `700 ${12 * d}px 'Space Grotesk', sans-serif`;
+      ctx.lineWidth = 4 * d;
+      ctx.strokeStyle = 'rgba(14,10,24,.85)';
+      const label = p === s.player ? 'You' : p.name ?? p.id;
+      ctx.strokeText(label, sc[0], sc[1]);
+      ctx.fillStyle = col;
+      ctx.fillText(label, sc[0], sc[1]);
+      if (p.down) {
+        const k = Math.min(1, (p.reviveT ?? 0) / TUNING.reviveT), r = 16 * d, cy = sc[1] - 26 * d;
+        ctx.lineWidth = 4 * d;
+        ctx.strokeStyle = 'rgba(14,10,24,.7)';
+        ctx.beginPath(); ctx.arc(sc[0], cy, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#7ee08a';
+        ctx.beginPath(); ctx.arc(sc[0], cy, r, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#f4f1ff';
+        ctx.font = `700 ${10 * d}px 'Space Grotesk', sans-serif`;
+        ctx.fillText(k > 0 ? 'REVIVING' : 'DOWN', sc[0], cy + 4 * d);
+      }
+    }
     for (let i = texts.length - 1; i >= 0; i--) {
       const tx = texts[i];
       tx.t += dt;

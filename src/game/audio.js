@@ -169,7 +169,6 @@ export function createAudio() {
         const stopTime = targetTime + clipLen;
         gainNode.gain.setValueAtTime(peakVol, fadeStart);
         gainNode.gain.linearRampToValueAtTime(0.0001, stopTime);
-        src.stop(stopTime + 0.05);
       }
 
       // Spatial stereo panning if event position is provided
@@ -192,6 +191,7 @@ export function createAudio() {
       }
 
       src.start(targetTime, offset);
+      if (clipLen > 0) src.stop(targetTime + clipLen + 0.05); // a source must start before it can be told to stop
     };
 
     if (bufferCache.has(url)) {

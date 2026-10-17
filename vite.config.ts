@@ -7,6 +7,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     // @ts-ignore
-    allowedHosts: 'all'
+    allowedHosts: 'all',
+    // co-op (R-082): the page talks to /ws; in dev that is `npm run server` on port 8787
+    proxy: { '/ws': { target: 'ws://localhost:8787', ws: true } }
   }
 });

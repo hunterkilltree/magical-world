@@ -117,7 +117,13 @@ export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8
 
   const ticker = setInterval(() => {
     const now = performance.now();
-    for (const r of rooms.values()) r.update(now);
+    for (const r of rooms.values()) {
+      try { r.update(now); } catch (e) { // one broken room must not take the server down
+        console.error(`room ${r.code} failed and was closed:`, e);
+        for (const conn of r.members.keys()) { err(conn, 'room_failed', 'the room hit an error and was closed'); sockets.get(conn)?.close(1011, 'room failed'); }
+        rooms.delete(r.code);
+      }
+    }
   }, tickMs);
 
   await new Promise((resolve, reject) => { http_.once('error', reject); http_.listen(port, host, resolve); });

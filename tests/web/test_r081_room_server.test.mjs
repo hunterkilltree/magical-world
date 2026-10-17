@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
-import { validateClientMessage, ROOM_CODE_RE, WIZARD_IDS, ROLE_IDS } from '../../src/net/protocol.js';
+import { validateClientMessage, ROOM_CODE_RE, WIZARD_IDS, ROLE_IDS, AIM_LIMIT } from '../../src/net/protocol.js';
 import { snapshotState, applySnapshot } from '../../src/net/snapshot.js';
 import { Room } from '../../server/room.js';
 import { createServer } from '../../server/index.js';
@@ -24,7 +24,7 @@ test('join: name and room code are cleaned up and checked', () => {
 });
 
 test('pick only takes known wizards and roles', () => {
-  assert.equal(WIZARD_IDS.length, 6);
+  assert.equal(WIZARD_IDS.length, 8);
   assert.equal(ROLE_IDS.length, 5);
   assert.deepEqual(ok({ type: 'pick', wizard: 'stone_druid', role: 'guardian' }), { type: 'pick', wizard: 'stone_druid', role: 'guardian' });
   assert.equal(ok({ type: 'pick', wizard: 'stone_druid' }).role, null);
@@ -36,7 +36,7 @@ test('input is clamped: unit movement, aim inside the court, a few known actions
   const m = ok({ type: 'input', seq: 7, move: { x: 5, z: -9 }, aim: { x: 1e9, z: -1e9 }, actions: ['el:fire', 'cast', 'pause', 'restart', 'el:plasma', 'recast', 7] });
   assert.equal(m.seq, 7);
   assert.ok(Math.abs(Math.hypot(m.move.x, m.move.z) - 1) < 1e-9, 'unit length');
-  assert.ok(Math.hypot(m.aim.x, m.aim.z) <= 40 + 1e-6, 'aim stays near the court');
+  assert.ok(Math.hypot(m.aim.x, m.aim.z) <= AIM_LIMIT + 1e-6, 'aim stays near the court');
   assert.deepEqual(m.actions, ['el:fire', 'cast', 'recast'], 'pause, restart and made-up actions are dropped');
   assert.equal(ok({ type: 'input', seq: 1, move: { x: 0.3, z: 0.2 }, aim: { x: 1, z: 1 }, actions: [] }).move.x, 0.3);
   assert.equal(ok({ type: 'input', seq: 1, move: { x: 0, z: 0 }, aim: { x: 0, z: 0 }, actions: Array(100).fill('cast') }).actions.length, 12, 'at most 12 actions');
@@ -411,4 +411,27 @@ test('over real WebSockets: ping gets a pong', async (t) => {
 test('single-player sim is untouched by any of this', () => {
   const g = createGame('ember_pyromancer');
   assert.equal(g.coop, false);
+});
+
+test('a running room that everyone leaves stops stepping instead of crashing', () => {
+  const { room } = mkRoom();
+  joinN(room, 2);
+  room.setReady('c1', true); room.setReady('c2', true); room.start('c1');
+  room.game.wave = 2; room.game.waveT = 0.001;
+  room.update(0);
+  for (let t = 100; t <= 3000; t += 100) room.update(t); // enemies are in the court now
+  assert.ok(room.game.enemies.length > 0);
+  room.leave('c1'); room.leave('c2');
+  const ticks = room.tickCount;
+  assert.doesNotThrow(() => { for (let t = 3100; t <= 4000; t += 100) room.update(t); });
+  assert.equal(room.tickCount, ticks, 'no ticks while empty');
+});
+
+test('the sim itself survives a court with enemies and no wizards', () => {
+  const g = createCoopGame([{ wizard: 'ember_pyromancer' }]);
+  g.mode = 'play'; g.wave = 3; g.waveT = 0.001;
+  for (let i = 0; i < 300; i++) step(g, { players: {} }, 1 / 60);
+  assert.ok(g.enemies.length > 0);
+  g.players.splice(0);
+  assert.doesNotThrow(() => { for (let i = 0; i < 120; i++) step(g, { players: {} }, 1 / 60); });
 });

@@ -90,8 +90,32 @@ export const App: React.FC = () => {
             <div className="label"><span>Casting role · Role archetype</span></div>
             <div className="roles" id="m-roles"></div>
             <div className="rolecard" id="m-rolecard"></div>
+            <div className="label"><span>Arena · Đấu trường</span></div>
+            <div className="roles arenas" id="m-arenas"></div>
             <div className="actions">
               <button className="btn btn-primary" id="m-start">Enter the court</button>
+            </div>
+            <div className="label"><span>Play together · up to four</span><span id="m-net-status"></span></div>
+            <div className="coop" id="m-coop">
+              <div className="coop-join" id="m-coop-join">
+                <div className="coop-row">
+                  <input id="m-name" className="field" maxLength={16} placeholder="Your name" autoComplete="off" />
+                  <button className="btn btn-ghost" id="m-create">Create room</button>
+                </div>
+                <div className="coop-row">
+                  <input id="m-code" className="field code" maxLength={4} placeholder="CODE" autoComplete="off" />
+                  <button className="btn btn-ghost" id="m-join">Join room</button>
+                </div>
+              </div>
+              <div className="lobby" id="m-lobby" hidden>
+                <div className="lobby-head"><span className="k">Room</span><b id="m-room">----</b><button className="btn btn-ghost sm" id="m-leave">Leave</button></div>
+                <div className="party" id="m-party"></div>
+                <p className="lobby-hint" id="m-lobby-hint">Share the code. Pick your wizard and role above, then ready up.</p>
+                <div className="actions">
+                  <button className="btn btn-ghost" id="m-ready">Ready</button>
+                  <button className="btn btn-primary" id="m-go" hidden>Start the run</button>
+                </div>
+              </div>
             </div>
             <div className="label">Controls</div>
             <div className="controls"></div>

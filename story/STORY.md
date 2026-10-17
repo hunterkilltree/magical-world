@@ -421,17 +421,47 @@ message (shape, size, element/wizard/role whitelists) and clamps input; a player
 who leaves is removed (the host passes to the next player); an empty room is
 destroyed. Protocol in `src/net/protocol.js`.
 
-### R-082 [planned] The browser joins a room
-Presentation. Lobby screen (room code, names, wizard and role, ready); client
-networking that sends input and applies snapshots to a local game the renderer
-understands, with entity interpolation about 100 ms behind.
+### R-082 [done] The browser joins a room
+Presentation. The menu has a "Play together" panel: a name, Create room, or a
+room code and Join. In a room it lists the party (name, wizard, role, ready),
+picking a wizard or role in the menu picks it for the room, Ready toggles, and
+the host starts the run. `src/net/client.js` connects to `/ws` (Vite forwards it
+to `npm run server`), sends input 30 times a second with a sequence number, and
+hands snapshots to a buffer (`src/net/interp.js`) that shows the world about
+100 ms behind the server: positions blend between the two snapshots around that
+moment, and each snapshot's events play once, when the view reaches it. Every
+wizard in the room is drawn (their own model, cast poses and effects) with a
+name tag, and a downed wizard shows how far their revive has got. Personal
+events of other wizards (their queue, fizzles, damage taken) do not toast or
+chime for you. A dropped connection returns you to the menu.
 
-### R-083 [planned] Four wizards on screen
-Presentation. One wizard rig per player with a name tag, the camera frames the
-party, a party strip with each wizard's health and energy, revive rings and a
-scoreboard on defeat.
+### R-083 [planned] The party on screen
+Presentation. The camera frames the party (it follows only you today), a party
+strip with each wizard's health and energy, and a scoreboard on defeat.
 
 ### R-084 [planned] Netcode polish
 Client prediction for the local wizard reconciled with `ack`, snapshot deltas
 (under 8 KB/s per client), reconnecting with the same id for 30 s, a ping
 display, per-player stats on the defeat screen.
+
+## Cracked Rune handoff in the browser (R-085 to R-087)
+
+The browser port takes the Staff of the Cracked Rune handoff (reference JS in `src/game/`). Gameplay numbers in
+the handoff are final; web tests are `tests/web/test_rNNN_<name>.test.mjs`.
+
+### R-085 [done] Two arenas and an arena picker
+Presentation. The court is a round arena of radius 24 with four gates on its rim. The menu has an Arena
+picker (Court of Waves, Hollow Glade); the choice is kept in the URL as `?a=forest` and sets `game.theme`, which the
+view reads to build the court or the glade (their own floor, props, light and water colours). The sim plays the same in
+either arena.
+
+### R-086 [done] Eight wizards on five roles
+Presentation. The roster has eight wizards, each with a role: the original five plus Thane Granitebrow (earth,
+destroyer), Ilsa Galesinger (wind, trickster) and The Hollow Warden (void, controller). Five roles own 45 pair
+spells each (225); any wizard can cast any pair without breaking the sim.
+
+### R-087 [done] Painterly effects layer
+Presentation. Spell effects are drawn as layered 2D sprites (`fx2d.js` recipes, `arena-fx.js` per-event
+casting language, `ice-spear.js`, `earth-fx.js`, `chain-fx.js`) on top of the older particles, whose density is
+cut to leave room for them. Every element, alone or mixed, maps to palettes that exist; fire+lightning is plasma,
+fire+earth magma, water+ice an ice field. Another wizard's casts in co-op use their own staff tip.

@@ -19,6 +19,7 @@ const icon = (el) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICON[el] ?? 
 const chips = (els) => els.map((e) => `<i style="--c:${hex(ELEMENTS[e].color)}" title="${ELEMENTS[e].name}">${icon(e)}</i>`).join('');
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const $ = (id) => document.getElementById(id);
 
 const CONTROLS = [
@@ -79,6 +80,28 @@ export function createHud(o) {
   }
   fillRoster($('m-roster'));
 
+  // Arena: where the fight happens. Same rules and props, different place.
+  const ARENAS = [
+    { id: 'court', name: 'Court of Waves', vi: 'Sân Thành Grauhold', kick: 'Grauhold Keep · Inner court', c: '#7c3aff' },
+    { id: 'forest', name: 'Hollow Glade', vi: 'Rừng Cây', kick: 'Mossbarrow Wood · Old glade', c: '#4f9a2c' }
+  ];
+  function fillArenas() {
+    const node = $('m-arenas'); if (!node) return;
+    const cur = o.themeOf?.() ?? 'court', A = ARENAS.find((a) => a.id === cur) ?? ARENAS[0];
+    node.innerHTML = '';
+    ARENAS.forEach((a) => {
+      const b = document.createElement('button');
+      b.className = 'role arena' + (a.id === cur ? ' is-on' : '');
+      b.style.setProperty('--c', a.c);
+      b.innerHTML = `<i></i><b>${a.name}</b><small>${a.vi}</small>`;
+      b.addEventListener('click', () => { o.onArena(a.id); fillArenas(); });
+      node.appendChild(b);
+    });
+    const t = document.querySelector('#menu h1'), k = document.querySelector('#menu .kicker');
+    if (t) t.textContent = A.name; if (k) k.textContent = A.kick;
+  }
+  fillArenas();
+
   // Casting role: the same pair becomes a different spell, thrown with a different body.
   function fillRoles() {
     const node = $('m-roles'), cur = o.roleOf();
@@ -126,6 +149,64 @@ export function createHud(o) {
 
 
   $('m-start').addEventListener('click', () => o.onStart());
+
+  // ---------------------------------------------------------------- co-op lobby (R-082)
+  const net = { name: $('m-name'), code: $('m-code'), join: $('m-coop-join'), lobby: $('m-lobby'), room: $('m-room'), party: $('m-party'),
+    status: $('m-net-status'), ready: $('m-ready'), go: $('m-go'), hint: $('m-lobby-hint') };
+  try { net.name.value = localStorage.getItem('cow.name') ?? ''; } catch {}
+  const nameOf = () => { const v = net.name.value.trim(); try { localStorage.setItem('cow.name', v); } catch {} return v || 'Wizard'; };
+  let amReady = false;
+  $('m-create').addEventListener('click', () => o.onCreate?.(nameOf()));
+  $('m-join').addEventListener('click', () => {
+    const code = net.code.value.trim().toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) { setNetStatus('A room code is four letters', true); net.code.focus(); return; }
+    o.onJoin?.(code, nameOf());
+  });
+  net.code.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Enter') $('m-join').click(); });
+  net.name.addEventListener('keydown', (ev) => ev.stopPropagation());
+  $('m-leave').addEventListener('click', () => o.onLeave?.());
+  net.ready.addEventListener('click', () => o.onReady?.(!amReady));
+  net.go.addEventListener('click', () => o.onGo?.());
+
+  function setNetStatus(text, err = false) {
+    net.status.textContent = text ?? '';
+    net.status.classList.toggle('err', !!err);
+  }
+
+  // msg: the server's lobby message, or null when not in a room.
+  function setLobby(msg, me) {
+    net.lobby.hidden = !msg;
+    net.join.hidden = !!msg;
+    $('m-start').hidden = !!msg;
+    if (!msg) { amReady = false; return; }
+    net.room.textContent = msg.room;
+    const mine = msg.players.find((p) => p.id === me);
+    amReady = !!mine?.ready;
+    net.party.innerHTML = msg.players.map((p) => {
+      const w = o.wizards.find((x) => x.id === p.wizard) ?? o.wizards[0], R = ROLES[p.role];
+      const tag = p.ready ? '<span class="tag ready">Ready</span>' : '<span class="tag">Choosing</span>';
+      return `<div class="party-row${p.id === me ? ' me' : ''}"><span class="sw" style="background:${hex(w.glow)}"></span>`
+        + `<span><b>${escapeHtml(p.name)}</b>${p.host ? ' <small>· host</small>' : ''}<br><small>${w.name} · ${R ? R.name : ''}</small></span>${tag}</div>`;
+    }).join('');
+    net.ready.textContent = amReady ? 'Not ready' : 'Ready';
+    net.ready.classList.toggle('btn-primary', !amReady);
+    net.ready.classList.toggle('btn-ghost', amReady);
+    const host = !!mine?.host, all = msg.players.every((p) => p.ready);
+    net.go.hidden = !host;
+    net.go.disabled = !all;
+    net.hint.textContent = msg.phase === 'play' ? 'The run is under way.' : host ? (all ? 'Everyone is ready. Start when you like.' : 'Share the code. Start once everyone is ready.')
+      : 'Share the code. Pick your wizard and role above, then ready up.';
+    $('d-restart').textContent = host ? 'Start again · R' : 'Waiting for the host';
+    $('d-restart').disabled = !host;
+    $('d-menu').textContent = 'Leave the room';
+  }
+
+  function setOffline() {
+    setLobby(null);
+    $('d-restart').textContent = 'Try again · R';
+    $('d-restart').disabled = false;
+    $('d-menu').textContent = 'Change wizard';
+  }
   $('p-resume').addEventListener('click', () => o.onResume());
   $('p-restart').addEventListener('click', () => o.onRestart());
   $('p-menu').addEventListener('click', () => o.onMenu());
@@ -161,6 +242,9 @@ export function createHud(o) {
 
   return {
     reset() { vig = 0; prevMode = null; setWho(); },
+    setLobby, setNetStatus, setOffline, toast: (t) => toast(t),
+    // keeps the roster and role pick in step with what the room says about you
+    syncPick(wizard) { if (wizard && wizard !== wizardId) { wizardId = wizard; document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === wizard)); setWho(); fillRoles(); } },
     setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
     update(g, events, dt) {
       const p = g.player;
@@ -173,7 +257,7 @@ export function createHud(o) {
         else if (e.type === 'queueFull') toast(`Queue holds ${MAX_QUEUE} elements — cast or clear (X)`);
         else if (e.type === 'cancel') toast(`${ELEMENTS[e.a].name} and ${ELEMENTS[e.b].name} cancel out`);
         else if (e.type === 'fizzle') toast('Queue an element first (1–0)');
-        else if (e.type === 'tag' && e.tag === 'interrupt' && e.id === 'player') toast('Cast interrupted · Phép bị ngắt');
+        else if (e.type === 'tag' && e.tag === 'interrupt' && e.id === p.id) toast('Cast interrupted · Phép bị ngắt');
         else if (e.type === 'cooldown') toast(e.spell ? `${e.name} recharging · ${e.t.toFixed(1)}s` : `${SHAPES[e.shape].label} spells recharging · ${e.t.toFixed(1)}s`);
       }
       toastT -= dt;

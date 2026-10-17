@@ -31,7 +31,7 @@ export const SHAPE_WEIGHT = { bolt: 0.35, chain: 0.4, cone: 0.5, beam: 0.7, boul
   guard: 0.55, blink: 0.25, dash: 0.3, decoy: 0.45, swap: 0.35 };
 
 export const WIZARD_ROLE = { ember_pyromancer: 'destroyer', rime_cryomancer: 'controller', stone_druid: 'guardian',
-  storm_conduit: 'trickster', arcane_archmage: 'arcanist', void_necromancer: 'controller' };
+  storm_conduit: 'trickster', arcane_archmage: 'arcanist', terra_geomancer: 'destroyer', zephyr_galesinger: 'trickster', void_necromancer: 'controller' };
 
 // The roster's element order; pairs are listed i<j in this order.
 const ORDER = ['fire', 'water', 'earth', 'wind', 'lightning', 'ice', 'light', 'dark', 'nature', 'arcane'];
