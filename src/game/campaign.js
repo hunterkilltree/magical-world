@@ -67,7 +67,31 @@ export function loadCampaign(data) {
     chapters.push({ id: c.id, title: c.title, arena: c.arena, waves: c.waves, waveStart, rules: [...rules], objective: { ...c.objective },
       unlocks: { elements: [...elements], wizards: [...wizards] }, lessons: [...(Array.isArray(lessons) ? lessons : [])], story: { briefing: story.briefing, ending: story.ending } });
   });
+  // The circle: the wizards who start. Absent, it is every wizard no chapter unlocks.
+  const earned = new Set(chapters.flatMap((c) => c.unlocks.wizards));
+  let circle = Object.keys(WIZARD_ROLE).filter((w) => !earned.has(w));
+  if (data.circle !== undefined) {
+    if (!Array.isArray(data.circle) || data.circle.length === 0) problems.push('circle must be a non-empty list of known wizard ids');
+    else {
+      data.circle.forEach((w, i) => {
+        if (!WIZARD_ROLE[w]) problems.push(`circle[${i}] ${JSON.stringify(w)} is not a known wizard`);
+        else if (earned.has(w)) problems.push(`circle[${i}] "${w}" starts in the circle but a chapter also unlocks it`);
+      });
+      circle = [...new Set(data.circle)];
+    }
+  }
   if (problems.length) throw new CampaignError(problems);
-  chapters.forEach((c, i) => { c.index = i; c.next = chapters[i + 1]?.id ?? null; Object.freeze(c); });
-  return Object.freeze({ version: VERSION, chapters: Object.freeze(chapters), byId: Object.freeze(Object.fromEntries(chapters.map((c) => [c.id, c]))) });
+  // The elements open in a chapter are everything unlocked up to and including it.
+  const open = [];
+  chapters.forEach((c, i) => {
+    for (const e of c.unlocks.elements) if (!open.includes(e)) open.push(e);
+    c.elements = [...open];
+    c.index = i; c.next = chapters[i + 1]?.id ?? null; Object.freeze(c);
+  });
+  return Object.freeze({ version: VERSION, circle: Object.freeze(circle), chapters: Object.freeze(chapters), byId: Object.freeze(Object.fromEntries(chapters.map((c) => [c.id, c]))) });
+}
+
+// The wizards you can pick in the campaign: the circle, plus any a cleared chapter has unlocked (the profile's list).
+export function wizardsAvailable(campaign, unlocked = []) {
+  return [...new Set([...campaign.circle, ...unlocked.filter((w) => WIZARD_ROLE[w])])];
 }
