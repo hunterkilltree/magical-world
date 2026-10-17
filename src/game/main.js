@@ -206,3 +206,7 @@ export function initGame() {
     ['pointerdown', 'keydown'].forEach((t) => window.removeEventListener(t, initAudio, { capture: true }));
   };
 }
+
+// Dev server: an edit to any game module would remount the page's game on top of the old renderer (a second WebGL
+// renderer on the same canvas, back at the menu, sometimes hung). Reload the page cleanly instead.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());
