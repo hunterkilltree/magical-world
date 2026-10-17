@@ -265,6 +265,28 @@ export function buildWizard(s) {
       add(root, new THREE.TorusGeometry(0.16 + i * 0.03, 0.008, 8, 34), brass(), `orb_ring_${i}`, [p.x, p.y + 0.16, p.z], [1.2 + i * 0.5, i * 0.8, 0.3]);
     }
   }
+  if (s.prop === 'windstaff') {
+    // Gale staff: a pale ash haft ending in an open hooked crescent (the hurricane sigil) around a white eye, ribbons trailing.
+    const top = s.propHeight ?? 1.9, lean = s.propLean ?? 0.04, hx = px + Math.sin(-lean) * top;
+    add(root, new THREE.CylinderGeometry(0.024, 0.03, top, 10), mat(s.id + '_ash', { color: 0xc9c2b2, roughness: 0.8 }), 'staff', [px, top / 2, 0.16], [0, 0, lean]);
+    const silver = mat(s.id + '_silver', { color: 0xb8c4d0, roughness: 0.3, metalness: 0.7 });
+    add(root, new THREE.TorusGeometry(0.13, 0.024, 8, 30, Math.PI * 1.45), silver, 'wind_hook', [hx, top + 0.1, 0.16], [0, 0, -0.6]);
+    add(root, new THREE.TorusGeometry(0.065, 0.016, 8, 24, Math.PI * 1.2), silver, 'wind_hook_inner', [hx, top + 0.1, 0.16], [0, 0, 2.2]);
+    add(root, new THREE.SphereGeometry(0.035, 12, 10), glowMat, 'wind_eye', [hx, top + 0.1, 0.16]);
+    for (let i = 0; i < 2; i++) add(root, new THREE.BoxGeometry(0.03, 0.32, 0.005), glowMat, `wind_ribbon_${i}`, [hx + (i ? 0.05 : -0.04), top - 0.18, 0.16], [0.1, 0, (i ? -0.3 : 0.25)]);
+  }
+  if (s.prop === 'geostaff') {
+    // Stone-headed staff: a split granite crown cradling an amber core, three shards floating in orbit.
+    const top = s.propHeight ?? 1.9, lean = s.propLean ?? 0.05;
+    add(root, new THREE.CylinderGeometry(0.03, 0.038, top, 8), wood(), 'staff', [px, top / 2, 0.16], [0, 0, lean]);
+    const hx = px + Math.sin(-lean) * top, stone = mat(s.id + '_stone', { color: 0x7d6a55, roughness: 0.95, flatShading: true });
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.4;
+      add(root, new THREE.ConeGeometry(0.045, 0.24, 4), stone, `staff_prong_${i}`, [hx + Math.sin(a) * 0.07, top + 0.02, 0.16 + Math.cos(a) * 0.07], [Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35]); }
+    add(root, new THREE.DodecahedronGeometry(0.09, 0), stone, 'staff_cradle', [hx, top - 0.08, 0.16], null, [1, 0.7, 1]);
+    add(root, new THREE.OctahedronGeometry(0.07, 0), glowMat, 'geo_core', [hx, top + 0.05, 0.16], [0.3, 0.5, 0], [1, 1.3, 1]);
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2;
+      add(root, new THREE.TetrahedronGeometry(0.04, 0), stone, `staff_float_${i}`, [hx + Math.sin(a) * 0.17, top + 0.06 + (i % 2) * 0.06, 0.16 + Math.cos(a) * 0.17], [a, a, 0.4]); }
+  }
   if (s.prop === 'club') {
     const cx = 0.40;
     add(root, new THREE.CylinderGeometry(0.045, 0.055, 0.75, 14), wood(), 'club_haft', [cx, 0.72, 0.18], [0, 0, 0.22]);
@@ -302,6 +324,14 @@ export const WIZARDS = [
     blurb: 'Granite pauldrons, moss-green wool, a rune-stone club. Argues with rocks and usually wins.',
     robe: 0x3f5e2e, trim: 0x8b7a5f, glow: 0x76c04a, hair: 0xb9b3a4, legs: 0x2c3f22,
     hat: 'cap', beard: 1.25, brows: true, pads: 'stone', pouch: true, prop: 'club', propSide: 'right', flare: 1.08 },
+  { id: 'terra_geomancer', name: 'Thane Granitebrow', role: 'Terra Geomancer',
+    blurb: 'Granite crown, ochre robes caked in quarry dust, a split-stone staff with an amber heart. The floor listens to him.',
+    robe: 0x7a5530, trim: 0x8d8170, glow: 0xf0a83a, hair: 0x4a3a2c, legs: 0x3e2c1c,
+    hat: 'crown', beard: 1.15, brows: true, pads: 'stone', pouch: true, prop: 'geostaff', propSide: 'right', propHeight: 1.92, motes: 6, flare: 1.1 },
+  { id: 'zephyr_galesinger', name: 'Ilsa Galesinger', role: 'Zephyromancer',
+    blurb: 'Sky-blue layers that never hang still, silver-hooked gale staff. Wherever she stands, the wind is already turning.',
+    robe: 0x5d86a8, trim: 0xd8e3ec, glow: 0xdff4ff, hair: 0xeef2f5, legs: 0x3b5a76,
+    hat: 'hood', beard: 0, brows: true, pads: 'mantle', prop: 'windstaff', propSide: 'right', propHeight: 1.9, motes: 5, flare: 1.12 },
   { id: 'storm_conduit', name: 'Kessa Voltmark', role: 'Storm Conduit',
     blurb: 'Tall narrow hat, hair that has not lain flat in years, a copper-coiled conducting rod.',
     robe: 0x2b3a5c, trim: 0xd9b84a, glow: 0xf7e26b, hair: 0xe8d9a0, legs: 0x1d2740,

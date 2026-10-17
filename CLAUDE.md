@@ -155,3 +155,15 @@ a random or auto-generated name.
   telegraphs, avoid puddles when it would cast lightning) clears wave 3 in about 53 s of game time with no self-damage
   (seed 11). Re-run it after any rules change. Not playtested by a human.
 - `run_tests.gd` waits one frame before running, so the root is live (nodes added to it get `_ready`, Tweens step).
+
+## Web port co-op (R-080 to R-084)
+
+The browser port (`src/`, Vite + three.js) has online co-op for up to four wizards; plan in `story/COOP_PLAN.md`.
+- `src/game/sim.js` runs 1-4 players (`createCoopGame`, `addPlayer`, `removePlayer`, `step(game, {players: {id: input}}, dt)`);
+  `game.player` is the local wizard. Single-player is pinned by `tests/web/golden/` (seeded digests): re-record only on purpose
+  (`node tests/web/support/record_golden.mjs`).
+- `server/` is the authoritative room server (`npm run server`, port 8787, path `/ws`; it also serves `dist/`).
+  `src/net/`: `protocol.js` (validation), `snapshot.js` (state <-> JSON), `client.js` (browser socket, `forMe`), `interp.js`
+  (snapshot buffer, ~100 ms behind). Dev: `npm run server` + `npm run dev` (Vite forwards `/ws`).
+- Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
+  on this machine: run npm from PowerShell.

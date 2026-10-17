@@ -122,7 +122,7 @@ export class Room {
     if (this.lastNow === null) { this.lastNow = nowMs; return; }
     const dt = Math.min(this.maxCatchUp, Math.max(0, (nowMs - this.lastNow) / 1000));
     this.lastNow = nowMs;
-    if (!this.game || this.phase !== 'play') return;
+    if (!this.game || this.phase !== 'play' || this.empty) return; // an empty room does not run
     this.acc += dt;
     while (this.acc >= STEP - 1e-9) { this.acc -= STEP; this._tick(); }
   }

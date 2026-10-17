@@ -36,13 +36,21 @@ const RAMPS = {
   lightning: [0xffffff, 0xfff2a0, 0x5f9cff, 0x0e1626],
   earth: [0xfff0c0, 0xff8f30, 0x8a3008, 0x1a120e],
   ice: [0xffffff, 0xc8f2ff, 0x4aa8ff, 0x0c1828],
-  water: [0xffffff, 0xa8dcff, 0x2f7fff, 0x0a1830]
+  water: [0xffffff, 0xa8dcff, 0x2f7fff, 0x0a1830],
+  light: [0xffffff, 0xfff3c0, 0xffc850, 0x3a2a10],
+  dark: [0xe8c8ff, 0x8a3ad0, 0x3a0a6a, 0x050208],
+  hellfire: [0xf0c0ff, 0xb040e0, 0x40104a, 0x000000],
+  solar: [0xffffff, 0xfff0b0, 0xff9a20, 0x2a1408],
+  plasma: [0xffffff, 0xdcd0ff, 0xff7a3a, 0x140c1c]
 };
 const pickRamp = (els) => {
   const h = (e) => els.includes(e);
+  if (h('fire') && h('dark')) return 'hellfire';
+  if (h('fire') && h('light')) return 'solar';
   if (h('fire') && h('arcane')) return 'hexfire';
+  if (h('fire') && h('lightning')) return 'plasma';
   if (h('fire') && h('earth')) return 'earth';
-  for (const e of ['fire', 'arcane', 'lightning', 'earth', 'ice', 'water']) if (h(e)) return e;
+  for (const e of ['fire', 'light', 'dark', 'arcane', 'lightning', 'earth', 'ice', 'water']) if (h(e)) return e;
   return 'fire';
 };
 
@@ -59,19 +67,39 @@ const SM = {
   spray:    { life: [0.45, 0.8], s0: 0.3, s1: 1.2, a: 0.55, c0: [0.85, 1.0, 1.2], c1: [0.4, 0.68, 1.1], heat: 1, glow: 0.5, drag: 2.4, buoy: -2.5 },
   arcane:   { life: [0.5, 0.9], s0: 0.45, s1: 1.6, a: 0.85, c0: [2.6, 1.3, 3.2], c1: [0.25, 0.05, 0.45], heat: 0.65, glow: 1, drag: 2.6, buoy: 0.7 },
   plasma:   { life: [0.25, 0.45], s0: 0.4, s1: 1.4, a: 0.9, c0: [2.8, 2.8, 3.2], c1: [0.6, 0.9, 2.4], heat: 0.8, glow: 1, drag: 3, buoy: 0.4 },
-  hex:      { life: [0.4, 0.7], s0: 0.35, s1: 1.2, a: 0.8, c0: [1.2, 3.0, 2.0], c1: [0.05, 0.4, 0.25], heat: 0.7, glow: 1, drag: 2.8, buoy: 0.5 }
+  hex:      { life: [0.4, 0.7], s0: 0.35, s1: 1.2, a: 0.8, c0: [1.2, 3.0, 2.0], c1: [0.05, 0.4, 0.25], heat: 0.7, glow: 1, drag: 2.8, buoy: 0.5 },
+  frostfog: { life: [1.4, 2.2], s0: 0.6, s1: 2.4, a: 0.36, c0: [0.82, 0.95, 1.08], c1: [0.66, 0.84, 1.0], heat: 1, glow: 0.3, drag: 2.2, buoy: -0.35 },
+  void:     { life: [0.8, 1.4], s0: 0.5, s1: 1.8, a: 0.72, c0: [0.05, 0.015, 0.08], c1: [0.02, 0.0, 0.03], heat: 1, glow: 0, drag: 2.0, buoy: 0.4 },
+  voidglow: { life: [0.4, 0.8], s0: 0.4, s1: 1.2, a: 0.8, c0: [1.3, 0.45, 2.3], c1: [0.3, 0.05, 0.6], heat: 0.7, glow: 1, drag: 2.4, buoy: 0.3 },
+  hellflame:{ life: [0.45, 0.8], s0: 0.5, s1: 1.4, a: 0.9, c0: [1.8, 0.55, 2.6], c1: [0.03, 0.01, 0.05], heat: 0.45, glow: 1, drag: 2.5, buoy: 2.4 },
+  holy:     { life: [0.5, 0.9], s0: 0.5, s1: 1.6, a: 0.85, c0: [3.0, 2.7, 1.6], c1: [1.2, 0.9, 0.3], heat: 0.7, glow: 1, drag: 2.4, buoy: 1.0 },
+  pollen:   { life: [1.2, 2.0], s0: 0.12, s1: 0.2, a: 0.9, c0: [1.6, 2.0, 0.6], c1: [0.8, 1.2, 0.3], heat: 1, glow: 1, drag: 1.5, buoy: 0.25 },
+  sand:     { life: [0.9, 1.5], s0: 0.5, s1: 1.8, a: 0.5, c0: [0.62, 0.5, 0.3], c1: [0.5, 0.4, 0.25], heat: 1, glow: 0, drag: 2.2, buoy: 0.15 },
+  scald:    { life: [1.4, 2.4], s0: 0.8, s1: 3.0, a: 0.4, c0: [0.95, 0.7, 0.45], c1: [0.6, 0.45, 0.32], heat: 1, glow: 0.15, drag: 1.8, buoy: 0.8 },
+  magma:    { life: [0.5, 0.9], s0: 0.3, s1: 0.5, a: 0.95, c0: [3.0, 1.6, 0.4], c1: [0.25, 0.06, 0.03], heat: 0.8, glow: 1, drag: 0.5, buoy: -9 },
+  necro:    { life: [1.0, 1.8], s0: 0.5, s1: 1.9, a: 0.55, c0: [0.3, 0.6, 0.2], c1: [0.03, 0.05, 0.03], heat: 0.5, glow: 0.4, drag: 2.0, buoy: 0.3 }
 };
+// Shape language: flames lick upward in S-curves (1), smoke and vapour roll and curl (2).
+for (const k of ['flame', 'hellflame', 'holy', 'plasma']) SM[k].mo = 1;
+for (const k of ['hotsmoke', 'smoke', 'dust', 'mist', 'steam', 'frostfog', 'void', 'sand', 'scald', 'necro', 'arcane', 'voidglow', 'hex']) SM[k].mo = 2;
+const DENSITY = 0.3; // halved again: the painterly fx2d layer (arena-fx.js) now carries the spell shapes
 // Velocity-stretched spark presets.
 const SP = {
   fire:      { c0: [3.2, 2.4, 1.3], c1: [2.4, 0.5, 0.08], w: 0.05, life: [0.35, 0.75], grav: 9, drag: 1.1, st: 0.035 },
   lightning: { c0: [3.2, 3.2, 3.4], c1: [2.6, 2.3, 0.6], w: 0.035, life: [0.14, 0.35], grav: 3, drag: 2.2, st: 0.03 },
   ice:       { c0: [2.6, 3.1, 3.3], c1: [0.6, 1.6, 2.7], w: 0.045, life: [0.4, 0.75], grav: 14, drag: 0.7, st: 0.03 },
-  water:     { c0: [1.6, 2.3, 3.0], c1: [0.3, 0.8, 2.2], w: 0.05, life: [0.5, 0.85], grav: 16, drag: 0.5, st: 0.04 },
+  water:     { splash: true, c0: [1.6, 2.3, 3.0], c1: [0.3, 0.8, 2.2], w: 0.05, life: [0.5, 0.85], grav: 16, drag: 0.5, st: 0.04 },
   arcane:    { c0: [3.0, 2.2, 3.3], c1: [1.4, 0.3, 2.7], w: 0.045, life: [0.35, 0.7], grav: 0, drag: 2.2, st: 0.035 },
   earth:     { c0: [2.4, 1.9, 1.2], c1: [0.6, 0.38, 0.2], w: 0.05, life: [0.35, 0.65], grav: 16, drag: 0.5, st: 0.03 },
-  hex:       { c0: [1.6, 3.2, 2.4], c1: [0.2, 1.6, 0.9], w: 0.04, life: [0.25, 0.5], grav: 2, drag: 2, st: 0.03 }
+  hex:       { c0: [1.6, 3.2, 2.4], c1: [0.2, 1.6, 0.9], w: 0.04, life: [0.25, 0.5], grav: 2, drag: 2, st: 0.03 },
+  nature:    { c0: [1.0, 2.4, 0.6], c1: [0.3, 0.9, 0.15], w: 0.04, life: [0.35, 0.7], grav: 6, drag: 1.6, st: 0.03 },
+  wind:      { c0: [0.5, 0.62, 0.6], c1: [0.2, 0.26, 0.26], w: 0.03, life: [0.25, 0.5], grav: 0, drag: 0.8, st: 0.09 },
+  light:     { c0: [3.2, 3.0, 2.0], c1: [2.4, 1.8, 0.6], w: 0.04, life: [0.3, 0.6], grav: -1, drag: 2, st: 0.035 },
+  dark:      { c0: [1.4, 0.5, 2.4], c1: [0.4, 0.1, 0.8], w: 0.045, life: [0.35, 0.7], grav: -0.5, drag: 2.2, st: 0.035 },
+  sand:      { c0: [1.6, 1.2, 0.6], c1: [0.8, 0.55, 0.25], w: 0.03, life: [0.4, 0.8], grav: 2, drag: 0.6, st: 0.05 },
+  snow:      { c0: [2.2, 2.4, 2.6], c1: [1.2, 1.5, 1.8], w: 0.03, life: [0.4, 0.8], grav: 1, drag: 0.6, st: 0.04 }
 };
-const SPARK_OF = { fire: 'fire', lightning: 'lightning', ice: 'ice', water: 'water', arcane: 'arcane', earth: 'earth' };
+const SPARK_OF = { fire: 'fire', lightning: 'lightning', ice: 'ice', water: 'water', arcane: 'arcane', earth: 'earth', nature: 'nature', wind: 'wind', light: 'light', dark: 'dark' };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rateN = (r, dt) => { const n = r * dt; return Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); };
 const ease = (k) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
@@ -124,7 +152,8 @@ class Smoke {
     this.max = max; this.next = 0;
     const F = (n) => new Float32Array(max * n);
     Object.assign(this, { p: F(3), c: F(3), sz: F(1), al: F(1), rot: F(1), vr: F(1), gl: F(1),
-      v: F(3), life: F(1), L: F(1), s0: F(1), s1: F(1), a0: F(1), c0: F(3), c1: F(3), heat: F(1), g0: F(1), drag: F(1), buoy: F(1), rs: F(1) });
+      v: F(3), life: F(1), L: F(1), s0: F(1), s1: F(1), a0: F(1), c0: F(3), c1: F(3), heat: F(1), g0: F(1), drag: F(1), buoy: F(1), rs: F(1),
+      mo: F(1), ph: F(1), sp: F(1) });
     const geo = new THREE.BufferGeometry(), at = (arr, n) => new THREE.BufferAttribute(arr, n).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('position', (this.aP = at(this.p, 3)));
     geo.setAttribute('pcolor', (this.aC = at(this.c, 3)));
@@ -155,7 +184,9 @@ class Smoke {
     scene.add(this.points);
   }
   emit(P, x, y, z, vx, vy, vz, o = {}) {
-    const i = this.next, j = i * 3, k = o.k ?? 1;
+    if (!o.child && Math.random() > DENSITY) return;
+    const i = this.next, j = i * 3, k = (o.k ?? 1) * (o.child ? 1 : 1.2);
+    this.mo[i] = P.mo ?? 0; this.ph[i] = Math.random() * 6.28; this.sp[i] = !o.child && P.s1 * k >= 1.4 && Math.random() < 0.55 ? 1 : 0;
     this.next = (i + 1) % this.max;
     const L = o.life ?? rnd(P.life[0], P.life[1]);
     this.p[j] = x; this.p[j + 1] = y; this.p[j + 2] = z;
@@ -176,6 +207,10 @@ class Smoke {
       if (l <= 0) { this.al[i] = 0; continue; }
       const j = i * 3, age = this.L[i] - l, k = age / this.L[i], dr = Math.max(0, 1 - this.drag[i] * dt);
       this.v[j] *= dr; this.v[j + 1] = this.v[j + 1] * dr + this.buoy[i] * dt; this.v[j + 2] *= dr;
+      const mo = this.mo[i];
+      if (mo === 1) { const w = Math.sin(this.ph[i] + age * 11) * 2.0 * dt; this.v[j] += w * Math.cos(this.ph[i]); this.v[j + 2] += w * Math.sin(this.ph[i]); }
+      else if (mo === 2) { const a = this.ph[i] + age * 2.4; this.v[j] += Math.cos(a) * 1.1 * dt; this.v[j + 2] += Math.sin(a) * 1.1 * dt; }
+      if (this.sp[i] && k > 0.5) this.split(i);
       this.p[j] += this.v[j] * dt; this.p[j + 1] += this.v[j + 1] * dt; this.p[j + 2] += this.v[j + 2] * dt;
       if (this.p[j + 1] < 0.1) { this.p[j + 1] = 0.1; this.v[j + 1] = Math.abs(this.v[j + 1]) * 0.2; }
       const h = Math.min(1, k / this.heat[i]);
@@ -188,6 +223,18 @@ class Smoke {
     }
     this.aP.needsUpdate = this.aC.needsUpdate = this.aS.needsUpdate = this.aA.needsUpdate = this.aR.needsUpdate = this.aG.needsUpdate = true;
   }
+  // Dissipation: a big puff breaks into two smaller ones that curl away rather than just fading out.
+  split(i) {
+    const j = i * 3, sz = this.sz[i], rem = this.life[i];
+    this.sp[i] = 0; this.s1[i] = sz * 1.05; this.a0[i] *= 0.7;
+    const c0 = [this.c[j], this.c[j + 1], this.c[j + 2]], c1 = [this.c1[j], this.c1[j + 1], this.c1[j + 2]];
+    for (let n = 0; n < 2; n++) {
+      const a = this.ph[i] + n * Math.PI + 1.3, sp = 0.6 + Math.random() * 0.6;
+      const P = { life: [rem, rem], s0: sz * 0.5, s1: sz * 0.85, a: this.a0[i] * 0.9, c0, c1, heat: 1, glow: 0, drag: this.drag[i], buoy: this.buoy[i] * 0.7 + 0.2, mo: 2 };
+      this.emit(P, this.p[j] + Math.cos(a) * sz * 0.2, this.p[j + 1], this.p[j + 2] + Math.sin(a) * sz * 0.2,
+        this.v[j] * 0.5 + Math.cos(a) * sp, this.v[j + 1] * 0.5 + 0.3, this.v[j + 2] * 0.5 + Math.sin(a) * sp, { child: true, life: rem * 1.15 });
+    }
+  }
   clear() { this.life.fill(0); this.al.fill(0); this.aA.needsUpdate = true; }
 }
 
@@ -199,7 +246,7 @@ class Streaks {
     geo.index = base.index;
     geo.setAttribute('position', base.attributes.position);
     const F = (n) => new Float32Array(max * n), at = (arr, n) => new THREE.InstancedBufferAttribute(arr, n).setUsage(THREE.DynamicDrawUsage);
-    Object.assign(this, { ip: F(3), iv: F(3), ic: F(4), iw: F(1), v: F(3), life: F(1), L: F(1), c0: F(3), c1: F(3), grav: F(1), drag: F(1), st: F(1), w0: F(1) });
+    Object.assign(this, { ip: F(3), iv: F(3), ic: F(4), iw: F(1), v: F(3), life: F(1), L: F(1), c0: F(3), c1: F(3), grav: F(1), drag: F(1), st: F(1), w0: F(1), kd: F(1) });
     geo.setAttribute('iPos', (this.aP = at(this.ip, 3)));
     geo.setAttribute('iVel', (this.aV = at(this.iv, 3)));
     geo.setAttribute('iCol', (this.aC = at(this.ic, 4)));
@@ -224,12 +271,14 @@ class Streaks {
   emit(P, x, y, z, vx, vy, vz, o = {}) {
     const i = this.next, j = i * 3;
     this.next = (i + 1) % this.max;
+    if (!o.child && Math.random() > DENSITY) { this.next = i; return; }
     const L = o.life ?? rnd(P.life[0], P.life[1]);
+    this.kd[i] = P.splash && !o.child ? 1 : 0;
     this.ip[j] = x; this.ip[j + 1] = y; this.ip[j + 2] = z;
     this.v[j] = vx; this.v[j + 1] = vy; this.v[j + 2] = vz;
     this.life[i] = L; this.L[i] = L;
     for (let q = 0; q < 3; q++) { this.c0[j + q] = P.c0[q]; this.c1[j + q] = P.c1[q]; }
-    this.grav[i] = o.grav ?? P.grav; this.drag[i] = P.drag; this.st[i] = o.st ?? P.st; this.w0[i] = P.w * (o.w ?? 1) * rnd(0.7, 1.3);
+    this.grav[i] = o.grav ?? P.grav; this.drag[i] = P.drag; this.st[i] = o.st ?? P.st; this.w0[i] = P.w * (o.w ?? 1) * rnd(0.7, 1.3) * (o.child ? 0.6 : 1.15);
   }
   update(dt) {
     for (let i = 0; i < this.max; i++) {
@@ -238,7 +287,14 @@ class Streaks {
       const l = (this.life[i] -= dt), k = 1 - Math.max(0, l) / this.L[i], dr = Math.max(0, 1 - this.drag[i] * dt);
       this.v[j] *= dr; this.v[j + 1] = this.v[j + 1] * dr - this.grav[i] * dt; this.v[j + 2] *= dr;
       this.ip[j] += this.v[j] * dt; this.ip[j + 1] += this.v[j + 1] * dt; this.ip[j + 2] += this.v[j + 2] * dt;
-      if (this.ip[j + 1] < 0.04) { this.ip[j + 1] = 0.04; this.v[j + 1] *= -0.35; this.v[j] *= 0.6; this.v[j + 2] *= 0.6; }
+      if (this.ip[j + 1] < 0.04) {
+        if (this.kd[i] && this.v[j + 1] < -3) { // a drop hits the floor: a small crown of droplets
+          this.kd[i] = 0; this.life[i] = 0;
+          for (let n = 0; n < 3; n++) { const a = Math.random() * 6.28; this.emit(SP.water, this.ip[j], 0.06, this.ip[j + 2], Math.cos(a) * 1.4, 2 + Math.random() * 1.5, Math.sin(a) * 1.4, { child: true, life: 0.3 }); }
+          continue;
+        }
+        this.ip[j + 1] = 0.04; this.v[j + 1] *= -0.35; this.v[j] *= 0.6; this.v[j + 2] *= 0.6;
+      }
       for (let q = 0; q < 3; q++) { this.iv[j + q] = this.v[j + q] * this.st[i]; this.ic[i * 4 + q] = this.c0[j + q] + (this.c1[j + q] - this.c0[j + q]) * Math.min(1, k * 1.6); }
       this.ic[i * 4 + 3] = l <= 0 ? 0 : Math.pow(1 - k, 0.8);
       this.iw[i] = l <= 0 ? 0 : this.w0[i] * (1 - k * 0.5);
@@ -470,7 +526,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
     const R = e.r, has = (x) => e.els.includes(x), big = !!e.big, noKey = !e.key;
     shell(e.x, 0, e.z, R * 1.25, e.color, big ? 0.38 : 0.28, true);
     flare(e.x, 1.0, e.z, e.color, R * (big ? 2.4 : 1.6), big ? 0.16 : 0.1);
-    if (noKey || has('fire') || has('arcane') || has('lightning')) fireball(e.x, 0.75, e.z, R * (big ? 0.72 : 0.55), noKey ? 'fire' : pickRamp(e.els), big ? 0.85 : 0.6);
+    if (noKey || has('fire') || has('arcane') || has('lightning') || has('light') || has('dark')) fireball(e.x, 0.75, e.z, R * (big ? 0.72 : 0.55), noKey ? 'fire' : pickRamp(e.els), big ? 0.85 : 0.6);
     const n = big ? 60 : 32, els = noKey ? ['fire'] : [...new Set(e.els)];
     els.forEach((el) => radialSparks(SPARK_OF[el] || 'fire', e.x, 0.8, e.z, Math.round(n / els.length) + 6, 8, big ? 24 : 16, 0.8));
     dustRing(e.x, e.z, R, big ? 26 : 14, R * 3, has('ice') && !has('fire') ? 'mist' : 'dust');
@@ -526,7 +582,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
   }
 
   function areaStart(e) {
-    if (e.key === 'ice+water') { for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * e.r; S('mist', e.x + Math.sin(a) * r, 0.3, e.z + Math.cos(a) * r, Math.sin(a) * 2.5, 0.3, Math.cos(a) * 2.5, { k: 1.2 }); } radialSparks('ice', e.x, 0.3, e.z, 34, 4, 10, 0.95); shell(e.x, 0, e.z, e.r * 1.1, 0xbfefff, 0.4, true, 1.6); }
+    if (e.key === 'ice+water+water') { for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * e.r; S('mist', e.x + Math.sin(a) * r, 0.3, e.z + Math.cos(a) * r, Math.sin(a) * 2.5, 0.3, Math.cos(a) * 2.5, { k: 1.2 }); } radialSparks('ice', e.x, 0.3, e.z, 34, 4, 10, 0.95); shell(e.x, 0, e.z, e.r * 1.1, 0xbfefff, 0.4, true, 1.6); }
     else if (e.key === 'lightning+water') { crown(e.x, e.z, e.r, 30); for (let i = 0; i < 2; i++) bolt([new THREE.Vector3(e.x + rnd(-3, 3), 15, e.z - rnd(2, 5)), new THREE.Vector3(e.x + rnd(-1, 1), 0.05, e.z + rnd(-1, 1))], 0xf4e15c, { life: 0.3, w: 0.3 }); shell(e.x, 0, e.z, e.r * 1.1, 0x9fd0ff, 0.35, true); }
     else if (e.key === 'arcane+water') { for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28, r = e.r * rnd(0.6, 1); S('arcane', e.x + Math.sin(a) * r, 0.4, e.z + Math.cos(a) * r, Math.cos(a) * 4 - Math.sin(a) * 2, 0.4, -Math.sin(a) * 4 - Math.cos(a) * 2, { k: 0.8 }); } }
     else if (e.key === 'burning') { for (let i = 0; i < 14; i++) S('flame', e.x + rnd(-e.r, e.r) * 0.6, 0.3, e.z + rnd(-e.r, e.r) * 0.6, 0, rnd(0.5, 2), 0, { k: 0.9 }); }
@@ -556,7 +612,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
     for (const b of s.shots) {
       seen.add(b.id);
       let tr = trails.get(b.id);
-      const y = b.kind === 'boulder' ? 0.95 : 1.15;
+      const y = b.y ?? (b.kind === 'boulder' ? 0.95 : 1.15);
       if (!tr) {
         const hex = b.owner === 'enemy' ? 0x5cffb0 : b.sp.color, w = b.kind === 'boulder' ? 0.42 : b.kind === 'orb' ? 0.3 : 0.16 + b.r * 0.6;
         const glowM = stripMat(hex, 1.6, 1.6), coreM = stripMat(0xffffff, 1.2, 1.0);
@@ -598,7 +654,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
     for (const a of s.areas) {
       if (a.delay > 0) continue;
       const ang = Math.random() * 6.28, r = Math.sqrt(Math.random()) * a.r, x = a.x + Math.sin(ang) * r, z = a.z + Math.cos(ang) * r;
-      if (a.key === 'ice+water') { if (Math.random() < dt * 14) S('mist', x, 0.25, z, rnd(-0.4, 0.4), 0.15, rnd(-0.4, 0.4), { k: 1.1 }); }
+      if (a.key === 'ice+water+water') { if (Math.random() < dt * 14) S('mist', x, 0.25, z, rnd(-0.4, 0.4), 0.15, rnd(-0.4, 0.4), { k: 1.1 }); }
       else if (a.key === 'burning') { for (let i = rateN(16 * a.r, dt); i--;) S('flame', a.x + rnd(-a.r, a.r) * 0.6, 0.2, a.z + rnd(-a.r, a.r) * 0.6, 0, rnd(0.3, 1.2), 0, { k: 0.7 }); if (Math.random() < dt * 4) S('hotsmoke', x, 1, z, 0, 1, 0, { k: 0.7 }); if (Math.random() < dt * 3) heat(a.x, 1, a.z, a.r, 0.6, 0.6); }
       else if (a.key === 'lightning+water') { for (let i = rateN(14, dt); i--;) K('lightning', x, 0.1, z, rnd(-3, 3), rnd(2, 6), rnd(-3, 3)); if (Math.random() < dt * 5) S('plasma', x, 0.3, z, 0, 0.6, 0, { k: 0.8 }); }
       else if (a.key === 'arcane+water') { for (let i = rateN(16, dt); i--;) { const tx = -(z - a.z), tz = x - a.x; S('arcane', x, 0.3, z, tx * 1.6 + (a.x - x) * 0.8, 0.3, tz * 1.6 + (a.z - z) * 0.8, { k: 0.6 }); } }
@@ -616,6 +672,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
   const _p = new THREE.Vector3(), _q = new THREE.Vector3(), _right = new THREE.Vector3();
   return {
     kick, release, blast, hit, cone, areaStart, wall, tag, fireball, shell, flare, bolt, dustRing, radialSparks,
+    sparkAt: (n, x, y, z, vx, vy, vz, o) => K(n, x, y, z, vx, vy, vz, o),
     smokeAt: (name, x, y, z, vx, vy, vz, o) => S(name, x, y, z, vx, vy, vz, o),
     reset() {
       smoke.clear(); sparks.clear(); heats.length = 0; kick.set(0, 0, 0);
