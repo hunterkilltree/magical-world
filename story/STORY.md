@@ -455,7 +455,7 @@ existing behaviour and the seeded digests do not change. New enemies, bosses, ha
 not playtested, and never touch `spells.json` or `enemies.json`. Web tests are
 `tests/web/test_rNNN_<name>.test.mjs`.
 
-### R-090 [planned] Campaign data and chapter runner
+### R-090 [done] Campaign data and chapter runner
 Core. `data/campaign.json` lists the chapters in order; each has an id, a title, an arena theme, a number of waves,
 its ground rules, an objective, its unlocks and its story keys. A small state machine in the sim runs one chapter:
 briefing, waves, climax, reward, camp. A cleared wave is a checkpoint: in solo, dying restarts the wave and not the
@@ -463,6 +463,10 @@ chapter; in co-op a downed wizard is revived as today and the chapter fails only
 difficulty comes from the existing wave scaling (`waveRoster`, health and speed scale) and never from changing
 `enemies.json`. A malformed campaign file is refused with a clear error. Quick play is untouched: a seeded run
 matches its recorded digest.
+Built in `src/game/campaign.js` (validation, `loadCampaign`, `CampaignError`), the rules in `sim.js`
+(`createCampaignGame`, `createCampaignCoopGame`, `retryChapter`; actions `begin` and `continue`; events `chapterBegin`,
+`climax`, `chapterClear`, `camp`, `chapterDone`, `retry`, `chapterFailed`) and the data in `data/campaign.json`, which for now
+holds the prologue. In the browser, `?c=<chapter id>` plays a chapter; Enter leaves the camp.
 
 ### R-091 [planned] Profile and save
 Core. A profile keeps what the player has earned: unlocked elements and wizards, grimoire pages found, chapters
