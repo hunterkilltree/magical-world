@@ -2,6 +2,7 @@
 // The combat engine (sim.js) only knows SHAPES; everything a spell does is declared in the data.
 import DATA from './spells-data.js';
 import { ROLE_BOOK } from './roles.js';
+import { FORMS } from './forms.js';
 
 export const ELEMENTS = DATA.elements;
 export const ORDER = Object.keys(ELEMENTS).sort((a, b) => (+ELEMENTS[a].key || 10) - (+ELEMENTS[b].key || 10));
@@ -13,7 +14,7 @@ Object.assign(SHAPES, {
   guard: { label: 'Ward', cost: 1.2, cd: 4 }, blink: { label: 'Blink', cost: 0.9, cd: 1.6 }, dash: { label: 'Dash', cost: 0.9, cd: 1.2 },
   decoy: { label: 'Double', cost: 1.2, cd: 3.5 }, swap: { label: 'Swap', cost: 1, cd: 2 }
 });
-export const COMBOS = DATA.combos;
+export const COMBOS = { ...DATA.combos, ...FORMS };
 // Combo keys that add a status to the hit payload (the rest are shape options).
 const DEF_PAYLOAD = ['stun', 'silence', 'freeze', 'weaken', 'inaccurate', 'confuse', 'slowPct', 'trueDamage', 'burnMult', 'curse'];
 

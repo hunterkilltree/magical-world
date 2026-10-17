@@ -753,12 +753,14 @@ export function createView(canvas, overlay) {
   function syncAreas(s, dt) {
     const seen = new Set();
     for (const a of s.areas) {
+      if (a.spray) continue; // a jet is drawn by its cone effect, not as a field
       seen.add(a.id);
+      const armed = !!a.mine && !a.mine.fired; // a mine shows only its small rune until it trips
       let v = areaViews.get(a.id);
       if (!v) {
         const fill = new THREE.Mesh(DISC, flatMat(new THREE.Color(a.color).multiplyScalar(0.55), 0.16)), edge = new THREE.Mesh(RING, flatMat(a.color, 0.8));
         fill.position.set(a.x, 0.03, a.z); edge.position.set(a.x, 0.04, a.z);
-        fill.scale.setScalar(a.r); edge.scale.setScalar(a.r);
+        fill.scale.setScalar(armed ? 0.9 : a.r); edge.scale.setScalar(armed ? 0.9 : a.r);
         scene.add(fill, edge);
         v = { objs: [fill, edge], fill, edge, zapT: 0 };
         if (a.delay > 0) { v.star = new THREE.Mesh(SPHERE, glowMat(a.color, 3)); v.star.scale.setScalar(0.45); scene.add(v.star); v.objs.push(v.star); }
@@ -766,12 +768,18 @@ export function createView(canvas, overlay) {
       }
       const fade = a.delay > 0 ? 1 : Math.min(1, a.life / 0.4);
       if (a.delay > 0) {
+        if (!v.star) { v.star = new THREE.Mesh(SPHERE, glowMat(a.color, 3)); v.star.scale.setScalar(0.45); scene.add(v.star); v.objs.push(v.star); }
+        if (a.mine) v.edge.scale.setScalar(a.r);
         const k = 1 - a.delay / a.delayMax;
         v.fill.scale.setScalar(Math.max(0.01, a.r * ease(k)));
         v.fill.material.opacity = 0.18 + 0.2 * k;
         v.edge.material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(t * 14));
         v.star.position.set(a.x + (1 - k) * 4, 0.6 + (1 - k) * 12, a.z - (1 - k) * 2);
         for (let i = rate(60, dt); i--;) puff(elStyle(a.els[(Math.random() * a.els.length) | 0]), v.star.position.x, v.star.position.y, v.star.position.z, (Math.random() - 0.5), 1, (Math.random() - 0.5), { size: 1.4 });
+      } else if (armed) {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 5), live = a.mine.arm > 0 ? 0.3 : 1;
+        v.fill.material.opacity = (0.1 + 0.1 * pulse) * live;
+        v.edge.material.opacity = (0.3 + 0.4 * pulse) * live;
       } else {
         v.fill.material.opacity = 0.16 * fade;
         v.edge.material.opacity = 0.8 * fade;

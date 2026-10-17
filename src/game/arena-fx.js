@@ -25,6 +25,19 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
   const CHAINS = scene ? createChains(fx, R, scene) : null;
   let S = null;
 
+  // Storms (R-088): a cloud over the mark and rain of the element for as long as the strikes last; lightning storms
+  // also drop a bolt from the cloud on every strike (see the explode case).
+  const stormKeys = new Set();
+  function storm(e, P) {
+    stormKeys.add(e.key);
+    const els = e.els || [], sc = e.scatter ?? 4, dur = (e.delay ?? 0) + (e.repeat ?? 6) * (e.interval ?? 0.4);
+    const rain = els.includes('ice') ? 'ice' : els.includes('fire') ? 'fire' : P.fire;
+    fx.during(dur, (dt) => {
+      if (Math.random() < dt * 12) fx.spawn({ kind: K.smoke, pal: 'smoke', p: [e.x + rnd(-sc, sc), rnd(6.5, 8), e.z + rnd(-sc, sc)], v: [rnd(-0.4, 0.4), 0, rnd(-0.4, 0.4)], s0: 2.2, s1: 3.6, life: 1.6, drag: 1 });
+      for (let i = 0; i < 3; i++) if (Math.random() < dt * 30) fx.spawn({ kind: K.spark, mode: M.vel, pal: rain, p: [e.x + rnd(-sc, sc), rnd(5, 7), e.z + rnd(-sc, sc)], v: [0, -22, 0], s: 0.12, aspect: 0.14, life: 0.3 });
+    });
+  }
+
   function zone(x, z, r, P, life = 1.6) {
     R.ring([x, 0, z], P.fire, r * 2, 0.4);
     if (P.fire === 'wind') R.tornado(() => [x, 0, z], 1.4, { h: 2.6, r0: 0.25, r1: Math.min(1.4, r * 0.45), rate: 70 });
@@ -161,6 +174,12 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           break;
         case 'nova': zone(e.x, e.z, e.r ?? 2.4, P); break;
         case 'area':
+          if (e.mine) { // armed rune, turning slowly until the mine trips
+            fx.decal({ kind: K.rune, pal: P.fire, p: [e.x, 0.03, e.z], s: 1.7, life: Math.min(e.life ?? 20, 30), rot: 0, tag: 'mine' + e.id, tick: (q, dt) => { q.rot += dt * 0.7; } });
+            R.flash([e.x, 0.3, e.z], P.fire, 0.6, 0);
+            break;
+          }
+          if (e.storm) { storm(e, P); break; }
           // Cryomancer's Water + Ice: the field is planted by a hurled ice spear (quick form — the sim field is already live).
           if (scene && e.key === 'ice+water' && e.name === 'Frozen Domain') {
             conjureSpear(fx, R, scene, { getHand: () => { const t = tip(); return [t[0], t[1] - 0.2, t[2]]; }, to: [e.x, 0, e.z], tForm: 0.12, hold: 0.03, flight: 0.22, scale: 0.8,
@@ -170,6 +189,10 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           if (e.heal) { spring(e.x, e.z, e.r ?? 3, P, Math.min(3, e.life ?? 2)); break; }
           fx.after(e.delay ?? 0, () => zone(e.x, e.z, e.r ?? 3, P, Math.min(4, e.life ?? 1.6)));
           break;
+        case 'explode':
+          if (stormKeys.has(e.key) && (e.els || []).includes('lightning')) { R.bolt([e.x, 8, e.z], [e.x, 0.4, e.z], 'lightning', { seg: 12, w: 0.14, life: 0.18, jit: 0.6, fork: 0.35 }); R.flash([e.x, 0.6, e.z], 'lightning', 1.2, 0); }
+          break;
+        case 'mineTrip': fx.kill('mine' + e.id); R.flash([e.x, 0.4, e.z], P.fire, 1.2, 0); R.ring([e.x, 0, e.z], P.fire, Math.min(2.6, e.r ?? 2.4), 0.25); break;
         case 'impact': if (!e.enemy && !(e.r > 0)) hitFx(e, P); break;
         case 'wall': wallFx(e, P); break;
         case 'decoy': R.flash([e.x, 1, e.z], P.fire, 1, 0); R.ring([e.x, 0, e.z], P.fire, 1.8, 0.3); R.curls?.([e.x, 1, e.z], 6, { pal: P.fire === 'wind' ? 'gale' : P.fire, s: 0.3 }); break;
@@ -185,8 +208,11 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           }
           if (e.pts?.length > 1) { const pts = e.pts.map((q) => [q[0], 1.1, q[1]]); R.chain(() => pts[0], pts.slice(1), 0.25); } break;
         case 'cone': { const ice = (e.els || []).includes('ice'), fire = P.fire === 'fire' || P.fire === 'magma', len = e.range ?? 4, d = [e.dx ?? 0, 0, e.dz ?? 1];
-          if (fire) R.firestream(() => [e.x, 1.0, e.z], () => d, len, 0.3, { rate: 45, s1: 1.2 });
-          else R.spray(() => [e.x + d[0] * 0.5, 1.0, e.z + d[2] * 0.5], () => d, len, 0.3, { pal: (e.els || []).includes('dark') ? 'smoke' : 'mist', drop: ice ? 'crystal' : 'water', cone: ((e.arc ?? 40) * Math.PI) / 360 });
+          const dur = e.channel ?? 0.3, me = () => (e.channel && S?.player && (!e.pid || e.pid === S.player.id) ? S.player : null); // a channelled jet turns with its wizard
+          const org = () => { const p = me(); return p ? [p.x + p.fx * 0.5, 1.0, p.z + p.fz * 0.5] : [e.x + d[0] * 0.5, 1.0, e.z + d[2] * 0.5]; };
+          const dir = () => { const p = me(); return p ? [p.fx, 0, p.fz] : d; };
+          if (fire) R.firestream(org, dir, len, dur, { rate: 45, s1: 1.2 });
+          else R.spray(org, dir, len, dur, { pal: (e.els || []).includes('dark') ? 'smoke' : 'mist', drop: ice ? 'crystal' : 'water', cone: ((e.arc ?? 40) * Math.PI) / 360 });
           if (ice) R.sheet([e.x, 0, e.z], d, len, len * 0.7, 2.6);
           break; }
       }

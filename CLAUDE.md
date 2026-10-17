@@ -167,3 +167,4 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
   (snapshot buffer, ~100 ms behind). Dev: `npm run server` + `npm run dev` (Vite forwards `/ws`).
 - Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
   on this machine: run npm from PowerShell.
+- Spell forms (R-088): `src/game/forms.js` holds twelve named three-element mixes (mines, storms, sprays, arcs) merged into `COMBOS` in `spells.js`; the sim knows them as options on existing shapes (area+`mine`, area+`repeat`, cone+`channel`, chain+`forks`). Not in `data/spells.json`.
