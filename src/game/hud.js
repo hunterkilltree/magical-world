@@ -46,7 +46,7 @@ export function createHud(o) {
   const cdText = {};
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
-  let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', wizardId = o.wizardId;
+  let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', lockKey = '', wizardId = o.wizardId;
 
   const row = $('h-elements');
   ORDER.forEach((el) => {
@@ -69,6 +69,11 @@ export function createHud(o) {
       b.className = 'pick' + (w.id === wizardId ? ' is-on' : '');
       b.dataset.w = w.id;
       b.innerHTML = `<span class="sw" style="background:${hex(w.glow)}"></span><span><b>${w.name}</b><small>${w.role}</small></span>`;
+      if (o.wizardOpen && !o.wizardOpen(w.id)) { // R-092: joins later in the campaign
+        b.classList.add('is-locked'); b.disabled = true; b.title = 'Joins later in the campaign · Gia nhập ở chặng sau';
+        node.appendChild(b);
+        return;
+      }
       b.addEventListener('click', () => {
         wizardId = w.id;
         document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === w.id));
@@ -142,8 +147,8 @@ export function createHud(o) {
   setWho();
 
   // Grimoire grouped by character: your role first and open, the other four folded, shared spells last.
-  function fillGrimoire(found, role) {
-    const row = (g) => `<div class="gr${found.has(g.sid ?? g.key) ? ' is-found' : ''}"><span class="gels">${chips(g.els)}</span>
+  function fillGrimoire(found, role, open) {
+    const row = (g) => `<div class="gr${found.has(g.sid ?? g.key) ? ' is-found' : ''}${open && g.els.some((e) => !open.includes(e)) ? ' is-locked' : ''}"><span class="gels">${chips(g.els)}</span>
       <span class="gname">${g.name}<small>${SHAPES[g.shape].label}</small></span><span class="gdesc">${g.desc}</span></div>`;
     const order = [role, ...ROLE_ORDER.filter((r) => r !== role)];
     const group = (title, c, list, open) => `<details class="grp"${open ? ' open' : ''}><summary><span class="dot" style="--c:${c}"></span>${title}
@@ -235,8 +240,8 @@ export function createHud(o) {
     screens.dead.classList.toggle('on', dead);
     document.body.classList.toggle('in-menu', g.mode === 'menu');
     if (g.mode !== prevMode || (dead && !screens.dead.dataset.filled)) {
-      if (g.mode === 'paused') fillGrimoire(g.stats.found, g.player.role);
-      if (g.mode === 'menu') fillBest();
+      if (g.mode === 'paused') fillGrimoire(g.stats.found, g.player.role, g.campaign?.chapter.elements);
+      if (g.mode === 'menu') { fillBest(); fillRoster($('m-roster')); }
       if (dead) {
         screens.dead.dataset.filled = '1';
         $('d-kick').textContent = `Fallen on wave ${g.wave}`;
@@ -260,6 +265,8 @@ export function createHud(o) {
     update(g, events, dt) {
       const p = g.player;
       showScreens(g);
+      const open = g.campaign?.chapter.elements, ok = open ? open.join() : '';
+      if (ok !== lockKey) { lockKey = ok; ORDER.forEach((el, i) => row.children[i]?.classList.toggle('is-locked', !!open && !open.includes(el))); }
       for (const e of events) {
         if (e.type === 'chapterBegin') replay(els.banner, e.title);
         else if (e.type === 'climax') replay(els.banner, `Final wave · ${e.n}`);
@@ -271,6 +278,7 @@ export function createHud(o) {
         else if (e.type === 'waveClear') replay(els.banner, `Wave ${e.n} cleared · +${e.heal} health`);
         else if (e.type === 'hurt') { vig = Math.min(1, vig + (e.dot ? 0.08 : 0.55)); if (e.self && e.reason && !e.dot) toast('Self-inflicted · ' + e.reason); }
         else if (e.type === 'noEnergy') { toast('Not enough energy'); els.enbar.classList.remove('flash'); void els.enbar.offsetWidth; els.enbar.classList.add('flash'); }
+        else if (e.type === 'locked') toast(`${ELEMENTS[e.el].name} is not learned yet`);
         else if (e.type === 'queueFull') toast(`Queue holds ${MAX_QUEUE} elements — cast or clear (X)`);
         else if (e.type === 'cancel') toast(`${ELEMENTS[e.a].name} and ${ELEMENTS[e.b].name} cancel out`);
         else if (e.type === 'fizzle') toast('Queue an element first (1–0)');

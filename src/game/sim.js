@@ -278,6 +278,9 @@ function act(s, p, a, inp) {
 
 function queueEl(s, p, el) {
   if (!ELEMENTS[el]) return;
+  // A campaign chapter only has the elements learned so far: a locked one is refused, and cancels nothing.
+  const open = s.campaign?.chapter.elements;
+  if (open && !open.includes(el)) { ev(s, 'locked', { pid: p.id, el }); return; }
   const opp = CANCELS[el];
   // Opposites cancel — unless the caster's role knows a spell for the clash.
   const i = opp && !rolePair(p.role, el, opp) ? p.queue.lastIndexOf(opp) : -1;
