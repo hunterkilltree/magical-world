@@ -4,6 +4,7 @@ import { K, M, PAL } from './fx2d.js';
 import { conjureSpear } from './ice-spear.js';
 import { createEarth } from './earth-fx.js';
 import { createChains } from './chain-fx.js';
+import { createSignatureFx } from './signature-fx.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 export function palOf(els = []) {
@@ -18,12 +19,13 @@ export function palOf(els = []) {
   return { fire: 'fire', smoke: 'smoke', crack: 'magma', zone: 'crack' };
 }
 
-export function createArenaFx({ fx, R, tipPos, scene }) {
+export function createArenaFx({ fx, R, tipPos, scene, bodyOf }) {
   const tip = () => { const v = tipPos(); return [v.x, v.y, v.z]; };
   const trails = new Map();
   const EARTH = scene ? createEarth(fx, R, scene) : null;
   const CHAINS = scene ? createChains(fx, R, scene) : null;
   let S = null;
+  const SIG = scene ? createSignatureFx({ scene, fx, R, earth: EARTH, chains: CHAINS, tip, getState: () => S, bodyOf }) : null; // the showcase signatures (R-089)
 
   // Storms (R-088): a cloud over the mark and rain of the element for as long as the strikes last; lightning storms
   // also drop a bolt from the cloud on every strike (see the explode case).
@@ -143,26 +145,42 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
     }));
     if (P.fire === 'ice' || P.zone === 'icefield') R.crystals([e.x, 0, e.z], e.ring ?? 0.6, Math.max(6, e.n), { life: 1.4, h: 0.8 });
   }
+  // Showcase signatures that ride on a cast: Tectonic Rupture's last great spire, Arcane Missiles.
+  function castSignature(e) {
+    if (!SIG) return;
+    const P = palOf(e.els);
+    if (e.style === 'slam' && (e.els || []).includes('earth') && P.fire === 'dust') SIG.spire(e);
+    if (e.shape === 'bolt' && SIG.only(e.els, 'arcane')) SIG.missiles(e);
+  }
   let stones = null;
+  let spearTo = null; // the ice spear conjured during a Frozen Domain wind-up: its target is set when the spell is released
 
   return {
     onEvent(e, s) {
+      if (s) S = s;
       S = s;
       const P = palOf(e.els || []);
       switch (e.type) {
         case 'windup':
           if (e.mode === 'self') break;
+          if (scene && e.key === 'ice+water' && e.name === 'Frozen Domain') {
+            // The showcase's signature: the spear forms over the shoulder through the wind-up and hold, and is thrown on release.
+            const to = spearTo = [e.x + (e.dx ?? 0) * 6, 0, e.z + (e.dz ?? 1) * 6];
+            const hold = e.hold ?? 0.05;
+            conjureSpear(fx, R, scene, { getHand: () => { const t = tip(); return [t[0], t[1] - 0.2, t[2]]; }, to, tForm: Math.max(0.12, e.t - hold), hold, flight: 0.3, scale: 1,
+              onImpact: (p) => { R.crystals(p, Math.min(1.6, (to.r ?? 3) * 0.45), 11, { life: 2.4 }); } });
+          }
           R.gather(tip, P.fire, e.t, { r: 1.0, orb: 0.25 + 0.25 * (e.weight ?? 0.5), rate: 45, tag: 'arena-gather' });
           fx.after(Math.max(0, e.t - (e.hold ?? 0.05)), () => R.flash(tip(), P.fire, 0.45, 0));
           if (EARTH && P.fire === 'dust' && (e.weight ?? 0.5) > 0.4) { const pl = () => [S?.player?.x ?? e.x, 0, S?.player?.z ?? e.z]; stones = EARTH.orbit(pl, 5, { r: 0.8, y: 1.15, dur: e.t + 0.1 }); }
           if (P.fire === 'wind') fx.during(e.t, (dt) => { if (Math.random() < dt * 30) { const s0 = tip(), a = Math.random() * 6.28, r = rnd(0.8, 1.2);
             fx.spawn({ kind: K.arc, pal: 'gale', p: [s0[0] + Math.cos(a) * r, s0[1] + rnd(-0.4, 0.3), s0[2] + Math.sin(a) * r], v: [-Math.cos(a) * 3, 0, -Math.sin(a) * 3], s0: 0.4, s1: 0.15, life: 0.28, spin: 9, add: 0.2 }); } });
           break;
-        case 'cast': if (e.mode !== 'self') release(e); else fx.kill('arena-gather');
+        case 'cast': if (e.mode !== 'self') { release(e); castSignature(e); } else fx.kill('arena-gather');
           if (stones) { stones.hurl([e.x + (e.dx ?? 0) * 6, 0, e.z + (e.dz ?? 1) * 6], { speed: 20, spread: 1.4 }); stones = null; } break;
-        case 'beam': beam(e); break;
-        case 'blink': blink(e); break;
-        case 'dash': fx.during(e.t ?? 0.2, () => { const p = S?.player; if (!p) return;
+        case 'beam': beam(e); if (e.key === 'fire+lightning') SIG?.plasmaEnd(e); break;
+        case 'blink': blink(e); SIG?.afterimages(e); break;
+        case 'dash': SIG?.afterimages(e); fx.during(e.t ?? 0.2, () => { const p = S?.player; if (!p) return;
           fx.spawn({ kind: K.spark, mode: M.vel, pal: P.fire, p: [p.x + rnd(-0.3, 0.3), rnd(0.3, 1.7), p.z + rnd(-0.3, 0.3)], v: [-(e.dx ?? 0) * 6, 0, -(e.dz ?? 1) * 6], s: 0.12, aspect: 0.14, life: 0.25, stretch: 0.1, drag: 5 }); });
           { const a = [e.x, 1.05, e.z], b = [e.x + (e.dx ?? 0) * (e.dist ?? 4), 1.05, e.z + (e.dz ?? 1) * (e.dist ?? 4)];
             if ((e.els || []).includes('lightning')) fx.after(e.t ?? 0.2, () => { R.bolt(a, b, 'lightning', { seg: 10, w: 0.12, life: 0.15, jit: 0.5, fork: 0.3 }); R.flash(b, 'lightning', 1.1, 0); });
@@ -174,6 +192,8 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           break;
         case 'nova': zone(e.x, e.z, e.r ?? 2.4, P); break;
         case 'area':
+          if (e.key === 'wind+wind' && SIG) { R.ring([e.x, 0, e.z], P.fire, (e.r ?? 3) * 2, 0.4); SIG.eye(e); break; }
+          if (e.key === 'earth+fire' && e.name === 'Magma Crush') SIG?.magma(e);
           if (e.mine) { // armed rune, turning slowly until the mine trips
             fx.decal({ kind: K.rune, pal: P.fire, p: [e.x, 0.03, e.z], s: 1.7, life: Math.min(e.life ?? 20, 30), rot: 0, tag: 'mine' + e.id, tick: (q, dt) => { q.rot += dt * 0.7; } });
             R.flash([e.x, 0.3, e.z], P.fire, 0.6, 0);
@@ -182,6 +202,7 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           if (e.storm) { storm(e, P); break; }
           // Cryomancer's Water + Ice: the field is planted by a hurled ice spear (quick form — the sim field is already live).
           if (scene && e.key === 'ice+water' && e.name === 'Frozen Domain') {
+            if (spearTo) { spearTo[0] = e.x; spearTo[2] = e.z; spearTo.r = e.r; spearTo = null; break; } // the spear from the wind-up flies to the field
             conjureSpear(fx, R, scene, { getHand: () => { const t = tip(); return [t[0], t[1] - 0.2, t[2]]; }, to: [e.x, 0, e.z], tForm: 0.12, hold: 0.03, flight: 0.22, scale: 0.8,
               onImpact: (p) => { R.crystals(p, Math.min(1.6, (e.r ?? 3) * 0.45), 11, { life: 2.4 }); } });
             break;
@@ -193,13 +214,14 @@ export function createArenaFx({ fx, R, tipPos, scene }) {
           if (stormKeys.has(e.key) && (e.els || []).includes('lightning')) { R.bolt([e.x, 8, e.z], [e.x, 0.4, e.z], 'lightning', { seg: 12, w: 0.14, life: 0.18, jit: 0.6, fork: 0.35 }); R.flash([e.x, 0.6, e.z], 'lightning', 1.2, 0); }
           break;
         case 'mineTrip': fx.kill('mine' + e.id); R.flash([e.x, 0.4, e.z], P.fire, 1.2, 0); R.ring([e.x, 0, e.z], P.fire, Math.min(2.6, e.r ?? 2.4), 0.25); break;
-        case 'impact': if (!e.enemy && !(e.r > 0)) hitFx(e, P); break;
+        case 'impact': if (!e.enemy && !(e.r > 0)) hitFx(e, P); if (!e.enemy && e.kind === 'bolt' && SIG?.only(e.els, 'dark')) SIG.yank(e); break;
         case 'wall': wallFx(e, P); break;
         case 'decoy': R.flash([e.x, 1, e.z], P.fire, 1, 0); R.ring([e.x, 0, e.z], P.fire, 1.8, 0.3); R.curls?.([e.x, 1, e.z], 6, { pal: P.fire === 'wind' ? 'gale' : P.fire, s: 0.3 }); break;
         case 'swap': { const a = [e.x0, 1, e.z0], b = [e.x1, 1, e.z1]; R.flash(a, P.fire, 1, 0); R.flash(b, P.fire, 1, 0);
           R.strands(() => a, () => b, P.fire, 0.18, { n: 3, amp: 0.2, w: 0.08, sag: 0.1, seg: 14 }); break; }
         case 'selfcast': R.nova([e.x, 0, e.z], P.fire, 1.6); break;
         case 'chain':
+          if (e.key === 'dark+earth' && SIG?.prison(e)) break; // Grave Chains: a prison of chains round every enemy
           if (CHAINS && e.pts?.length > 1 && !(e.els || []).includes('lightning')) {
             // Grave Chains / binds: an iron chain from a floor portal beside each struck target.
             e.pts.slice(1).forEach((q, i) => { const a = Math.random() * 6.28;
