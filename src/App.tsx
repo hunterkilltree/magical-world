@@ -92,8 +92,11 @@ export const App: React.FC = () => {
             <div className="rolecard" id="m-rolecard"></div>
             <div className="label"><span>Arena · Đấu trường</span></div>
             <div className="roles arenas" id="m-arenas"></div>
+            <div className="label"><span>Graphics · Đồ họa</span><span className="qnote"></span></div>
+            <div className="roles quality" id="m-quality"></div>
             <div className="actions">
               <button className="btn btn-primary" id="m-start">Enter the court</button>
+              <button className="btn btn-ghost" id="m-full" hidden>Full screen</button>
             </div>
             <div className="label"><span>Play together · up to four</span><span id="m-net-status"></span></div>
             <div className="coop" id="m-coop">
@@ -135,6 +138,13 @@ export const App: React.FC = () => {
         </div>
       </div>
 
+      <div id="rotate" aria-hidden="true">
+        <div>
+          <b>Turn your phone sideways</b>
+          <span>Court of Waves plays in landscape.</span>
+        </div>
+      </div>
+
       <div className="screen" id="pause">
         <div className="panel card">
           <div className="col">
@@ -145,6 +155,8 @@ export const App: React.FC = () => {
               <button className="btn btn-ghost" id="p-restart">Restart</button>
               <button className="btn btn-ghost" id="p-menu">Change wizard</button>
             </div>
+            <div className="label"><span>Graphics</span><span className="qnote"></span></div>
+            <div className="roles quality" id="p-quality"></div>
             <div className="label">Controls</div>
             <div className="controls"></div>
           </div>

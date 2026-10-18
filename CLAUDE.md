@@ -168,3 +168,23 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
 - Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
   on this machine: run npm from PowerShell.
 - Spell forms (R-088): `src/game/forms.js` holds twelve named three-element mixes (mines, storms, sprays, arcs) merged into `COMBOS` in `spells.js`; the sim knows them as options on existing shapes (area+`mine`, area+`repeat`, cone+`channel`, chain+`forks`). Not in `data/spells.json`.
+
+## Web port quality and phones (R-110, R-111)
+
+Browser port only; the Godot game is untouched.
+- `src/game/quality.js` is pure (no three, no DOM) and holds everything testable: `PROFILES` (`minimal` < `low` < `medium` < `high`;
+  `high` is the old look), `pickTier` (the first guess from `?q=`, the saved menu choice, memory, cores, the GPU name, phone), `pixelRatioFor`,
+  `createGovernor` (drops a tier under ~40 fps and never returns to a tier that was too slow; climbs after 20 s of steady 57 fps, up to the
+  device ceiling), `createFaultGuard` (frame throws: retry, lower the tier, stop), `createSafeRunner` (an optional layer that throws three times
+  is switched off), `safeGet`/`safeSet` (storage never throws). Numbers in `PROFILES` are our tuning, not measured on real weak hardware.
+- `render.js` applies a tier in `applyQuality`: render ratio and pixel budget (`resize`), shadow map size, bloom, how many point lights stay lit
+  (`applyLights`: about 17 exist, and each lit pixel pays for them; lights are only toggled on a tier change or an arena rebuild, never
+  while playing, because a changed count recompiles every lit material), particle caps/density (`Particles.setLimit`) and `fx2.budget`.
+  `antialias` is off on purpose: the scene goes through the composer's targets, so MSAA on the canvas smooths nothing. A lost WebGL context pauses the run.
+  New optional effect code should be called through `safe.run(name, fn)` in `render.js`.
+- `main.js` owns the loop: `try`/`catch` per frame, the governor, a frame cap (30 fps on `minimal`, 60 on a phone), the Graphics row
+  (`hud.js`, saved as `cow_quality`). `fatal.js` draws the "cannot run" card. `?q=minimal|low|medium|high` forces a tier and turns the governor off.
+- Phones: `touch.js` (pure maths + `createTouchControls`) feeds the same `move`/aim the keyboard does; `input.js` ignores touch pointers for
+  the mouse aim. `?touch=1` / `?touch=0` forces touch mode; the HUD layout is the `body.touch` block at the end of `styles.css`.
+  `window.__arena.quality` and `.view` (with `.scene`, `.setQuality`) are the test hooks. Touch cannot be simulated with mouse clicks:
+  dispatch `PointerEvent`s with `pointerType: 'touch'`.

@@ -2,6 +2,7 @@
 // Combines authentic recorded CC0 studio clips (data/sfx.json) with dynamic pitch-shifting,
 // stereo spatialization, musical element chords, and low-frequency tactile synthesis.
 import sfxData from '../../data/sfx.json';
+import { safeGet, safeSet } from './quality.js';
 
 const NOTE = {
   earth: 261.6,
@@ -23,7 +24,7 @@ export function createAudio() {
   let ac = null;
   let masterGain = null;
   let compressor = null;
-  let muted = localStorage.getItem('cow_muted') === '1';
+  let muted = safeGet('cow_muted') === '1'; // storage may be blocked (R-110)
   let volume = 0.85;
 
   const bufferCache = new Map();
@@ -33,13 +34,13 @@ export function createAudio() {
 
   function init() {
     if (ac) {
-      if (ac.state === 'suspended') ac.resume();
+      if (ac.state === 'suspended') ac.resume()?.catch?.(() => {});
       return;
     }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
 
-    ac = new AudioContextClass();
+    try { ac = new AudioContextClass(); } catch { ac = null; return; } // no sound is better than no game (R-110)
 
     // Studio-grade dynamic mastering chain
     compressor = ac.createDynamicsCompressor();
@@ -421,7 +422,7 @@ export function createAudio() {
     },
     toggle() {
       muted = !muted;
-      localStorage.setItem('cow_muted', muted ? '1' : '0');
+      safeSet('cow_muted', muted ? '1' : '0');
       if (masterGain && ac) {
         masterGain.gain.setValueAtTime(muted ? 0 : volume, ac.currentTime);
       }

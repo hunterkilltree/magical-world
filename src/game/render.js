@@ -12,6 +12,7 @@ import { ELEMENTS, resolveSpell } from './spells.js';
 import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
 import { createWow } from './wow.js';
+import { PROFILES, pixelRatioFor, createSafeRunner } from './quality.js';
 
 const cols = (...h) => h.map((x) => new THREE.Color(x));
 const STYLE = {
@@ -64,7 +65,7 @@ void main() { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
 const DENSITY = 0.6, SIZE_K = 1.25;
 class Particles {
   constructor(scene, max, additive) {
-    this.max = max; this.next = 0;
+    this.max = max; this.limit = max; this.density = DENSITY; this.next = 0;
     this.p = new Float32Array(max * 3); this.c = new Float32Array(max * 3); this.sz = new Float32Array(max); this.al = new Float32Array(max);
     this.v = new Float32Array(max * 3); this.life = new Float32Array(max); this.L = new Float32Array(max); this.g = new Float32Array(max);
     this.d = new Float32Array(max); this.s0 = new Float32Array(max); this.s1 = new Float32Array(max); this.a0 = new Float32Array(max);
@@ -83,19 +84,26 @@ class Particles {
     scene.add(this.points);
   }
   emit(x, y, z, vx, vy, vz, life, s0, s1, col, a0 = 1, g = 0, d = 0, mo = 0) {
-    if (Math.random() > DENSITY) return; // fewer, bigger particles so silhouettes read
+    if (Math.random() > this.density) return; // fewer, bigger particles so silhouettes read
     s0 *= SIZE_K; s1 *= SIZE_K;
     const i = this.next, j = i * 3;
     this.mo[i] = mo; this.ph[i] = Math.random() * 6.28; this.sp[i] = s0 >= 0.24 && Math.random() < 0.6 ? 1 : 0;
-    this.next = (i + 1) % this.max;
+    this.next = (i + 1) % this.limit;
     this.p[j] = x; this.p[j + 1] = y; this.p[j + 2] = z;
     this.v[j] = vx; this.v[j + 1] = vy; this.v[j + 2] = vz;
     this.c[j] = col.r; this.c[j + 1] = col.g; this.c[j + 2] = col.b;
     this.life[i] = life; this.L[i] = life; this.s0[i] = s0; this.s1[i] = s1; this.a0[i] = a0; this.g[i] = g; this.d[i] = d;
     this.sz[i] = s0; this.al[i] = a0;
   }
+  // R-110: a tier caps how many particles live at once (the arrays stay as big as the biggest tier)
+  setLimit(n) {
+    this.limit = Math.max(16, Math.min(this.max, n | 0));
+    if (this.next >= this.limit) this.next = 0;
+    for (let i = this.limit; i < this.max; i++) { this.life[i] = 0; this.al[i] = 0; }
+    this.points.geometry.setDrawRange(0, this.limit);
+  }
   update(dt) {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.limit; i++) {
       if (this.life[i] <= 0) continue;
       const l = (this.life[i] -= dt);
       if (l <= 0) { this.al[i] = 0; continue; }
@@ -121,7 +129,7 @@ class Particles {
     for (let n = 0; n < 2; n++) {
       const a = this.ph[i] + n * Math.PI + 1.2, sp = 0.9 + Math.random() * 0.8;
       const vx = this.v[j] * 0.5 + Math.cos(a) * sp, vz = this.v[j + 2] * 0.5 + Math.sin(a) * sp;
-      const q = this.next; this.next = (q + 1) % this.max;
+      const q = this.next; this.next = (q + 1) % this.limit;
       const t = q * 3;
       this.p[t] = this.p[j]; this.p[t + 1] = this.p[j + 1]; this.p[t + 2] = this.p[j + 2];
       this.v[t] = vx; this.v[t + 1] = this.v[j + 1] * 0.5 + 0.4; this.v[t + 2] = vz;
@@ -134,7 +142,7 @@ class Particles {
     const j = i * 3, x = this.p[j], z = this.p[j + 2], s = this.s0[i] * 0.5;
     this.life[i] = 0; this.al[i] = 0;
     for (let n = 0; n < 3; n++) {
-      const a = Math.random() * 6.28, q = this.next, t = q * 3; this.next = (q + 1) % this.max;
+      const a = Math.random() * 6.28, q = this.next, t = q * 3; this.next = (q + 1) % this.limit;
       this.p[t] = x; this.p[t + 1] = 0.05; this.p[t + 2] = z;
       this.v[t] = Math.cos(a) * 1.2; this.v[t + 1] = 1.6 + Math.random(); this.v[t + 2] = Math.sin(a) * 1.2;
       this.c[t] = this.c[j]; this.c[t + 1] = this.c[j + 1]; this.c[t + 2] = this.c[j + 2];
@@ -144,7 +152,7 @@ class Particles {
   }
   // Air push: a pressure wave shoves every live particle inside r outward (bends smoke and sparks around a cast).
   push(x, y, z, r, k) {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.limit; i++) {
       if (this.life[i] <= 0) continue;
       const j = i * 3, dx = this.p[j] - x, dy = this.p[j + 1] - y, dz = this.p[j + 2] - z, d = Math.hypot(dx, dy, dz);
       if (d >= r || d < 1e-3) continue;
@@ -197,9 +205,39 @@ const ROCK_HOT = new THREE.MeshStandardMaterial({ color: 0x5a3020, emissive: 0xf
 const ROCK_RUNE = new THREE.MeshStandardMaterial({ color: 0x4a3a5a, emissive: 0xb04bff, emissiveIntensity: 1.2, roughness: 0.8, flatShading: true });
 const ROCK_ZAP = new THREE.MeshStandardMaterial({ color: 0x5a5440, emissive: 0xf4e15c, emissiveIntensity: 1.0, roughness: 0.8, flatShading: true });
 
-export function createView(canvas, overlay) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+function readCaps(renderer) {
+  const gl = renderer.getContext();
+  const get = (fn) => { try { return fn(); } catch { return undefined; } };
+  const info = get(() => gl.getExtension('WEBGL_debug_renderer_info'));
+  return {
+    gpu: String(get(() => (info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))) ?? ''),
+    maxTexture: renderer.capabilities.maxTextureSize,
+    maxFragUniforms: get(() => gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS))
+  };
+}
+
+// Tries the usual settings, then plainer ones. With no WebGL at all it throws an error whose code is 'nowebgl'.
+// No MSAA on the canvas: the scene is drawn into the composer's own targets, so a multisampled backbuffer smooths nothing.
+function makeRenderer(canvas) {
+  let cause = null;
+  for (const powerPreference of ['high-performance', 'default', 'low-power']) {
+    try { return new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference }); } catch (err) { cause = err; }
+  }
+  throw Object.assign(new Error('WebGL is not available'), { code: 'nowebgl', cause });
+}
+
+// opts: { choose(caps) -> tier name, onContext('lost' | 'restored'), onDisable(layer, err) }
+export function createView(canvas, overlay, opts = {}) {
+  const renderer = makeRenderer(canvas);
+  const caps = readCaps(renderer);
+  let tierName = opts.choose?.(caps);
+  if (!PROFILES[tierName]) tierName = 'high';
+  let prof = PROFILES[tierName];
+  let lost = false;
+  const safe = createSafeRunner({
+    onFault: (name, err, n) => console.warn(`[view] ${name} threw (${n})`, err),
+    onDisable: (name, err) => { console.error(`[view] ${name} switched off`, err); opts.onDisable?.(name, err); }
+  });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -296,20 +334,32 @@ export function createView(canvas, overlay) {
   let conePrevKey = '';
   const wallPrev = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5).rotateX(-Math.PI / 2), flatMat(0xffffff, 0.18)); wallPrev.position.y = 0.04; scene.add(wallPrev);
 
+  // The scene renders at the tier's ratio; the 2D overlay (bars, numbers) stays at least 1:1 so text reads on a small buffer.
   function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    dpr = renderer.getPixelRatio();
+    const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
+    const rpr = pixelRatioFor(prof, w, h, window.devicePixelRatio);
+    dpr = Math.min(window.devicePixelRatio || 1, Math.max(1, rpr));
+    renderer.setPixelRatio(rpr);
+    composer.setPixelRatio(rpr);
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    const s = (h * dpr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const s = (h * rpr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     fx.glow.mat.uniforms.uScale.value = s;
     fx.dust.mat.uniforms.uScale.value = s;
-    overlay.width = w * dpr; overlay.height = h * dpr;
+    overlay.width = Math.round(w * dpr); overlay.height = Math.round(h * dpr);
   }
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+  window.visualViewport?.addEventListener('resize', resize);
   resize();
+
+  // A lost WebGL context (a driver reset, a tab starved of memory) must not end the page: stop drawing, say so, carry on when it is back.
+  const onLost = (e) => { e.preventDefault(); lost = true; opts.onContext?.('lost'); };
+  const onRestored = () => { lost = false; resize(); applyQuality(tierName); opts.onContext?.('restored'); };
+  canvas.addEventListener('webglcontextlost', onLost, false);
+  canvas.addEventListener('webglcontextrestored', onRestored, false);
 
   // ---------------------------------------------------------------- particles
   function puff(style, x, y, z, vx, vy, vz, o = {}) {
@@ -417,7 +467,7 @@ export function createView(canvas, overlay) {
 
   function reset(game) {
     const th = game.theme ?? 'court';
-    if (!arena || theme !== th) { if (arena) scene.remove(arena.group); arena = buildArena(ARENA_R, game.props, GATES, th); scene.add(arena.group); theme = th; applyTheme(th); }
+    if (!arena || theme !== th) { if (arena) scene.remove(arena.group); arena = buildArena(ARENA_R, game.props, GATES, th); scene.add(arena.group); theme = th; applyTheme(th); applyLights(); }
     clearViews();
     if (!pv || pv.w.id !== game.player.wizard) setWizard(game.player.wizard);
     camTarget.set(game.player.x, 0, game.player.z);
@@ -459,10 +509,10 @@ export function createView(canvas, overlay) {
     for (const e of events) {
       const mine = !e.pid || !game.player || e.pid === game.player.id;
       const ov = mine ? null : others.get(e.pid) ?? null;
-      if (mine) wow.onEvent(e, game);
-      else if (!BODY_ONLY.has(e.type)) wow.onEvent(e, game, ov ? tipPos(ov) : null);
-      if (mine) afx.onEvent(e, game);
-      else if (!BODY_ONLY.has(e.type)) { fxTip = ov ? tipPos(ov) : null; afx.onEvent(e, game); fxTip = null; }
+      if (mine) safe.run('wow', () => wow.onEvent(e, game));
+      else if (!BODY_ONLY.has(e.type)) safe.run('wow', () => wow.onEvent(e, game, ov ? tipPos(ov) : null));
+      if (mine) safe.run('afx', () => afx.onEvent(e, game));
+      else if (!BODY_ONLY.has(e.type)) { fxTip = ov ? tipPos(ov) : null; safe.run('afx', () => afx.onEvent(e, game)); fxTip = null; }
       switch (e.type) {
         case 'cast': {
           const tp = tipPos(ov ?? pv);
@@ -1047,6 +1097,7 @@ export function createView(canvas, overlay) {
 
   // ---------------------------------------------------------------- frame
   function render(s, dt) {
+    if (lost) return;
     t += dt;
     updatePlayerViews(s, dt);
     syncEnemies(s, dt);
@@ -1079,8 +1130,7 @@ export function createView(canvas, overlay) {
       }
     }
     for (const l of flashes) l.intensity *= Math.exp(-14 * dt);
-    fx.glow.update(dt);
-    fx.dust.update(dt);
+    safe.run('particles', () => { fx.glow.update(dt); fx.dust.update(dt); });
 
     const p = s.player;
     camMode = s.mode === 'menu' ? 'menu' : 'play';
@@ -1106,9 +1156,9 @@ export function createView(canvas, overlay) {
       for (const mm of pl.mats ?? [pl.mat]) { mm.opacity = op; mm.depthWrite = op > 0.95; }
     }
 
-    wow.update(dt, s, pv ? tipPos() : null);
-    afx.update(s);
-    fx2.update(dt);
+    safe.run('wow', () => wow.update(dt, s, pv ? tipPos() : null));
+    safe.run('afx', () => afx.update(s));
+    safe.run('fx2', () => fx2.update(dt));
     composer.render();
     drawOverlay(s, dt);
   }
@@ -1218,5 +1268,52 @@ export function createView(canvas, overlay) {
     ctx.globalAlpha = 1;
   }
 
-  return { reset, setWizard, screenToGround, consume, render, renderer };
+  // ---------------------------------------------------------------- quality (R-110)
+  // Point lights are what a lit pixel pays for, so a tier keeps only some of them lit. Lights are never toggled while
+  // playing (a changed light count recompiles every lit material); only here, on a tier change or an arena rebuild.
+  function applyLights() {
+    const all = [];
+    scene.traverse((o) => { if (o.isPointLight) all.push(o); });
+    const first = new Set([flashes[0], ...(arena?.braziers ?? []).map((b) => b.light)]);
+    all.sort((a, b) => (first.has(b) ? 1 : 0) - (first.has(a) ? 1 : 0));
+    all.forEach((l, i) => { l.visible = i < prof.lights; });
+  }
+
+  function applyQuality(tier) {
+    if (!PROFILES[tier]) return tierName;
+    tierName = tier; prof = PROFILES[tier];
+    resize();
+    moon.castShadow = prof.shadow > 0;
+    if (prof.shadow && moon.shadow.mapSize.x !== prof.shadow) {
+      moon.shadow.mapSize.set(prof.shadow, prof.shadow);
+      moon.shadow.map?.dispose();
+      moon.shadow.map = null;
+    }
+    bloom.enabled = prof.bloom;
+    for (const [P, n] of [[fx.glow, prof.glow], [fx.dust, prof.dust]]) { P.setLimit(n); P.density = prof.density; }
+    fx2.S.density = prof.fx;
+    fx2.budget(prof.sprites);
+    applyLights();
+    return tierName;
+  }
+  applyQuality(tierName);
+
+  function dispose() {
+    window.removeEventListener('resize', resize);
+    window.removeEventListener('orientationchange', resize);
+    window.visualViewport?.removeEventListener('resize', resize);
+    canvas.removeEventListener('webglcontextlost', onLost, false);
+    canvas.removeEventListener('webglcontextrestored', onRestored, false);
+    try { composer.dispose?.(); renderer.dispose(); } catch { /* the page is going away */ }
+  }
+
+  return {
+    reset, setWizard, screenToGround, consume, render, renderer, scene, caps, dispose,
+    setAim(x, z) { aim.x = x; aim.z = z; },
+    setQuality: applyQuality,
+    get tier() { return tierName; },
+    get lost() { return lost; },
+    // a layer that was switched off after repeated errors comes back after a restart
+    clearFaults() { safe.reset(); }
+  };
 }
