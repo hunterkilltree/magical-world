@@ -486,3 +486,24 @@ Arcane Missiles (an arcane bolt sends three missiles bowing in on the target), C
 casts a chain that drags streaks back to the staff), Grave Chains' prison (portals and chains round every enemy
 struck), plus Magma Crush's lava drops, geysers and dust wave, Hurricane Eye walking its tornado through the enemy
 line (Cyclone), and Arc Plasma's burst at the end of the beam. Render-only; gameplay is unchanged.
+
+### R-110 [done] Quality tiers and crash guards
+Browser port only (the Godot game is unchanged). Four graphics tiers (`minimal`, `low`, `medium`, `high`) in
+`src/game/quality.js`, a pure module: each tier sets a render-resolution cap and pixel budget, shadow size, bloom,
+how many point lights stay lit, particle caps and density, and a frame-rate cap. `high` is the old look. The starting tier
+is a guess from the device (`?q=` and the menu's saved choice win; software renderers start at `minimal`, phones and
+weak CPUs/GPUs start lower). A frame-time governor drops a tier when the average stays under about 40 fps (at once under
+25 fps) and never returns to a tier that was too slow; it climbs one tier after 20 s of steady 57 fps, up to the device's
+ceiling. Nothing may blank the page: the WebGL context is made with fallbacks and, when no WebGL exists, a plain
+message replaces the game; a lost context pauses the run and resumes on restore; storage that throws (private mode)
+is ignored; an effect layer that throws three frames in a row is switched off, and a frame that keeps throwing lowers
+the tier and finally stops with a Reload card. The menu and pause screens have a Graphics row (Auto, Low, Medium, High).
+
+### R-111 [done] Play on a phone
+Browser port only. On a touch screen (`?touch=1` forces it) the page fills the visible screen (`dvh`, safe-area
+insets, no page scroll, no pinch or double-tap zoom on the arena, no long-press menu). The left half is a floating move stick; the Cast pad at the bottom
+right casts when touched, keeps recasting while held and aims where it is dragged (untouched, it aims at the nearest
+enemy, else along the facing); Area, Self and Dodge are buttons next to it; the ten element keys are a 5 x 2 grid; a
+tap on the right half of the arena aims and casts there. The sim is unchanged (a touch stick feeds the same `move`
+and aim the keyboard and mouse do). A portrait phone is asked to turn sideways. Phones start at `low` or `medium`,
+render at no more than 60 fps, and add a web manifest so the game can be installed full screen.

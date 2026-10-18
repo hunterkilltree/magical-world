@@ -349,6 +349,8 @@ export function createFx2d({ scene, camera, renderer, lights = 4, post: withPost
     S, PAL, K, M, post,
     get time() { return S.time; },
     spawn: (o) => make(o, sprites),
+    // R-110: a quality tier caps how many sprites live at once (the buffers keep their full size)
+    budget(n) { sprites.max = Math.max(64, Math.min(3600, n | 0)); while (sprites.list.length > sprites.max) sprites.list.shift(); },
     decal: (o) => make({ mode: M.ground, rot: 0, ...o }, decals),
     kill(tag) { for (const P of [sprites, decals]) P.list = P.list.filter((p) => p.tag !== tag); },
     clear() { funnels.forEach((d) => scene.remove(d.m)); funnels.length = 0; domes.forEach((d) => scene.remove(d.m)); domes.length = 0; sprites.list.length = 0; decals.list.length = 0; timers.length = 0; heats.length = 0; L.forEach((s) => { s.I = 0; s.l.intensity = 0; }); },
