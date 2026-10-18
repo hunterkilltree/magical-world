@@ -188,6 +188,7 @@ test('the page cannot be blanked by startup: audio, the renderer and the app all
   assert.match(main, /createFaultGuard/);
   assert.match(main, /createGovernor/);
   assert.match(main, /showFatal/, 'a card replaces the game when it cannot run');
+  assert.match(read('src/App.tsx'), /try\s*{\s*cleanup = initGame\(\)/, 'an error anywhere in the start-up shows the card too');
 });
 
 test('the menu and pause screens offer a Graphics choice', () => {

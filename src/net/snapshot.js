@@ -7,6 +7,7 @@
 import { makeSpell, lookupDef } from '../game/spells.js';
 import { ENEMY_TYPES } from '../game/enemies.js';
 import { newStatus } from '../game/sim.js';
+import { weaponSpell } from '../game/weapons.js';
 
 const r3 = (n) => (Number.isInteger(n) ? n : Math.round(n * 1000) / 1000);
 
@@ -42,7 +43,7 @@ export function snapshotState(g) {
     const spec = { key: sp.key, name: sp.name, els: sp.els, power: r3(sp.power) };
     if (sp.role) spec.role = sp.role;
     if (sp.amped) spec.amped = true;
-    if (lookupDef(sp.key, sp.role) !== sp.def) spec.def = plain(sp.def); // dynamic spells (burning ground, reflected hex...)
+    if (!sp.weapon && lookupDef(sp.key, sp.role) !== sp.def) spec.def = plain(sp.def); // dynamic spells (burning ground, reflected hex...)
     specs.push(spec);
     index.set(sp, specs.length - 1);
     return specs.length - 1;
@@ -69,6 +70,7 @@ export function snapshotState(g) {
 }
 
 const rebuild = (spec) => {
+  if (spec.key?.startsWith('weapon:')) return weaponSpell(spec.key.slice(7)); // a weapon's hit is rebuilt from the armory (R-112)
   const def = spec.def ?? lookupDef(spec.key, spec.role);
   if (!def) return null;
   const sp = makeSpell(spec.els, def, spec.power, spec.key, spec.name);

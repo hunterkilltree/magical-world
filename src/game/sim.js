@@ -4,6 +4,7 @@
 import { ELEMENTS, MAX_QUEUE, CANCELS, resolveSpell, makeSpell } from './spells.js';
 import { ENEMY_TYPES, waveRoster } from './enemies.js';
 import { ROLES, STYLES, SHAPE_WEIGHT, WIZARD_ROLE, rolePair } from './roles.js';
+import { WEAPONS, weaponSpell, weaponFor, nextWeapon, isWeapon } from './weapons.js';
 
 export const ARENA_R = 24;
 const SC = ARENA_R / 15; // layout authored at R=15, scaled out
@@ -80,7 +81,9 @@ function makePlayer(id, wizard, role, x, z, name) {
     hp: P.hp, maxHp: P.hp, energy: P.energy, maxEnergy: P.energy, fx: 0, fz: -1,
     queue: [], last: null, cd: { cast: 0, nova: 0, self: 0, dodge: 0 }, shapeCd: {}, shapeMax: {}, spellCd: {}, spellMax: {},
     cdMax: { cast: 0.3, nova: P.novaCd, self: P.selfCd, dodge: P.dodgeCd },
-    dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, down: false, reviveT: 0, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0
+    dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, down: false, reviveT: 0, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0,
+    // R-112: the weapon in the free hand. swing = the wind-up before a blow or a shot; swingT = what is left of the follow-through
+    weapon: weaponFor(wizard), wcd: 0, wcdMax: 0.4, swing: null, swingT: 0, swingMax: 0.2
   };
 }
 
@@ -212,6 +215,9 @@ function act(s, p, a, inp) {
   if (a === 'nova') return cast(s, p, inp, 'nova', false);
   if (a === 'self') return cast(s, p, inp, 'self', false);
   if (a === 'dodge') return dodge(s, p, inp);
+  if (a === 'attack') return attack(s, p, false);
+  if (a === 'reattack') return attack(s, p, true);
+  if (a.startsWith('weapon:')) return arm(s, p, a.slice(7));
 }
 
 function queueEl(s, p, el) {
@@ -236,7 +242,7 @@ function ownTimer(sp) {
 
 function cast(s, p, inp, mode, held) {
   const st = p.st;
-  if (st.frozen > 0 || st.stun > 0 || p.wind || p.dashT > 0) return;
+  if (st.frozen > 0 || st.stun > 0 || p.wind || p.swing || p.dashT > 0) return;
   let q = p.queue;
   if (held && q.length) return;
   if (!q.length) {
@@ -301,6 +307,62 @@ function release(s, p, inp) {
   if (d.reflectPlayer) st.reflect = Math.max(st.reflect, d.reflectPlayer);
   if (mode === 'nova' && !MOVES.has(d.shape)) return nova(s, sp, p);
   (CAST[d.shape] ?? CAST.bolt)(s, sp, p, dx, dz, Math.max(1.2, aimDist));
+}
+
+// ---------------------------------------------------------------- weapons (R-112)
+// A second attack beside the spells: no energy, its own cooldown, a short wind-up, then a blow or a shot.
+function attack(s, p, held) {
+  const st = p.st, W = WEAPONS[p.weapon];
+  if (!W || st.frozen > 0 || st.stun > 0 || p.wind || p.swing || p.dashT > 0 || p.dodge > 0 || p.wcd > 0) return;
+  p.wcd = p.wcdMax = W.cd;
+  p.swing = { t: W.windup, max: W.windup };
+  ev(s, 'swing', { pid: p.id, weapon: p.weapon, kind: W.kind, anim: W.anim, t: W.windup, held, x: p.x, z: p.z, dx: p.fx, dz: p.fz, color: W.color, els: W.els });
+}
+
+// The blow lands (or the shot leaves) where the player aims now.
+function blow(s, p, inp) {
+  const W = WEAPONS[p.weapon], sp = weaponSpell(p.weapon);
+  p.swing = null;
+  if (!W) return;
+  const ax = inp.aim.x - p.x, az = inp.aim.z - p.z, L0 = Math.hypot(ax, az);
+  if (L0 > 0.05) { p.fx = ax / L0; p.fz = az / L0; }
+  const dx = p.fx, dz = p.fz;
+  p.swingT = p.swingMax = Math.min(0.32, 0.12 + W.cd * 0.25);
+  if (W.kind === 'ranged') {
+    const n = W.count ?? 1, spread = ((W.spread ?? 0) * Math.PI) / 180;
+    for (let i = 0; i < n; i++) {
+      const a = n > 1 ? (i - (n - 1) / 2) * spread : 0, c = Math.cos(a), sn = Math.sin(a);
+      const vx = dx * c + dz * sn, vz = -dx * sn + dz * c;
+      s.shots.push({ id: s.nid++, kind: 'bolt', weapon: p.weapon, owner: 'player', pid: p.id, x: p.x + vx * 0.6, z: p.z + vz * 0.6,
+        vx: vx * W.speed, vz: vz * W.speed, r: W.r ?? 0.14, life: W.life, pierce: W.pierce ?? 0, hits: [], sp, color: W.color, els: sp.els,
+        ...(W.lob ? { arc: true, y: 1.25, vy: 3.4, bounces: 0 } : {}) });
+    }
+    ev(s, 'shoot', { pid: p.id, weapon: p.weapon, anim: W.anim, x: p.x, z: p.z, dx, dz, count: n, color: W.color, els: W.els });
+    return;
+  }
+  const range = W.range, cos = Math.cos((W.arc * Math.PI) / 360);
+  const inside = (o, pad) => {
+    const vx = o.x - p.x, vz = o.z - p.z, L = Math.hypot(vx, vz);
+    if (L > range + pad) return false;
+    return W.arc >= 360 || L < pad + 0.4 || (vx * dx + vz * dz) / L >= cos;
+  };
+  let hits = 0;
+  for (const e of live(s)) if (inside(e, e.r)) {
+    const L = dist(e, p) || 1;
+    if (applyPayload(s, e, sp.payload, { kx: (e.x - p.x) / L, kz: (e.z - p.z) / L, block: shieldBlocks(e, p.x, p.z) ? 0.5 : 1 }) > 0) hits++;
+  }
+  if (W.els.length) for (const o of envList(s)) if (inside(o, o.r)) envHit(s, o, W.els, false);
+  ev(s, 'strike', { pid: p.id, weapon: p.weapon, anim: W.anim, x: p.x, z: p.z, dx, dz, range, arc: W.arc, hits, color: W.color, els: W.els });
+}
+
+// C / Shift+C walk the armory; 'weapon:<id>' takes one by name.
+function arm(s, p, what) {
+  const id = what === 'next' ? nextWeapon(p.weapon, 1) : what === 'prev' ? nextWeapon(p.weapon, -1) : what;
+  if (!isWeapon(id) || id === p.weapon) return;
+  p.weapon = id;
+  p.swing = null; // a switch drops a blow that had not landed; the cooldown still runs
+  p.wcd = Math.max(p.wcd, 0.25); p.wcdMax = Math.max(p.wcdMax, 0.25);
+  ev(s, 'weapon', { pid: p.id, weapon: id, name: WEAPONS[id].name, x: p.x, z: p.z, color: WEAPONS[id].color });
 }
 
 const CAST = {
@@ -826,6 +888,7 @@ function applyPayload(s, t, pl, c = {}) {
     let d = pl.parts[el] * k * (pl.trueDamage ? 1 : t.resist?.[el] ?? 1);
     if (el === 'lightning' && wasWet) { d *= 2; tag('conduct'); }
     if (el === 'earth' && wasFrozen) { d *= 2.2; tag('shatter'); }
+    if (el === 'steel' && wasFrozen && pl.blunt) { d *= 2.2; tag('shatter'); } // a hammer is as good as a boulder (R-112)
     if (el === 'fire' && thermal) d *= 1.8;
     if (el === 'light' && purge) d *= 1.5;
     if (d > topV) { topV = d; top = el; }
@@ -1012,6 +1075,12 @@ function updatePlayer(s, p, inp, dt) {
   p.energy = Math.min(p.maxEnergy, p.energy + P.regen * dt);
   p.castT = Math.max(0, p.castT - dt);
   p.hurtT = Math.max(0, p.hurtT - dt);
+  p.wcd = Math.max(0, p.wcd - dt);
+  p.swingT = Math.max(0, p.swingT - dt);
+  if (p.swing) {
+    if (st.frozen > 0 || st.stun > 0) { p.swing = null; ev(s, 'tag', { tag: 'interrupt', x: p.x, z: p.z, id: p.id }); }
+    else if ((p.swing.t -= dt) <= 0) blow(s, p, inp);
+  }
   if (p.wind) {
     if (st.frozen > 0 || st.stun > 0) { p.wind = null; ev(s, 'tag', { tag: 'interrupt', x: p.x, z: p.z, id: p.id }); }
     else if ((p.wind.t -= dt) <= 0) release(s, p, inp);
@@ -1031,7 +1100,7 @@ function updatePlayer(s, p, inp, dt) {
     p.dodge -= dt;
     p.vx = p.ddx * P.dodgeSpeed; p.vz = p.ddz * P.dodgeSpeed;
   } else if (!stunned && st.root <= 0) {
-    const planted = p.wind ? (p.wind.style === 'flick' ? 0.75 : 0.3) : p.castT > p.castMax * 0.55 && p.castStyle !== 'flick' ? 0.55 : 1;
+    const planted = p.swing ? WEAPONS[p.weapon]?.plant ?? 0.8 : p.wind ? (p.wind.style === 'flick' ? 0.75 : 0.3) : p.castT > p.castMax * 0.55 && p.castStyle !== 'flick' ? 0.55 : 1;
     const spd = P.speed * slowMul(st) * (st.haste > 0 ? 1.4 : 1) * planted;
     const L = Math.hypot(inp.move.x, inp.move.z);
     const tvx = L ? (inp.move.x / L) * spd : 0, tvz = L ? (inp.move.z / L) * spd : 0;
@@ -1424,6 +1493,11 @@ function shotStep(s, b) {
 
 function impact(s, b, target) {
   if (b.owner === 'enemy') { ev(s, 'impact', { x: b.x, z: b.z, color: 0x5cffb0, els: [], enemy: true }); return; }
+  if (b.weapon) { // an arrow, a ball or a stone: it only touches the court through its element (R-112)
+    if (b.els[0] !== 'steel') envAt(s, b.x, b.z, 0.5, b.els, false);
+    ev(s, 'weaponImpact', { x: b.x, z: b.z, weapon: b.weapon, hit: !!target, color: b.color, els: b.els, dx: b.vx, dz: b.vz, y: b.y });
+    return;
+  }
   const sp = b.sp, d = sp.def, R = d.explode || d.splash || 0;
   if (R) explode(s, b.x, b.z, R, sp.payload, { pid: b.pid, selfMul: d.explode ? 0.45 : 0.3, big: !!d.explode, color: sp.color, els: sp.els, key: sp.key, tier: sp.tier });
   else envAt(s, b.x, b.z, 0.5, sp.els, b.kind === 'boulder');
