@@ -168,6 +168,7 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
 - Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
   on this machine: run npm from PowerShell.
 - Spell forms (R-088): `src/game/forms.js` holds twelve named three-element mixes (mines, storms, sprays, arcs) merged into `COMBOS` in `spells.js`; the sim knows them as options on existing shapes (area+`mine`, area+`repeat`, cone+`channel`, chain+`forks`). Not in `data/spells.json`.
+- Showcase signatures (R-089): `src/game/signature-fx.js` ports the rest of the fx-showcase (afterimages, great spire, missiles, chain yank, prison, Magma Crush lava, Hurricane Eye, Arc Plasma burst); `arena-fx.js` calls it from sim events. Tests stub the effects layer (`tests/web/test_r089_signature_fx.test.mjs`).
 
 ## Web port quality and phones (R-110, R-111)
 

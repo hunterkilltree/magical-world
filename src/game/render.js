@@ -501,7 +501,8 @@ export function createView(canvas, overlay, opts = {}) {
     return v ? v.group.position.clone().add(new THREE.Vector3(0, 1.6, 0)) : new THREE.Vector3();
   }
 
-  const afx = createArenaFx({ fx: fx2, R: FX, tipPos: () => fxTip ?? tipPos(), scene });
+  const afx = createArenaFx({ fx: fx2, R: FX, tipPos: () => fxTip ?? tipPos(), scene,
+    bodyOf: (pid, selfId) => (!pid || pid === selfId ? pv : others.get(pid) ?? null) });
 
   // Events about the wizard on this screen use its body; another wizard's casts use theirs (R-082).
   const BODY_ONLY = new Set(['queue', 'windup', 'dash', 'dashEnd', 'dodge']);

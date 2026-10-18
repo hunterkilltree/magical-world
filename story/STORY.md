@@ -478,6 +478,15 @@ jumping on from its own first target, and with no target still flashes one bolt 
 usual rules (energy, recharge, snapshots in co-op). Frost, Thunder and Blight Mine; Thunderstorm, Hailstorm and Ash
 Storm; Flamethrower, Frost Breath and Venom Spray; Forked Lightning, Conductive Net and Arcane Web.
 
+### R-089 [done] Every showcase signature in the arena
+Presentation, browser port. The effects the fx-showcase marks "not yet in the arena" are wired in
+(`src/game/signature-fx.js`, driven by sim events from `arena-fx.js`): Flash Step's afterimages (every dash and blink
+leaves four fading ghosts of the caster), Tectonic Rupture's great final spire (any earth slam, under the enemy ahead),
+Arcane Missiles (an arcane bolt sends three missiles bowing in on the target), Chain Hook's yank (a landed dark bolt
+casts a chain that drags streaks back to the staff), Grave Chains' prison (portals and chains round every enemy
+struck), plus Magma Crush's lava drops, geysers and dust wave, Hurricane Eye walking its tornado through the enemy
+line (Cyclone), and Arc Plasma's burst at the end of the beam. Render-only; gameplay is unchanged.
+
 ### R-110 [done] Quality tiers and crash guards
 Browser port only (the Godot game is unchanged). Four graphics tiers (`minimal`, `low`, `medium`, `high`) in
 `src/game/quality.js`, a pure module: each tier sets a render-resolution cap and pixel budget, shadow size, bloom,
