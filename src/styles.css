@@ -70,6 +70,27 @@ body.in-menu .hud { opacity: 0; }
 .pausebtn:hover { border-color: var(--accent-frontend); }
 
 .vitals { position: absolute; left: 16px; bottom: 16px; width: 290px; padding: 14px 16px; display: grid; gap: 11px; }
+.pstrip { position: absolute; left: 16px; top: 16px; width: 220px; padding: 8px 10px; display: grid; gap: 7px; }
+.pstrip[hidden] { display: none; }
+.prow { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 8px; row-gap: 3px; align-items: center; font-size: 12px; }
+.prow .sw { width: 9px; height: 9px; border-radius: 999px; grid-row: span 3; align-self: start; margin-top: 3px; }
+.prow b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow b small { color: var(--ink-faint); font-weight: 600; margin-left: 6px; }
+.prow .bar { height: 5px; }
+.prow .bar.en { height: 3px; }
+.prow.me b { color: #fff; }
+.prow.me { box-shadow: -4px 0 0 -1px var(--brand); }
+.prow.down { opacity: .55; }
+.prow.down .bar.hp i { background: #f0c84a !important; }
+.board { display: grid; gap: 4px; }
+.board[hidden] { display: none; }
+.brow { display: grid; grid-template-columns: 10px minmax(0, 1fr) repeat(3, 56px); gap: 8px; align-items: center; font-size: 13px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.brow.head { background: none; padding-top: 0; padding-bottom: 0; }
+.brow .sw { width: 10px; height: 10px; border-radius: 999px; }
+.brow b { font-weight: 600; }
+.brow small { color: var(--ink-soft); }
+.brow .n { text-align: right; font-family: var(--font-display); font-weight: 700; }
+.brow.me { box-shadow: inset 3px 0 0 var(--brand); }
 .who { display: flex; align-items: center; gap: 11px; }
 .who .sw { width: 12px; height: 12px; border-radius: 999px; box-shadow: 0 0 12px currentColor; }
 .who b { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
@@ -332,3 +353,5 @@ body.touch #t-self { right: 4px; bottom: 114px; }
 
 /* the start button stays in reach however long the menu is */
 body.touch #menu .col > .actions { position: sticky; bottom: -16px; z-index: 2; padding: 10px 0 12px; background: linear-gradient(to top, #fff 78%, rgba(255,255,255,0)); }
+body.touch .pstrip { top: calc(84px + var(--sat)); left: calc(8px + var(--sal)); width: 168px; padding: 6px 8px; gap: 5px; }
+body.touch .prow { font-size: 10.5px; row-gap: 2px; }

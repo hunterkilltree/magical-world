@@ -32,6 +32,8 @@ export const App: React.FC = () => {
           <button className="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>
         </div>
 
+        <div className="pstrip glass" id="h-party" hidden></div>
+
         <div className="vitals glass">
           <div className="who">
             <span className="sw" id="h-sw"></span>
@@ -173,6 +175,7 @@ export const App: React.FC = () => {
             <div className="kicker" id="d-kick">Fallen</div>
             <h1>The court holds</h1>
             <div className="dstats" id="d-stats"></div>
+            <div className="board" id="d-board" hidden></div>
             <div className="actions">
               <button className="btn btn-primary" id="d-restart">Try again · R</button>
               <button className="btn btn-ghost" id="d-menu">Change wizard</button>

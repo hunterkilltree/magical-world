@@ -13,6 +13,7 @@ import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
 import { createWow } from './wow.js';
 import { PROFILES, pixelRatioFor, createSafeRunner } from './quality.js';
+import { frameParty } from './party.js';
 
 const cols = (...h) => h.map((x) => new THREE.Color(x));
 const STYLE = {
@@ -283,7 +284,7 @@ export function createView(canvas, overlay, opts = {}) {
     hemi.color.setHex(T.sky); hemi.groundColor.setHex(T.ground); hemi.intensity = T.hemi;
     moon.color.setHex(T.sun); moon.intensity = T.sunI; renderer.toneMappingExposure = T.exp;
   }
-  let arena = null, pv = null, shake = 0, t = 0, camMode = 'menu', menuBlend = 1;
+  let arena = null, pv = null, shake = 0, t = 0, camMode = 'menu', menuBlend = 1, camZoom = 1;
   const others = new Map(); // co-op (R-082): player id -> the view of every wizard but your own
   const camTarget = new THREE.Vector3(0, 0, 3.5);
   const enemyViews = new Map(), shotViews = new Map(), areaViews = new Map(), wallViews = new Map();
@@ -471,6 +472,7 @@ export function createView(canvas, overlay, opts = {}) {
     clearViews();
     if (!pv || pv.w.id !== game.player.wizard) setWizard(game.player.wizard);
     camTarget.set(game.player.x, 0, game.player.z);
+    camZoom = 1;
     shake = 0;
     wow.reset();
     callouts.length = 0;
@@ -1136,9 +1138,12 @@ export function createView(canvas, overlay, opts = {}) {
     const p = s.player;
     camMode = s.mode === 'menu' ? 'menu' : 'play';
     menuBlend += ((camMode === 'menu' ? 1 : 0) - menuBlend) * (1 - Math.exp(-3 * dt));
-    const want = new THREE.Vector3(p.x + (aim.x - p.x) * 0.15 * (1 - menuBlend), 0, p.z + (aim.z - p.z) * 0.15 * (1 - menuBlend));
+    // R-083: alone this is you leaned toward the aim; in a party, the middle of everyone, pulled back as it spreads
+    const fr = frameParty(s.players, p, aim, 0.15 * (1 - menuBlend));
+    const want = new THREE.Vector3(fr.x, 0, fr.z);
     camTarget.lerp(want, 1 - Math.exp(-6 * dt));
-    const playOff = new THREE.Vector3(0, 13.5, 12.5);
+    camZoom += (fr.zoom - camZoom) * (1 - Math.exp(-2.5 * dt));
+    const playOff = new THREE.Vector3(0, 13.5, 12.5).multiplyScalar(camZoom);
     const ang = t * 0.12 + 0.5, menuOff = new THREE.Vector3(Math.sin(ang) * 6.5, 3.2, Math.cos(ang) * 6.5);
     const off = playOff.lerp(menuOff, menuBlend);
     // in the menu, slide the framing so the wizard sits left of the panel

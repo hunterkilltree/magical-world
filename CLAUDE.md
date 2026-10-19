@@ -165,6 +165,9 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
 - `server/` is the authoritative room server (`npm run server`, port 8787, path `/ws`; it also serves `dist/`).
   `src/net/`: `protocol.js` (validation), `snapshot.js` (state <-> JSON), `client.js` (browser socket, `forMe`), `interp.js`
   (snapshot buffer, ~100 ms behind). Dev: `npm run server` + `npm run dev` (Vite forwards `/ws`).
+- The party on screen (R-083): `src/game/party.js` is pure: `frameParty` (camera target + zoom; alone it is the old 15% aim lean),
+  `partyRows` (the HUD's party strip, `#h-party`), `createPartyTally` / `scoreboard` (casts, downs, raises counted from all events;
+  `hud.update(g, mine, dt, events)` gets every event online). Per-player kills and damage wait for the server's stats (R-084).
 - Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
   on this machine: run npm from PowerShell.
 - Spell forms (R-088): `src/game/forms.js` holds twelve named three-element mixes (mines, storms, sprays, arcs) merged into `COMBOS` in `spells.js`; the sim knows them as options on existing shapes (area+`mine`, area+`repeat`, cone+`channel`, chain+`forks`). Not in `data/spells.json`.

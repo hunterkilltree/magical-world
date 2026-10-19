@@ -236,7 +236,7 @@ export function initGame() {
     view.consume(events, g);
     audio.play(mine, g);
     view.render(g, dt);
-    hud.update(g, mine, dt);
+    hud.update(g, mine, dt, events);
   }
 
   function runFrame(now, dt) {

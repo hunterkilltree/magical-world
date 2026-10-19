@@ -1,6 +1,7 @@
 // DOM HUD + menu/pause/death screens. Reads state; user intent goes back via callbacks.
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
+import { partyRows, createPartyTally, scoreboard } from './party.js';
 
 // Element glyphs (16px grid, stroked).
 const ICON = {
@@ -53,6 +54,9 @@ export function createHud(o) {
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
   let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', wizardId = o.wizardId;
+  // R-083: the party strip (co-op only) and what each wizard did this run, for the defeat scoreboard
+  const strip = $('h-party'), board = $('d-board'), tally = createPartyTally();
+  let stripKey = '', stripRows = [];
 
   const row = $('h-elements');
   ORDER.forEach((el) => {
@@ -252,6 +256,42 @@ export function createHud(o) {
   const toast = (text) => { if (text === lastToast && toastT > 0) return; lastToast = text; toastT = 1.6; replay(els.toast, text); };
   const set = (n, v) => { if (n.textContent !== String(v)) n.textContent = v; };
 
+  const wizardOf = (id) => o.wizards.find((x) => x.id === id) ?? o.wizards[0];
+
+  // One row per wizard: built when the party changes, the bars moved every frame.
+  function updateStrip(g) {
+    const on = g.players.length > 1;
+    if (strip.hidden === on) strip.hidden = !on;
+    if (!on) { stripKey = ''; return; }
+    const rows = partyRows(g.players, g.meId ?? g.player.id);
+    const key = rows.map((r) => `${r.id}:${r.name}:${r.wizard}:${r.me}`).join('|');
+    if (key !== stripKey) {
+      stripKey = key;
+      strip.innerHTML = rows.map((r) => `<div class="prow${r.me ? ' me' : ''}"><span class="sw" style="background:${hex(wizardOf(r.wizard).glow)}"></span>`
+        + `<b>${escapeHtml(r.name)}<small></small></b><div class="bar hp"><i style="background:#ef4444"></i></div>`
+        + `<div class="bar en"><i style="background:var(--accent-frontend)"></i></div></div>`).join('');
+      stripRows = [...strip.querySelectorAll('.prow')].map((n) => ({ n, hp: n.querySelector('.hp i'), en: n.querySelector('.en i'), tag: n.querySelector('small') }));
+    }
+    rows.forEach((r, i) => {
+      const v = stripRows[i];
+      v.n.classList.toggle('down', r.down);
+      v.hp.style.transform = `scaleX(${r.down ? r.revive : r.hp})`;
+      v.en.style.transform = `scaleX(${r.energy})`;
+      set(v.tag, r.down ? (r.revive > 0 ? `raising ${Math.round(r.revive * 100)}%` : 'down') : r.me ? 'you' : '');
+    });
+  }
+
+  function fillBoard(g) {
+    board.hidden = g.players.length <= 1;
+    if (board.hidden) return;
+    const rows = scoreboard(g.players, tally, g.meId ?? g.player.id);
+    board.innerHTML = `<div class="brow head"><span></span><span class="k">Wizard</span><span class="k n">Casts</span><span class="k n">Downed</span><span class="k n">Raised</span></div>`
+      + rows.map((r) => { const w = wizardOf(r.wizard), R = ROLES[r.role];
+        return `<div class="brow${r.me ? ' me' : ''}"><span class="sw" style="background:${hex(w.glow)}"></span>`
+          + `<span><b>${escapeHtml(r.name)}</b><br><small>${w.name}${R ? ' · ' + R.name : ''}</small></span>`
+          + `<span class="n">${r.casts}</span><span class="n">${r.downs}</span><span class="n">${r.raised}</span></div>`; }).join('');
+  }
+
   function showScreens(g) {
     const dead = g.mode === 'dead' && g.player.deadT > 1.0;
     screens.menu.classList.toggle('on', g.mode === 'menu');
@@ -263,6 +303,7 @@ export function createHud(o) {
       if (dead) {
         screens.dead.dataset.filled = '1';
         $('d-kick').textContent = `Fallen on wave ${g.wave}`;
+        fillBoard(g);
         $('d-stats').innerHTML = [['Wave reached', g.wave], ['Kills', g.kills], ['Score', g.score], ['Damage dealt', Math.round(g.stats.dealt)],
           ['Self-inflicted', Math.round(g.stats.selfDmg)], ['Spells found', `${g.stats.found.size} / ${grimoireFor(g.player.role).length}`]]
           .map(([k, v]) => `<div><span class="k">${k}</span><b>${v}</b></div>`).join('');
@@ -273,15 +314,19 @@ export function createHud(o) {
   }
 
   return {
-    reset() { vig = 0; prevMode = null; setWho(); },
+    reset() { vig = 0; prevMode = null; tally.reset(); stripKey = ''; setWho(); },
     setLobby, setNetStatus, setOffline, toast: (t) => toast(t),
     // keeps the roster and role pick in step with what the room says about you
     syncPick(wizard) { if (wizard && wizard !== wizardId) { wizardId = wizard; document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === wizard)); setWho(); fillRoles(); } },
     setQuality(q) { quality = { ...quality, ...q }; fillQuality(); },
     setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
-    update(g, events, dt) {
+    // `all`: every event of the frame (online, `events` holds only yours), for the party tally
+    update(g, events, dt, all = events) {
       const p = g.player;
+      if (prevMode === 'dead' && g.mode === 'play') tally.reset(); // the host started the run again
+      tally.add(all);
       showScreens(g);
+      updateStrip(g);
       for (const e of events) {
         if (e.type === 'wave') replay(els.banner, `Wave ${e.n}`);
         else if (e.type === 'waveClear') replay(els.banner, `Wave ${e.n} cleared · +${e.heal} health`);

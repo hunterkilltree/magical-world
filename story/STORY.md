@@ -435,9 +435,16 @@ name tag, and a downed wizard shows how far their revive has got. Personal
 events of other wizards (their queue, fizzles, damage taken) do not toast or
 chime for you. A dropped connection returns you to the menu.
 
-### R-083 [planned] The party on screen
-Presentation. The camera frames the party (it follows only you today), a party
-strip with each wizard's health and energy, and a scoreboard on defeat.
+### R-083 [done] The party on screen
+Presentation. With more than one wizard the camera frames the party: it aims at
+the middle of everyone (downed wizards too), never more than 6 m from you, and
+pulls back as the party spreads (up to 1.8x); alone it follows you exactly as
+before. A party strip (top left) lists every wizard with their name, health and
+energy bars, yours marked, a downed one greyed with their revive progress. The
+defeat screen of a co-op run adds a scoreboard: one row per wizard (name, wizard,
+role) with the casts, times downed and times raised this client saw in the run's
+events. The maths is pure (`src/game/party.js`); kills and damage per player
+come with the server's stats in R-084.
 
 ### R-084 [planned] Netcode polish
 Client prediction for the local wizard reconciled with `ack`, snapshot deltas
