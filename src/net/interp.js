@@ -28,13 +28,15 @@ export function createSnapBuffer({ delayMs = 100, keep = 40 } = {}) {
   return {
     get size() { return snaps.length; },
     get delayMs() { return delayMs; },
+    // The newest snapshot (R-084: the base the local wizard's prediction replays from): {tick, state, ack}.
+    get latest() { const s = snaps[snaps.length - 1]; return s ? { tick: s.tick, state: s.state, ack: s.ack } : null; },
     reset() { snaps.length = 0; offset = Infinity; applied = null; playedTick = -1; },
 
     push(snap, nowMs) {
       const time = snap.tick * TICK_MS;
       offset = Math.min(offset, nowMs - time);
       if (snaps.length && snap.tick <= snaps[snaps.length - 1].tick) return; // stale or duplicate
-      snaps.push({ tick: snap.tick, time, state: snap.state, events: snap.events ?? [], idx: null });
+      snaps.push({ tick: snap.tick, time, state: snap.state, events: snap.events ?? [], ack: snap.ack ?? 0, idx: null });
       while (snaps.length > keep) snaps.shift();
     },
 

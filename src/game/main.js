@@ -1,5 +1,6 @@
 // Wires input → sim → renderer/HUD on a fixed 60 Hz simulation step.
 // Co-op (R-082): in a room the sim runs on the server; this page sends input and draws snapshots.
+// R-084: your own wizard is predicted (predict.js), the ping is shown, and a dropped socket reconnects to the same seat.
 // R-110: the frame loop is guarded (a throwing frame is retried, then the quality drops, then a card replaces the game)
 // and a governor lowers the graphics tier when frames run slow. R-111: touch controls on phones.
 import { createGame, createCoopGame, step } from './sim.js';
@@ -12,11 +13,15 @@ import { ROLES, WIZARD_ROLE } from './roles.js';
 import { createDemo } from './demo.js';
 import { createNetClient, forMe } from '../net/client.js';
 import { createSnapBuffer } from '../net/interp.js';
+import { createPredictor } from '../net/predict.js';
 import { PROFILES, TIER_ORDER, isTier, pickTier, createGovernor, createFaultGuard, safeGet, safeSet } from './quality.js';
 import { readTouchEnv, createTouchControls, aimPoint } from './touch.js';
 import { showFatal, FATAL } from './fatal.js';
 
 const SEND_EVERY = 1 / 30; // input messages per second, online
+const PING_EVERY = 2; // seconds
+const RECONNECT_MS = 30000; // the server holds a dropped seat this long
+const RETRY_MS = 1500;
 const LOCAL_ONLY = new Set(['pause', 'restart', 'mute', 'recast']);
 const QUALITY_KEY = 'cow_quality'; // 'auto' or a tier name, saved by the Graphics row in the menu
 
@@ -123,16 +128,21 @@ export function initGame() {
   }
 
   // ---------------------------------------------------------------- co-op
-  // online: {client, buffer, game (the server's world, as last drawn), drawing, sendT, actions}
+  // online: {client, buffer, predictor, game (the server's world, as last drawn), drawing, sendT, pingT, actions, name, lostAt}
   let online = null;
 
   async function goOnline(code, name) {
     if (online) return;
     hud.setNetStatus('Connecting…');
-    const o = { client: null, buffer: createSnapBuffer({ delayMs: 100 }), game: null, drawing: false, sendT: 0, actions: [] };
+    const o = { client: null, buffer: createSnapBuffer({ delayMs: 100 }), predictor: createPredictor(), game: null, drawing: false,
+      sendT: 0, pingT: PING_EVERY, actions: [], name, lostAt: null };
     online = o;
     o.client = createNetClient({
-      onWelcome(m) { hud.setNetStatus('Room ' + m.room); o.client.pick(wizardId, roleId); },
+      onWelcome(m) {
+        hud.setNetStatus('Room ' + m.room);
+        if (m.resumed) { o.lostAt = null; o.buffer.reset(); o.predictor.reset(); hud.toast('Back in the room'); return; }
+        o.client.pick(wizardId, roleId);
+      },
       onLobby(m) {
         hud.setLobby(m, o.client.me);
         const mine = m.players.find((p) => p.id === o.client.me);
@@ -144,9 +154,17 @@ export function initGame() {
       },
       onError(m) {
         hud.setNetStatus(m.message ?? m.code, true);
-        if (!o.client.me) dropOnline(); // the join itself failed: no room, or it is full
+        if (!o.client.me || m.code === 'no_seat') dropOnline(); // the join itself failed: no room, it is full, or the seat is gone
       },
-      onClose() { if (online === o) { dropOnline(); hud.setNetStatus('Lost the connection to the server', true); } }
+      onClose() {
+        if (online !== o) return;
+        if (!o.client.token) { dropOnline(); hud.setNetStatus('Lost the connection to the server', true); return; }
+        o.lostAt ??= performance.now();
+        hud.setNetStatus('Connection lost · reconnecting…', true);
+        hud.toast('Connection lost · reconnecting…');
+        setTimeout(() => reconnect(o), RETRY_MS);
+      },
+      onPong() { hud.setPing(o.client.rtt); }
     });
     try {
       await o.client.connect();
@@ -157,10 +175,18 @@ export function initGame() {
     o.client.join(code, name);
   }
 
+  // Tries the same seat again until the server's hold runs out.
+  async function reconnect(o) {
+    if (online !== o || o.lostAt === null || o.client.connected) return;
+    if (performance.now() - o.lostAt > RECONNECT_MS) { dropOnline(); hud.setNetStatus('Could not get back into the room', true); return; }
+    try { await o.client.rejoin(o.name); } catch { if (online === o) setTimeout(() => reconnect(o), RETRY_MS); }
+  }
+
   function dropOnline() {
     const o = online;
     if (!o) return;
     online = null;
+    hud.setPing(null);
     try { o.client.leave(); o.client.close(); } catch {}
     hud.setOffline();
     if (o.drawing) { game.mode = 'menu'; view.reset(game); hud.reset(); }
@@ -232,11 +258,16 @@ export function initGame() {
       o.sendT = 0;
       o.client.sendInput({ move: f.move, aim, actions: [...o.actions.splice(0, 11), ...(held ? ['recast'] : [])] });
     }
+    // your wizard where it is going to be, everyone else ~100 ms behind (R-084)
+    const pr = o.predictor.frame(g, g.player, o.buffer.latest, o.client.seq, f.move, dt);
+    if (pr.predicted) { const ax = aim.x - g.player.x, az = aim.z - g.player.z, L = Math.hypot(ax, az); if (L > 0.3) { g.player.fx = ax / L; g.player.fz = az / L; } }
+    o.pingT += dt;
+    if (o.pingT >= PING_EVERY && o.client.connected) { o.pingT = 0; o.client.ping(); }
     const mine = forMe(events, o.client.me);
     view.consume(events, g);
     audio.play(mine, g);
     view.render(g, dt);
-    hud.update(g, mine, dt, events);
+    hud.update(g, mine, dt);
   }
 
   function runFrame(now, dt) {

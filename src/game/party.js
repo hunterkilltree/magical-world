@@ -1,5 +1,5 @@
 // The party on screen (R-083): where the camera looks when several wizards share the court, the rows of the party
-// strip, and the defeat scoreboard. Pure (no three, no DOM) so it is testable in node.
+// strip, and the defeat scoreboard (R-084: from the server's per-player stats). Pure (no three, no DOM) so it is testable in node.
 import { TUNING } from './sim.js';
 
 export const FRAME = { lean: 0.15, partyLean: 0.08, maxOff: 6, pad: 2.5, view: 6.5, maxZoom: 1.8 };
@@ -25,34 +25,18 @@ export function frameParty(players, me, aim, lean = FRAME.lean) {
   return { x, z, zoom: clamp((spread + FRAME.pad) / FRAME.view, 1, FRAME.maxZoom) };
 }
 
-// One row per wizard for the party strip, in party order.
-export function partyRows(players, meId) {
+// One row per wizard for the party strip, in party order. `away`: ids whose connection dropped (R-084).
+export function partyRows(players, meId, away = new Set()) {
   return players.map((p) => ({
-    id: p.id, name: p.name ?? p.id, wizard: p.wizard, role: p.role, me: p.id === meId,
+    id: p.id, name: p.name ?? p.id, wizard: p.wizard, role: p.role, me: p.id === meId, away: away.has(p.id),
     hp: frac(p.hp, p.maxHp), energy: frac(p.energy, p.maxEnergy),
     down: !!p.down, revive: p.down ? frac(p.reviveT, TUNING.reviveT) : 0
   }));
 }
 
-// Counts what each wizard did, from the events this client saw (all of them, not only yours).
-export function createPartyTally() {
-  let by = new Map();
-  const row = (id) => { if (!by.has(id)) by.set(id, { casts: 0, raised: 0, downs: 0 }); return by.get(id); };
-  return {
-    reset() { by = new Map(); },
-    add(events) {
-      for (const e of events) {
-        if (e.pid === undefined) continue;
-        if (e.type === 'cast') row(e.pid).casts++;
-        else if (e.type === 'revived') row(e.pid).raised++;
-        else if (e.type === 'playerDown') row(e.pid).downs++;
-      }
-    },
-    get(id) { return { casts: 0, raised: 0, downs: 0, ...by.get(id) }; }
-  };
-}
-
-// The defeat screen's rows: every wizard of the party with their tally, in party order.
-export function scoreboard(players, tally, meId) {
-  return players.map((p) => ({ id: p.id, name: p.name ?? p.id, wizard: p.wizard, role: p.role, me: p.id === meId, ...tally.get(p.id) }));
+// The defeat screen's rows: every wizard of the party with their share of the run, as the server counted it
+// (R-084: `p.stats`, kills going to the last wizard who hit), in party order.
+export function scoreboard(players, meId) {
+  return players.map((p) => ({ id: p.id, name: p.name ?? p.id, wizard: p.wizard, role: p.role, me: p.id === meId,
+    kills: 0, dealt: 0, taken: 0, casts: 0, revives: 0, downs: 0, ...p.stats }));
 }

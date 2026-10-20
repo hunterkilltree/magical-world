@@ -1,7 +1,7 @@
 // DOM HUD + menu/pause/death screens. Reads state; user intent goes back via callbacks.
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
-import { partyRows, createPartyTally, scoreboard } from './party.js';
+import { partyRows, scoreboard } from './party.js';
 
 // Element glyphs (16px grid, stroked).
 const ICON = {
@@ -54,9 +54,9 @@ export function createHud(o) {
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
   let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', wizardId = o.wizardId;
-  // R-083: the party strip (co-op only) and what each wizard did this run, for the defeat scoreboard
-  const strip = $('h-party'), board = $('d-board'), tally = createPartyTally();
-  let stripKey = '', stripRows = [];
+  // R-083: the party strip and the defeat scoreboard (co-op only); R-084: who is reconnecting, and the ping
+  const strip = $('h-party'), board = $('d-board'), ping = $('h-ping');
+  let stripKey = '', stripRows = [], away = new Set();
 
   const row = $('h-elements');
   ORDER.forEach((el) => {
@@ -214,13 +214,15 @@ export function createHud(o) {
     net.lobby.hidden = !msg;
     net.join.hidden = !!msg;
     $('m-start').hidden = !!msg;
+    away = new Set(msg ? msg.players.filter((p) => p.away).map((p) => p.id) : []);
+    stripKey = '';
     if (!msg) { amReady = false; return; }
     net.room.textContent = msg.room;
     const mine = msg.players.find((p) => p.id === me);
     amReady = !!mine?.ready;
     net.party.innerHTML = msg.players.map((p) => {
       const w = o.wizards.find((x) => x.id === p.wizard) ?? o.wizards[0], R = ROLES[p.role];
-      const tag = p.ready ? '<span class="tag ready">Ready</span>' : '<span class="tag">Choosing</span>';
+      const tag = p.away ? '<span class="tag">Reconnecting</span>' : p.ready ? '<span class="tag ready">Ready</span>' : '<span class="tag">Choosing</span>';
       return `<div class="party-row${p.id === me ? ' me' : ''}"><span class="sw" style="background:${hex(w.glow)}"></span>`
         + `<span><b>${escapeHtml(p.name)}</b>${p.host ? ' <small>· host</small>' : ''}<br><small>${w.name} · ${R ? R.name : ''}</small></span>${tag}</div>`;
     }).join('');
@@ -263,7 +265,7 @@ export function createHud(o) {
     const on = g.players.length > 1;
     if (strip.hidden === on) strip.hidden = !on;
     if (!on) { stripKey = ''; return; }
-    const rows = partyRows(g.players, g.meId ?? g.player.id);
+    const rows = partyRows(g.players, g.meId ?? g.player.id, away);
     const key = rows.map((r) => `${r.id}:${r.name}:${r.wizard}:${r.me}`).join('|');
     if (key !== stripKey) {
       stripKey = key;
@@ -277,19 +279,20 @@ export function createHud(o) {
       v.n.classList.toggle('down', r.down);
       v.hp.style.transform = `scaleX(${r.down ? r.revive : r.hp})`;
       v.en.style.transform = `scaleX(${r.energy})`;
-      set(v.tag, r.down ? (r.revive > 0 ? `raising ${Math.round(r.revive * 100)}%` : 'down') : r.me ? 'you' : '');
+      v.n.classList.toggle('away', r.away);
+      set(v.tag, r.away ? 'reconnecting' : r.down ? (r.revive > 0 ? `raising ${Math.round(r.revive * 100)}%` : 'down') : r.me ? 'you' : '');
     });
   }
 
   function fillBoard(g) {
     board.hidden = g.players.length <= 1;
     if (board.hidden) return;
-    const rows = scoreboard(g.players, tally, g.meId ?? g.player.id);
-    board.innerHTML = `<div class="brow head"><span></span><span class="k">Wizard</span><span class="k n">Casts</span><span class="k n">Downed</span><span class="k n">Raised</span></div>`
+    const rows = scoreboard(g.players, g.meId ?? g.player.id);
+    board.innerHTML = `<div class="brow head"><span></span><span class="k">Wizard</span><span class="k n">Kills</span><span class="k n">Damage</span><span class="k n">Revived</span><span class="k n">Downed</span></div>`
       + rows.map((r) => { const w = wizardOf(r.wizard), R = ROLES[r.role];
         return `<div class="brow${r.me ? ' me' : ''}"><span class="sw" style="background:${hex(w.glow)}"></span>`
           + `<span><b>${escapeHtml(r.name)}</b><br><small>${w.name}${R ? ' · ' + R.name : ''}</small></span>`
-          + `<span class="n">${r.casts}</span><span class="n">${r.downs}</span><span class="n">${r.raised}</span></div>`; }).join('');
+          + `<span class="n">${r.kills}</span><span class="n">${Math.round(r.dealt)}</span><span class="n">${r.revives}</span><span class="n">${r.downs}</span></div>`; }).join('');
   }
 
   function showScreens(g) {
@@ -314,17 +317,19 @@ export function createHud(o) {
   }
 
   return {
-    reset() { vig = 0; prevMode = null; tally.reset(); stripKey = ''; setWho(); },
+    reset() { vig = 0; prevMode = null; stripKey = ''; setWho(); },
+    // round trip to the room server in ms, or null offline (R-084)
+    setPing(ms) {
+      ping.hidden = ms === null || ms === undefined;
+      if (!ping.hidden) { set(ping, `Ping ${Math.round(ms)} ms`); ping.classList.toggle('bad', ms > 150); }
+    },
     setLobby, setNetStatus, setOffline, toast: (t) => toast(t),
     // keeps the roster and role pick in step with what the room says about you
     syncPick(wizard) { if (wizard && wizard !== wizardId) { wizardId = wizard; document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === wizard)); setWho(); fillRoles(); } },
     setQuality(q) { quality = { ...quality, ...q }; fillQuality(); },
     setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
-    // `all`: every event of the frame (online, `events` holds only yours), for the party tally
-    update(g, events, dt, all = events) {
+    update(g, events, dt) {
       const p = g.player;
-      if (prevMode === 'dead' && g.mode === 'play') tally.reset(); // the host started the run again
-      tally.add(all);
       showScreens(g);
       updateStrip(g);
       for (const e of events) {

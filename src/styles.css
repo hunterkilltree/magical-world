@@ -80,11 +80,14 @@ body.in-menu .hud { opacity: 0; }
 .prow .bar.en { height: 3px; }
 .prow.me b { color: #fff; }
 .prow.me { box-shadow: -4px 0 0 -1px var(--brand); }
-.prow.down { opacity: .55; }
+.prow.down, .prow.away { opacity: .55; }
+.ping { pointer-events: none; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
+.ping[hidden] { display: none; }
+.ping.bad { color: #f0c84a; }
 .prow.down .bar.hp i { background: #f0c84a !important; }
 .board { display: grid; gap: 4px; }
 .board[hidden] { display: none; }
-.brow { display: grid; grid-template-columns: 10px minmax(0, 1fr) repeat(3, 56px); gap: 8px; align-items: center; font-size: 13px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.brow { display: grid; grid-template-columns: 10px minmax(0, 1fr) repeat(4, 56px); gap: 8px; align-items: center; font-size: 13px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--surface-2); }
 .brow.head { background: none; padding-top: 0; padding-bottom: 0; }
 .brow .sw { width: 10px; height: 10px; border-radius: 999px; }
 .brow b { font-weight: 600; }
@@ -146,6 +149,7 @@ body.in-menu .hud { opacity: 0; }
 
 @media (max-width: 1240px) {
   .vitals { top: 16px; bottom: auto; width: 240px; padding: 12px 14px; gap: 9px; }
+  .pstrip { left: auto; right: 16px; top: 68px; width: 200px; } /* the vitals took the top left */
   .spell { left: 16px; transform: none; padding: 10px 12px; }
   .elkey { width: 44px; }
   .elkey .nm { font-size: 9px; }
@@ -353,5 +357,5 @@ body.touch #t-self { right: 4px; bottom: 114px; }
 
 /* the start button stays in reach however long the menu is */
 body.touch #menu .col > .actions { position: sticky; bottom: -16px; z-index: 2; padding: 10px 0 12px; background: linear-gradient(to top, #fff 78%, rgba(255,255,255,0)); }
-body.touch .pstrip { top: calc(84px + var(--sat)); left: calc(8px + var(--sal)); width: 168px; padding: 6px 8px; gap: 5px; }
+body.touch .pstrip { top: calc(58px + var(--sat)); left: auto; right: calc(8px + var(--sar)); width: 160px; padding: 6px 8px; gap: 5px; }
 body.touch .prow { font-size: 10.5px; row-gap: 2px; }

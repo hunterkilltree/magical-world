@@ -28,6 +28,7 @@ export const App: React.FC = () => {
           <div className="stat"><span className="k">Score</span><b id="h-score">0</b></div>
         </div>
         <div className="tr">
+          <span className="pausebtn glass ping" id="h-ping" hidden>Ping</span>
           <button className="pausebtn glass" id="h-mute">Sound on <span>M</span></button>
           <button className="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>
         </div>

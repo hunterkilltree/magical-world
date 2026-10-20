@@ -80,7 +80,8 @@ function makePlayer(id, wizard, role, x, z, name) {
     hp: P.hp, maxHp: P.hp, energy: P.energy, maxEnergy: P.energy, fx: 0, fz: -1,
     queue: [], last: null, cd: { cast: 0, nova: 0, self: 0, dodge: 0 }, shapeCd: {}, shapeMax: {}, spellCd: {}, spellMax: {},
     cdMax: { cast: 0.3, nova: P.novaCd, self: P.selfCd, dodge: P.dodgeCd },
-    dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, down: false, reviveT: 0, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0
+    dodge: 0, ddx: 0, ddz: 0, st: status(), alive: true, down: false, reviveT: 0, castT: 0, hurtT: 0, speed: 0, deadT: 0, dotAcc: 0, healAcc: 0,
+    stats: { kills: 0, dealt: 0, taken: 0, casts: 0, revives: 0, downs: 0 } // this wizard's share of the run (R-084)
   };
 }
 
@@ -166,7 +167,7 @@ export function step(s, inp, dt) {
   for (const p of s.players) {
     if (!p.alive || p.hp > 0) continue;
     if (p.st.revive > 0) { p.st.revive = 0; p.hp = p.maxHp * 0.5; p.st.invuln = 1.5; ev(s, 'revive', { pid: p.id, x: p.x, z: p.z }); continue; }
-    p.alive = false; p.hp = 0; p.down = true; p.reviveT = 0; p.wind = null; p.dashT = 0; p.deadT = 0;
+    p.alive = false; p.hp = 0; p.down = true; p.reviveT = 0; p.wind = null; p.dashT = 0; p.deadT = 0; p.stats.downs++;
     ev(s, 'playerDown', { pid: p.id, id: p.id, x: p.x, z: p.z });
   }
   if (s.players.length && s.players.every((q) => !q.alive) && s.mode === 'play') {
@@ -182,10 +183,10 @@ export function step(s, inp, dt) {
 function updateRevives(s, dt) {
   for (const p of s.players) {
     if (p.alive || !p.down) continue;
-    const near = s.players.filter((q) => q.alive && q !== p && Math.hypot(q.x - p.x, q.z - p.z) < P.reviveR).length;
-    if (near > 0) p.reviveT += dt * (1 + 0.5 * (near - 1));
+    const near = s.players.filter((q) => q.alive && q !== p && Math.hypot(q.x - p.x, q.z - p.z) < P.reviveR);
+    if (near.length > 0) p.reviveT += dt * (1 + 0.5 * (near.length - 1));
     else p.reviveT = Math.max(0, p.reviveT - dt * P.reviveDrain);
-    if (p.reviveT >= P.reviveT) raise(s, p, P.reviveHp);
+    if (p.reviveT >= P.reviveT) { raise(s, p, P.reviveHp); for (const q of near) q.stats.revives++; }
   }
 }
 
@@ -261,7 +262,7 @@ function cast(s, p, inp, mode, held) {
   const fromQueue = p.queue.length > 0, isNew = !s.stats.found.has(sp.sid);
   if (fromQueue) p.last = [...p.queue];
   p.queue = [];
-  s.stats.casts++; s.stats.found.add(sp.sid);
+  s.stats.casts++; s.stats.found.add(sp.sid); p.stats.casts++;
   // Anticipation: the body loads the spell before it leaves. Heavier spells and heavier styles wind up longer.
   const style = ROLES[p.role]?.style ?? 'thrust', S = STYLES[style];
   const weight = Math.min(1.3, (SHAPE_WEIGHT[d.shape] ?? 0.5) * (0.75 + 0.25 * sp.tier) + (mode === 'nova' ? 0.3 : 0));
@@ -743,6 +744,7 @@ function hurt(s, t, dmg, el, o = {}) {
     }
     if (dmg <= 0) return 0;
     s.stats.taken += dmg;
+    if (t.stats) t.stats.taken += dmg;
     if (o.self) s.stats.selfDmg += dmg;
     if (!o.dot) t.hurtT = 0.3;
     if (o.src && o.src.hp > 0 && st.reflect > 0) {
@@ -752,7 +754,11 @@ function hurt(s, t, dmg, el, o = {}) {
   } else {
     if (st.curse > 0) dmg *= 1.25;
     if (!o.dot) t.flash = 0.14;
-    if (!t.decoy) s.stats.dealt += dmg;
+    if (!t.decoy) {
+      s.stats.dealt += dmg;
+      const by = s.who?.stats ? s.who : o.dot ? byId(s, t.lastBy) : null; // burns and other ticks count for the last wizard who hit
+      if (by) { by.stats.dealt += dmg; t.lastBy = by.id; } // and so does the kill
+    }
   }
   t.hp -= dmg;
   let shown = dmg;
@@ -1030,20 +1036,35 @@ function updatePlayer(s, p, inp, dt) {
   } else if (p.dodge > 0) {
     p.dodge -= dt;
     p.vx = p.ddx * P.dodgeSpeed; p.vz = p.ddz * P.dodgeSpeed;
-  } else if (!stunned && st.root <= 0) {
-    const planted = p.wind ? (p.wind.style === 'flick' ? 0.75 : 0.3) : p.castT > p.castMax * 0.55 && p.castStyle !== 'flick' ? 0.55 : 1;
-    const spd = P.speed * slowMul(st) * (st.haste > 0 ? 1.4 : 1) * planted;
-    const L = Math.hypot(inp.move.x, inp.move.z);
-    const tvx = L ? (inp.move.x / L) * spd : 0, tvz = L ? (inp.move.z / L) * spd : 0;
-    const a = Math.min(1, dt * 14);
-    p.vx += (tvx - p.vx) * a; p.vz += (tvz - p.vz) * a;
-  } else { p.vx *= 0.8; p.vz *= 0.8; }
+  } else if (!stunned && st.root <= 0) walk(p, inp.move, dt);
+  else { p.vx *= 0.8; p.vz *= 0.8; }
   move(s, p, dt);
   p.speed = Math.hypot(p.vx, p.vz);
   if (!stunned && !(p.dashT > 0)) {
     const ax = inp.aim.x - p.x, az = inp.aim.z - p.z, L = Math.hypot(ax, az);
     if (L > 0.3) { p.fx = ax / L; p.fz = az / L; }
   }
+}
+
+// Steers a wizard's velocity toward where the stick points (slowed while casting, chilled or slowed).
+function walk(p, mv, dt) {
+  const st = p.st;
+  const planted = p.wind ? (p.wind.style === 'flick' ? 0.75 : 0.3) : p.castT > p.castMax * 0.55 && p.castStyle !== 'flick' ? 0.55 : 1;
+  const spd = P.speed * slowMul(st) * (st.haste > 0 ? 1.4 : 1) * planted;
+  const L = Math.hypot(mv.x, mv.z);
+  const tvx = L ? (mv.x / L) * spd : 0, tvz = L ? (mv.z / L) * spd : 0;
+  const a = Math.min(1, dt * 14);
+  p.vx += (tvx - p.vx) * a; p.vz += (tvz - p.vz) * a;
+}
+
+// The client's prediction of its own wizard (R-084): one step of walking with the same rules and collisions as
+// updatePlayer. False (and nothing moved) while the wizard is not walking: dodging, dashing, stunned, rooted or down.
+export function predictWalk(s, p, mv, dt) {
+  const st = p.st;
+  if (!p.alive || p.dodge > 0 || p.dashT > 0 || st.frozen > 0 || st.shock > 0 || st.stun > 0 || st.root > 0) return false;
+  walk(p, mv, dt);
+  move(s, p, dt);
+  return true;
 }
 
 function move(s, e, dt) {
@@ -1117,6 +1138,8 @@ function spawnEnemy(s, kind) {
 
 function kill(s, e) {
   s.kills++;
+  const by = byId(s, e.lastBy);
+  if (by) by.stats.kills++;
   s.score += Math.round(e.T.score * (1 + 0.25 * (s.wave - 1)));
   ev(s, 'death', { id: e.id, x: e.x, z: e.z, kind: e.kind, frozen: e.st.frozen > 0, burning: e.st.burn > 0, cursed: e.st.curse > 0 });
 }

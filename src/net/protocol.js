@@ -1,10 +1,12 @@
 // The co-op wire protocol (R-081): JSON messages over a WebSocket. Pure data and validation, no
 // sockets, so the server, the browser client and the tests share it. See story/COOP_PLAN.md.
 //
-// client -> server: join {room?, name} · pick {wizard, role?} · ready {ready} · start · leave
-//                   input {seq, move, aim, actions} · ping {t}
-// server -> client: welcome {you, room} · lobby {room, phase, players} · snap {tick, state, events, ack, you}
-//                   error {code, message} · pong {t}
+// client -> server: join {room?, name, token?} · pick {wizard, role?} · ready {ready} · start · leave
+//                   input {seq, move, aim, actions} · ping {t} · resync
+// server -> client: welcome {you, room, token, resumed?} · lobby {room, phase, players (with `away`)}
+//                   snap {tick, state | base + delta, events, ack, you} · error {code, message} · pong {t}
+// R-084: `token` (from welcome) brings a dropped player back to their seat within 30 s; a snap with
+// `delta` patches the snap of tick `base` (delta.js); `resync` asks for the next snap whole.
 import { ELEMENTS } from '../game/spells.js';
 import { ROLES, WIZARD_ROLE } from '../game/roles.js';
 import { ARENA_R } from '../game/sim.js';
@@ -17,6 +19,7 @@ export const ROLE_IDS = Object.keys(ROLES);
 export const MAX_NAME = 16;
 export const MAX_ACTIONS = 12; // per input message
 export const AIM_LIMIT = ARENA_R + 25;
+export const TOKEN_RE = /^[0-9a-f]{24}$/;
 
 const ACTIONS = new Set(['clear', 'cast', 'recast', 'nova', 'self', 'dodge']); // not pause, restart or mute
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -44,6 +47,11 @@ export function validateClientMessage(m) {
         if (!ROOM_CODE_RE.test(code)) return fail('bad_message', 'a room code is four letters');
         out.room = code;
       }
+      if (m.token !== undefined && m.token !== null) {
+        if (typeof m.token !== 'string' || !TOKEN_RE.test(m.token)) return fail('bad_message', 'a bad seat token');
+        if (!out.room) return fail('bad_message', 'a seat token needs its room code');
+        out.token = m.token;
+      }
       return good(out);
     }
     case 'pick': {
@@ -55,6 +63,7 @@ export function validateClientMessage(m) {
       return typeof m.ready === 'boolean' ? good({ type: 'ready', ready: m.ready }) : fail('bad_message', 'ready is true or false');
     case 'start':
     case 'leave':
+    case 'resync':
       return good({ type: m.type });
     case 'ping':
       return good({ type: 'ping', t: isNum(m.t) ? m.t : 0 });

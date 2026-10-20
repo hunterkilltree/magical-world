@@ -120,4 +120,4 @@ deltas and quantised numbers (target < 8 KB/s per client), reconnect with the sa
 2. R-081 room logic + `ws` server + protocol validation, tested with real sockets.
 3. R-082 client networking and lobby.
 4. R-083 multi-wizard rendering, party HUD, camera (done; `src/game/party.js`).
-5. R-084 prediction, deltas, reconnect.
+5. R-084 prediction, deltas, reconnect (done; `src/net/delta.js`, `src/net/predict.js`).

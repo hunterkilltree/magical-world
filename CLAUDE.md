@@ -166,8 +166,14 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
   `src/net/`: `protocol.js` (validation), `snapshot.js` (state <-> JSON), `client.js` (browser socket, `forMe`), `interp.js`
   (snapshot buffer, ~100 ms behind). Dev: `npm run server` + `npm run dev` (Vite forwards `/ws`).
 - The party on screen (R-083): `src/game/party.js` is pure: `frameParty` (camera target + zoom; alone it is the old 15% aim lean),
-  `partyRows` (the HUD's party strip, `#h-party`), `createPartyTally` / `scoreboard` (casts, downs, raises counted from all events;
-  `hud.update(g, mine, dt, events)` gets every event online). Per-player kills and damage wait for the server's stats (R-084).
+  `partyRows` (the HUD's party strip, `#h-party`; top right below 1240 px and on phones), `scoreboard` (the defeat screen;
+  the scoreboard reads each wizard's `p.stats`).
+- Netcode (R-084): `src/net/delta.js` (`diff`/`patch`; the room sends one whole snapshot, then deltas from the one before; a skipped
+  send or a client `resync` gets a whole one), `snapshot.js` quantises numbers by key (`quantise`) and leaves the server's own
+  bookkeeping out (`SKIP`; add a key there only if nothing under `src/game/` reads it), spells keep spec ids; the server has
+  permessage-deflate on (busy 4-wizard run ~6.6 KB/s per client, `test_r084`). `src/net/predict.js` predicts the local wizard with
+  the sim's `predictWalk`. A dropped socket holds its seat 30 s (`Room.drop`/`resume`, `welcome.token`, `client.rejoin`). The sim
+  counts per-wizard `p.stats` (kills to the enemy's `lastBy`, damage incl. its burns, casts, revives, downs).
 - Web tests: `tests/web/*.test.mjs` (node:test), `harness/run.sh web`; `reqs`/`story` count them. `npm` fails inside Git Bash
   on this machine: run npm from PowerShell.
 - Spell forms (R-088): `src/game/forms.js` holds twelve named three-element mixes (mines, storms, sprays, arcs) merged into `COMBOS` in `spells.js`; the sim knows them as options on existing shapes (area+`mine`, area+`repeat`, cone+`channel`, chain+`forks`). Not in `data/spells.json`.

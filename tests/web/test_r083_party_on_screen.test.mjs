@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { frameParty, partyRows, createPartyTally, scoreboard, FRAME } from '../../src/game/party.js';
+import { frameParty, partyRows, scoreboard, FRAME } from '../../src/game/party.js';
 import { createGame, createCoopGame, step, TUNING } from '../../src/game/sim.js';
 
 const read = (p) => readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
@@ -65,12 +65,11 @@ test('party strip rows: name, health and energy, you marked, a downed wizard wit
   assert.equal(partyRows(g.players, 'p1')[0].hp, 1);
 });
 
-test('the scoreboard tallies each wizard\'s casts, downs and raises from a real co-op run', () => {
+test('the scoreboard shows each wizard\'s share of a real co-op run (R-084: the sim counts it per player)', () => {
   const g = createCoopGame([{ wizard: 'ember_pyromancer' }, { wizard: 'stone_druid' }]);
   g.mode = 'play'; g.waveT = 1e9;
-  const tally = createPartyTally();
   const idle = { move: { x: 0, z: 0 }, aim: { x: 0, z: -5 }, actions: [] };
-  const frame = (p1, p2 = idle) => tally.add(step(g, { players: { p1, p2 } }, 1 / 60));
+  const frame = (p1, p2 = idle) => step(g, { players: { p1, p2 } }, 1 / 60);
   frame({ ...idle, actions: ['el:fire', 'cast'] });
   for (let i = 0; i < 40; i++) frame(idle);
   frame({ ...idle, actions: ['el:water', 'cast'] });
@@ -80,11 +79,11 @@ test('the scoreboard tallies each wizard\'s casts, downs and raises from a real 
   p2.x = p1.x + 0.5; p2.z = p1.z; p2.hp = 0;
   for (let i = 0; i < Math.ceil(TUNING.reviveT * 60) + 30; i++) frame(idle);
   assert.equal(p2.alive, true, 'raised');
-  const rows = scoreboard(g.players, tally, 'p1');
-  assert.deepEqual(rows.map((r) => [r.id, r.casts, r.downs, r.raised]), [['p1', 2, 0, 0], ['p2', 0, 1, 1]]);
+  const rows = scoreboard(g.players, 'p1');
+  assert.deepEqual(rows.map((r) => [r.id, r.casts, r.downs, r.revives]), [['p1', 2, 0, 1], ['p2', 0, 1, 0]]);
   assert.equal(rows[0].me, true);
-  tally.reset();
-  assert.deepEqual(scoreboard(g.players, tally, 'p1').map((r) => r.casts), [0, 0], 'a new run starts at zero');
+  assert.ok(rows.every((r) => typeof r.kills === 'number' && typeof r.dealt === 'number'));
+  assert.deepEqual(scoreboard([{ id: 'p9', name: 'Old' }], 'p1')[0].kills, 0, 'a wizard without stats reads as zeros');
 });
 
 test('single-player camera input is unchanged by the party framing', () => {
@@ -103,5 +102,5 @@ test('wiring: the view frames the party, the HUD draws the strip and the scorebo
   assert.match(hud, /scoreboard\(/, 'hud.js fills the scoreboard');
   assert.match(app, /id="h-party"/); assert.match(app, /id="d-board"/);
   assert.match(css, /\.pstrip/); assert.match(css, /body\.touch \.pstrip/, 'the strip has a phone layout');
-  assert.match(main, /hud\.update\(g, mine, dt, events\)/, 'online, the HUD tallies every wizard\'s events, not only yours');
+  assert.match(hud, /scoreboard\(g\.players/, 'the board reads the wizards\' own stats');
 });

@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import { validateClientMessage, ROOM_CODE_RE, WIZARD_IDS, ROLE_IDS, AIM_LIMIT } from '../../src/net/protocol.js';
 import { snapshotState, applySnapshot } from '../../src/net/snapshot.js';
 import { Room } from '../../server/room.js';
+import { patch } from '../../src/net/delta.js';
 import { createServer } from '../../server/index.js';
 import { createCoopGame, createGame, step, seedRandom, unseedRandom } from '../../src/game/sim.js';
 import { ENEMY_TYPES } from '../../src/game/enemies.js';
@@ -262,7 +263,7 @@ test('a snapshot survives JSON and rebuilds the world on a client', () => {
   for (const [a, b] of g.enemies.map((e, i) => [e, client.enemies[i]])) {
     assert.equal(b.id, a.id);
     assert.equal(b.kind, a.kind);
-    assert.ok(Math.abs(b.x - a.x) < 0.01 && Math.abs(b.z - a.z) < 0.01 && Math.abs(b.hp - a.hp) < 0.01);
+    assert.ok(Math.abs(b.x - a.x) < 0.01 && Math.abs(b.z - a.z) < 0.01 && Math.abs(b.hp - a.hp) <= 0.051, "positions to 1 cm, health to 0.1 (R-084 quantising)");
     assert.equal(b.T, ENEMY_TYPES[a.kind], 'enemy stats are looked up, not sent');
     assert.equal(b.st.burn > 0, a.st.burn > 0);
     assert.equal(typeof b.st.frozen, 'number', 'status keeps every field');
@@ -270,7 +271,7 @@ test('a snapshot survives JSON and rebuilds the world on a client', () => {
   g.players.forEach((a, i) => {
     const b = client.players[i];
     assert.equal(b.id, a.id); assert.equal(b.wizard, a.wizard); assert.equal(b.role, a.role); assert.equal(b.alive, a.alive);
-    assert.ok(Math.abs(b.hp - a.hp) < 0.01 && Math.abs(b.x - a.x) < 0.01);
+    assert.ok(Math.abs(b.hp - a.hp) <= 0.051 && Math.abs(b.x - a.x) < 0.01);
     assert.deepEqual(b.queue, a.queue);
     assert.equal(b.isPlayer, true);
   });
@@ -315,8 +316,10 @@ function connect(port) {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   const inbox = [];
   const waiters = [];
+  let last = null; // R-084: snapshots after the first are deltas; rebuild the whole state like the client does
   ws.on('message', (d) => {
     const m = JSON.parse(d.toString());
+    if (m.type === 'snap') { if (m.delta) m.state = patch(last, m.delta); last = m.state; }
     inbox.push(m);
     for (const w of [...waiters]) if (w.pred(m)) { waiters.splice(waiters.indexOf(w), 1); w.res(m); }
   });
@@ -381,8 +384,8 @@ test('over real WebSockets: junk is refused and a flood is cut off', async (t) =
   assert.equal(closed, true, 'the flooding client is disconnected');
 });
 
-test('over real WebSockets: a dropped connection frees the slot and an empty room goes away', async (t) => {
-  const srv = await createServer({ port: 0, tickMs: 4, emptyRoomMs: 50 });
+test('over real WebSockets: a dropped connection frees the slot once its hold runs out and an empty room goes away', async (t) => {
+  const srv = await createServer({ port: 0, tickMs: 4, emptyRoomMs: 50, reconnectMs: 50 }) // R-084 holds a dropped seat; here only briefly;
   t.after(() => srv.close());
   const a = connect(srv.port); await a.open;
   a.send({ type: 'join', name: 'A' });

@@ -17,7 +17,7 @@ const RATE = { capacity: 240, perSecond: 120 }; // messages per connection: a bu
 const MAX_STRIKES = 20; // malformed messages before a connection is dropped
 const MAX_BUFFERED = 262144; // a client this far behind gets no more snapshots until it catches up
 
-export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8, emptyRoomMs = 30000 } = {}) {
+export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8, emptyRoomMs = 30000, reconnectMs = 30000 } = {}) {
   const rooms = new Map(); // code -> Room
   const timers = new Map(); // code -> empty-room timer
   const sockets = new Map(); // conn id -> ws
@@ -38,13 +38,16 @@ export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8
       res.end('not found (run `npm run build` to serve the game from here)');
     }
   });
-  const wss = new WebSocketServer({ server: http_, path: '/ws', maxPayload: 4096 });
+  // permessage-deflate (with context takeover) squeezes the JSON snapshots and their deltas to a few KB/s (R-084)
+  const wss = new WebSocketServer({ server: http_, path: '/ws', maxPayload: 4096, perMessageDeflate: { threshold: 128 } });
 
+  // false when the message was not sent (the room then sends that client a whole snapshot next)
   const sendTo = (conn, msg) => {
     const ws = sockets.get(conn);
-    if (!ws || ws.readyState !== 1) return;
-    if (msg.type === 'snap' && ws.bufferedAmount > MAX_BUFFERED) return; // slow client: skip this one
+    if (!ws || ws.readyState !== 1) return false;
+    if (msg.type === 'snap' && ws.bufferedAmount > MAX_BUFFERED) return false; // slow client: skip this one
     ws.send(JSON.stringify(msg));
+    return true;
   };
   const err = (conn, code, message) => sendTo(conn, { type: 'error', code, message });
 
@@ -88,10 +91,10 @@ export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8
         } else {
           const code = newCode();
           if (!code) { err(conn, 'busy', 'the server is full'); return; }
-          r = new Room(code, { send: sendTo });
+          r = new Room(code, { send: sendTo, reconnectMs });
           rooms.set(code, r);
         }
-        const j = r.join(conn, { name: m.name });
+        const j = m.token ? r.resume(conn, m.token, m.name) : r.join(conn, { name: m.name });
         if (!j.ok) { err(conn, j.code, j.message); dropIfEmpty(r); return; }
         room = r;
         clearTimeout(timers.get(r.code));
@@ -104,13 +107,14 @@ export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8
       else if (m.type === 'ready') out = room.setReady(conn, m.ready);
       else if (m.type === 'start') out = room.start(conn);
       else if (m.type === 'input') room.input(conn, m);
+      else if (m.type === 'resync') room.resync(conn);
       else if (m.type === 'leave') { room.leave(conn); dropIfEmpty(room); room = null; }
       if (!out.ok) err(conn, out.code, out.message);
     });
 
     ws.on('close', () => {
       sockets.delete(conn);
-      if (room) { room.leave(conn); dropIfEmpty(room); room = null; }
+      if (room) { room.drop(conn); room = null; } // held for reconnectMs; the ticker drops the room once it is empty
     });
     ws.on('error', () => ws.terminate());
   });
@@ -118,7 +122,7 @@ export async function createServer({ port = 8787, host = '127.0.0.1', tickMs = 8
   const ticker = setInterval(() => {
     const now = performance.now();
     for (const r of rooms.values()) {
-      try { r.update(now); } catch (e) { // one broken room must not take the server down
+      try { r.update(now); if (r.empty) dropIfEmpty(r); } catch (e) { // one broken room must not take the server down
         console.error(`room ${r.code} failed and was closed:`, e);
         for (const conn of r.members.keys()) { err(conn, 'room_failed', 'the room hit an error and was closed'); sockets.get(conn)?.close(1011, 'room failed'); }
         rooms.delete(r.code);

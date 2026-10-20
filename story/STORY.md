@@ -442,14 +442,25 @@ pulls back as the party spreads (up to 1.8x); alone it follows you exactly as
 before. A party strip (top left) lists every wizard with their name, health and
 energy bars, yours marked, a downed one greyed with their revive progress. The
 defeat screen of a co-op run adds a scoreboard: one row per wizard (name, wizard,
-role) with the casts, times downed and times raised this client saw in the run's
-events. The maths is pure (`src/game/party.js`); kills and damage per player
-come with the server's stats in R-084.
+role) with their share of the run (since R-084 the server's per-player stats:
+kills, damage, allies revived, times downed). The maths is pure
+(`src/game/party.js`).
 
-### R-084 [planned] Netcode polish
-Client prediction for the local wizard reconciled with `ack`, snapshot deltas
-(under 8 KB/s per client), reconnecting with the same id for 30 s, a ping
-display, per-player stats on the defeat screen.
+### R-084 [done] Netcode polish
+Core and presentation, browser port. Your own wizard is predicted: the newest
+snapshot's position for you with every input the server has not acknowledged
+(`ack`) walked again by the sim's own rules (`predictWalk`); a correction eases
+out instead of snapping, and while you dodge, dash or are stunned the server's
+word is drawn (`src/net/predict.js`). After the first snapshot the server sends
+each client only a delta from the one before (`src/net/delta.js`), or a whole
+one after a missed send or a `resync`; numbers are quantised by kind, spells
+keep their spec ids, and permessage-deflate is on, so a busy four-wizard run
+costs under 8 KB/s per client on the wire. A dropped socket keeps its seat for
+30 s (`welcome` gives a token; the wizard stands still in the run, the lobby
+shows them away, the host passes on) and the page reconnects to it by itself.
+The HUD shows the ping in co-op. The sim counts each wizard's kills (the last
+wizard to hit), damage dealt and taken, casts, allies revived and times downed;
+the defeat scoreboard shows them.
 
 ## Cracked Rune handoff in the browser (R-085 to R-087)
 
