@@ -12,7 +12,15 @@ npx serve .          # or: python3 -m http.server 8000
 Then open `http://localhost:8000/arena.html` (add `?w=rime_cryomancer` etc. to pick a wizard).
 
 ## Controls
-WASD move · mouse aim · 1–6 queue Fire / Water / Ice / Lightning / Earth / Arcane (up to 3) · left click casts at the cursor (hold to recast) · right click or E casts as an area around you · F self-cast · Space dodge · X clear · Esc pause · R restart.
+WASD move · mouse aim · 1–6 queue Fire / Water / Ice / Lightning / Earth / Arcane (up to 3) · left click casts at the cursor (hold to recast) · right click or E casts as an area around you · F self-cast · Space dodge · X clear · Esc pause · R restart · Q (or middle click) strikes with your weapon, hold to keep going · C / Z next / previous weapon.
+
+## Weapons
+Twenty-four weapons beside your spells (`weapons.js`): swords, axes, hammers, polearms, bows, firearms and thrown weapons, thirteen of plain steel and eleven carrying an element (Emberbrand burns, Rimecleaver freezes in three chops, Thundermaul doubles on the wet, Earthsplitter shatters the frozen...). They cost no energy and run on their own cooldown. Pick one in the menu's Armory row (or `?k=crossbow`); each wizard starts with their own.
+
+## Weak PCs and phones
+- **Graphics tiers** (`quality.js`): `minimal`, `low`, `medium`, `high`. The game picks a start from the device and a governor lowers it when frames run slow (a message says so). Choose by hand in the menu's Graphics row, or force one with `?q=low` (`minimal | low | medium | high`).
+- **If something breaks:** no WebGL gives a plain card instead of a blank page; a lost graphics context pauses the run and carries on when it returns; a frame that keeps throwing lowers the tier and then stops with a Reload card.
+- **On a phone** (landscape; portrait asks you to turn): drag on the left half to move; the Cast pad at the bottom right casts, keeps casting while held and aims where you drag (untouched, at the nearest enemy); Area, Self, Dodge and Clear are buttons; tap the element keys to queue; tap the right half of the arena to aim and cast there. `?touch=1` forces touch mode on any screen (`?touch=0` turns it off). "Add to home screen" installs it full screen.
 
 ## Architecture (`game/`)
 - `spells.js`: data only. Elements (hit payload + self-cast effect), shapes (cost, cooldown), and the `COMBOS` table. `resolveSpell(queue, role)` turns a queue into a spell.
@@ -27,7 +35,9 @@ WASD move · mouse aim · 1–6 queue Fire / Water / Ice / Lightning / Earth / A
 - `audio.js`: synthesized sound effects driven by sim events (no audio files). M mutes.
 - `input.js`: turns keyboard and mouse input into a movement vector, an aim point and a list of actions.
 - `hud.js`: the DOM HUD plus the menu, pause and death screens.
-- `main.js`: the loop that wires these together.
+- `main.js`: the loop that wires these together, behind a per-frame `try`/`catch`, a graphics governor and a frame cap.
+- `weapons.js`: the armory and each weapon's hit. `weapon-models.js`: the weapons and their projectiles, built from primitives.
+- `quality.js`: tiers, device guess, governor and fault guards (pure, tested in `tests/web`). `touch.js`: phone controls. `fatal.js`: the "cannot run" card.
 
 ## Adding a spell
 Add one entry to `COMBOS` in `spells.js`:

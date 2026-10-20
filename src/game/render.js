@@ -12,6 +12,9 @@ import { ELEMENTS, resolveSpell } from './spells.js';
 import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
 import { createWow } from './wow.js';
+import { PROFILES, pixelRatioFor, createSafeRunner } from './quality.js';
+import { WEAPONS } from './weapons.js';
+import { buildWeaponModel, buildShotModel } from './weapon-models.js';
 
 const cols = (...h) => h.map((x) => new THREE.Color(x));
 const STYLE = {
@@ -64,7 +67,7 @@ void main() { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
 const DENSITY = 0.6, SIZE_K = 1.25;
 class Particles {
   constructor(scene, max, additive) {
-    this.max = max; this.next = 0;
+    this.max = max; this.limit = max; this.density = DENSITY; this.next = 0;
     this.p = new Float32Array(max * 3); this.c = new Float32Array(max * 3); this.sz = new Float32Array(max); this.al = new Float32Array(max);
     this.v = new Float32Array(max * 3); this.life = new Float32Array(max); this.L = new Float32Array(max); this.g = new Float32Array(max);
     this.d = new Float32Array(max); this.s0 = new Float32Array(max); this.s1 = new Float32Array(max); this.a0 = new Float32Array(max);
@@ -83,19 +86,26 @@ class Particles {
     scene.add(this.points);
   }
   emit(x, y, z, vx, vy, vz, life, s0, s1, col, a0 = 1, g = 0, d = 0, mo = 0) {
-    if (Math.random() > DENSITY) return; // fewer, bigger particles so silhouettes read
+    if (Math.random() > this.density) return; // fewer, bigger particles so silhouettes read
     s0 *= SIZE_K; s1 *= SIZE_K;
     const i = this.next, j = i * 3;
     this.mo[i] = mo; this.ph[i] = Math.random() * 6.28; this.sp[i] = s0 >= 0.24 && Math.random() < 0.6 ? 1 : 0;
-    this.next = (i + 1) % this.max;
+    this.next = (i + 1) % this.limit;
     this.p[j] = x; this.p[j + 1] = y; this.p[j + 2] = z;
     this.v[j] = vx; this.v[j + 1] = vy; this.v[j + 2] = vz;
     this.c[j] = col.r; this.c[j + 1] = col.g; this.c[j + 2] = col.b;
     this.life[i] = life; this.L[i] = life; this.s0[i] = s0; this.s1[i] = s1; this.a0[i] = a0; this.g[i] = g; this.d[i] = d;
     this.sz[i] = s0; this.al[i] = a0;
   }
+  // R-110: a tier caps how many particles live at once (the arrays stay as big as the biggest tier)
+  setLimit(n) {
+    this.limit = Math.max(16, Math.min(this.max, n | 0));
+    if (this.next >= this.limit) this.next = 0;
+    for (let i = this.limit; i < this.max; i++) { this.life[i] = 0; this.al[i] = 0; }
+    this.points.geometry.setDrawRange(0, this.limit);
+  }
   update(dt) {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.limit; i++) {
       if (this.life[i] <= 0) continue;
       const l = (this.life[i] -= dt);
       if (l <= 0) { this.al[i] = 0; continue; }
@@ -121,7 +131,7 @@ class Particles {
     for (let n = 0; n < 2; n++) {
       const a = this.ph[i] + n * Math.PI + 1.2, sp = 0.9 + Math.random() * 0.8;
       const vx = this.v[j] * 0.5 + Math.cos(a) * sp, vz = this.v[j + 2] * 0.5 + Math.sin(a) * sp;
-      const q = this.next; this.next = (q + 1) % this.max;
+      const q = this.next; this.next = (q + 1) % this.limit;
       const t = q * 3;
       this.p[t] = this.p[j]; this.p[t + 1] = this.p[j + 1]; this.p[t + 2] = this.p[j + 2];
       this.v[t] = vx; this.v[t + 1] = this.v[j + 1] * 0.5 + 0.4; this.v[t + 2] = vz;
@@ -134,7 +144,7 @@ class Particles {
     const j = i * 3, x = this.p[j], z = this.p[j + 2], s = this.s0[i] * 0.5;
     this.life[i] = 0; this.al[i] = 0;
     for (let n = 0; n < 3; n++) {
-      const a = Math.random() * 6.28, q = this.next, t = q * 3; this.next = (q + 1) % this.max;
+      const a = Math.random() * 6.28, q = this.next, t = q * 3; this.next = (q + 1) % this.limit;
       this.p[t] = x; this.p[t + 1] = 0.05; this.p[t + 2] = z;
       this.v[t] = Math.cos(a) * 1.2; this.v[t + 1] = 1.6 + Math.random(); this.v[t + 2] = Math.sin(a) * 1.2;
       this.c[t] = this.c[j]; this.c[t + 1] = this.c[j + 1]; this.c[t + 2] = this.c[j + 2];
@@ -144,7 +154,7 @@ class Particles {
   }
   // Air push: a pressure wave shoves every live particle inside r outward (bends smoke and sparks around a cast).
   push(x, y, z, r, k) {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.limit; i++) {
       if (this.life[i] <= 0) continue;
       const j = i * 3, dx = this.p[j] - x, dy = this.p[j + 1] - y, dz = this.p[j + 2] - z, d = Math.hypot(dx, dy, dz);
       if (d >= r || d < 1e-3) continue;
@@ -176,6 +186,7 @@ const POSE = {
 };
 const DASH_POSE = { lean: 0.55, crouch: 0.3, arm: 0.6, tilt: 1.3, trail: 0.8 };
 const CH = ['lean', 'twist', 'roll', 'crouch', 'lunge', 'arm', 'tilt', 'trail', 'flare', 'slide'];
+const WCH = ['rx', 'ry', 'rz', 'z', 'lift'];
 const PROP_RX = /^(staff|shard_|crystal_socket|skull|jaw|horn_|rod_tip|coil_|club_|orb|geo_core|wind_)/;
 function spring(sp, target, k, dt, zeta = 0.5) {
   const c = 2 * Math.sqrt(k) * zeta, n = Math.max(1, Math.ceil(dt * Math.sqrt(k) * 2)), h = dt / n;
@@ -197,9 +208,39 @@ const ROCK_HOT = new THREE.MeshStandardMaterial({ color: 0x5a3020, emissive: 0xf
 const ROCK_RUNE = new THREE.MeshStandardMaterial({ color: 0x4a3a5a, emissive: 0xb04bff, emissiveIntensity: 1.2, roughness: 0.8, flatShading: true });
 const ROCK_ZAP = new THREE.MeshStandardMaterial({ color: 0x5a5440, emissive: 0xf4e15c, emissiveIntensity: 1.0, roughness: 0.8, flatShading: true });
 
-export function createView(canvas, overlay) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+function readCaps(renderer) {
+  const gl = renderer.getContext();
+  const get = (fn) => { try { return fn(); } catch { return undefined; } };
+  const info = get(() => gl.getExtension('WEBGL_debug_renderer_info'));
+  return {
+    gpu: String(get(() => (info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))) ?? ''),
+    maxTexture: renderer.capabilities.maxTextureSize,
+    maxFragUniforms: get(() => gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS))
+  };
+}
+
+// Tries the usual settings, then plainer ones. With no WebGL at all it throws an error whose code is 'nowebgl'.
+// No MSAA on the canvas: the scene is drawn into the composer's own targets, so a multisampled backbuffer smooths nothing.
+function makeRenderer(canvas) {
+  let cause = null;
+  for (const powerPreference of ['high-performance', 'default', 'low-power']) {
+    try { return new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference }); } catch (err) { cause = err; }
+  }
+  throw Object.assign(new Error('WebGL is not available'), { code: 'nowebgl', cause });
+}
+
+// opts: { choose(caps) -> tier name, onContext('lost' | 'restored'), onDisable(layer, err) }
+export function createView(canvas, overlay, opts = {}) {
+  const renderer = makeRenderer(canvas);
+  const caps = readCaps(renderer);
+  let tierName = opts.choose?.(caps);
+  if (!PROFILES[tierName]) tierName = 'high';
+  let prof = PROFILES[tierName];
+  let lost = false;
+  const safe = createSafeRunner({
+    onFault: (name, err, n) => console.warn(`[view] ${name} threw (${n})`, err),
+    onDisable: (name, err) => { console.error(`[view] ${name} switched off`, err); opts.onDisable?.(name, err); }
+  });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -296,20 +337,32 @@ export function createView(canvas, overlay) {
   let conePrevKey = '';
   const wallPrev = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5).rotateX(-Math.PI / 2), flatMat(0xffffff, 0.18)); wallPrev.position.y = 0.04; scene.add(wallPrev);
 
+  // The scene renders at the tier's ratio; the 2D overlay (bars, numbers) stays at least 1:1 so text reads on a small buffer.
   function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    dpr = renderer.getPixelRatio();
+    const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
+    const rpr = pixelRatioFor(prof, w, h, window.devicePixelRatio);
+    dpr = Math.min(window.devicePixelRatio || 1, Math.max(1, rpr));
+    renderer.setPixelRatio(rpr);
+    composer.setPixelRatio(rpr);
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    const s = (h * dpr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const s = (h * rpr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     fx.glow.mat.uniforms.uScale.value = s;
     fx.dust.mat.uniforms.uScale.value = s;
-    overlay.width = w * dpr; overlay.height = h * dpr;
+    overlay.width = Math.round(w * dpr); overlay.height = Math.round(h * dpr);
   }
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+  window.visualViewport?.addEventListener('resize', resize);
   resize();
+
+  // A lost WebGL context (a driver reset, a tab starved of memory) must not end the page: stop drawing, say so, carry on when it is back.
+  const onLost = (e) => { e.preventDefault(); lost = true; opts.onContext?.('lost'); };
+  const onRestored = () => { lost = false; resize(); applyQuality(tierName); opts.onContext?.('restored'); };
+  canvas.addEventListener('webglcontextlost', onLost, false);
+  canvas.addEventListener('webglcontextrestored', onRestored, false);
 
   // ---------------------------------------------------------------- particles
   function puff(style, x, y, z, vx, vy, vz, o = {}) {
@@ -342,6 +395,23 @@ export function createView(canvas, overlay) {
   function lightning(pts, color, y0 = 1.15, y1 = 1.0) {
     const quiet = y1 < 0.5;
     wow.vfx.bolt(pts.map((p, i) => new THREE.Vector3(p[0], i === 0 ? y0 : y1, p[1])), color, { quiet, w: quiet ? 0.11 : 0.22, life: quiet ? 0.14 : 0.26 });
+  }
+
+  // A blow's arc: a crescent that flashes and fades along the swing (R-112).
+  const trailGeos = new Map();
+  function weaponTrail(e) {
+    const key = e.range + ':' + e.arc;
+    if (!trailGeos.has(key)) {
+      const a = Math.min(Math.PI * 2, (e.arc * Math.PI) / 180);
+      trailGeos.set(key, new THREE.RingGeometry(e.range * 0.35, e.range, 40, 1, -a / 2, a).rotateX(-Math.PI / 2));
+    }
+    const m = addMat(e.color ?? 0xffffff, e.els?.length ? 1.6 : 1.1, 0.55);
+    m.side = THREE.DoubleSide;
+    const o = new THREE.Mesh(trailGeos.get(key), m);
+    o.position.set(e.x, WEAPONS[e.weapon]?.anim === 'chop' ? 0.25 : 1.0, e.z);
+    o.rotation.y = Math.atan2(-e.dz, e.dx);
+    transient(o, 0.2, (k) => { m.opacity = 0.55 * (1 - k); o.scale.setScalar(0.9 + 0.15 * k); });
+    if (e.hits && WEAPONS[e.weapon]?.anim === 'chop') ringFx(e.x + e.dx * e.range * 0.7, e.z + e.dz * e.range * 0.7, 1.2, e.color ?? 0xffb070, 0.35);
   }
 
   function ringFx(x, z, r, color, dur = 0.4, y = 0.06) {
@@ -395,8 +465,11 @@ export function createView(canvas, overlay) {
     ice.userData.fx = ward.userData.fx = stones.userData.fx = true;
     const motes = [0, 1, 2].map(() => { const m = new THREE.Mesh(SPHERE, glowMat(0xffffff)); m.scale.setScalar(0.09); scene.add(m); return m; });
     const pose = {}; for (const c of CH) pose[c] = { x: 0, v: 0 };
+    // R-112: the weapon rides on its own pivot at the free hand
+    const wpivot = new THREE.Group(); wpivot.name = 'weapon_pivot'; root.add(wpivot);
+    const wpose = {}; for (const c of WCH) wpose[c] = { x: 0, v: 0 };
     return { group, rig: built.rig, tip, ice, ward, stones, motes, phase: 0, yaw: Math.PI, w, pivot, hand, side, hatCone, hatX: hatCone?.rotation.x ?? 0,
-      pose, hat: { x: 0, v: 0 }, whip: { x: 0, v: 0 } };
+      pose, hat: { x: 0, v: 0 }, whip: { x: 0, v: 0 }, wpivot, ohand: root.getObjectByName('hand_' + (1 - side)), wid: null, wobj: null, wpose };
   }
 
   function clearViews() {
@@ -419,7 +492,7 @@ export function createView(canvas, overlay) {
 
   function reset(game) {
     const th = game.theme ?? 'court';
-    if (!arena || theme !== th) { if (arena) scene.remove(arena.group); arena = buildArena(ARENA_R, game.props, GATES, th); scene.add(arena.group); theme = th; applyTheme(th); }
+    if (!arena || theme !== th) { if (arena) scene.remove(arena.group); arena = buildArena(ARENA_R, game.props, GATES, th); scene.add(arena.group); theme = th; applyTheme(th); applyLights(); }
     clearViews();
     if (!pv || pv.w.id !== game.player.wizard) setWizard(game.player.wizard);
     camTarget.set(game.player.x, 0, game.player.z);
@@ -453,7 +526,8 @@ export function createView(canvas, overlay) {
     return v ? v.group.position.clone().add(new THREE.Vector3(0, 1.6, 0)) : new THREE.Vector3();
   }
 
-  const afx = createArenaFx({ fx: fx2, R: FX, tipPos: () => fxTip ?? tipPos(), scene });
+  const afx = createArenaFx({ fx: fx2, R: FX, tipPos: () => fxTip ?? tipPos(), scene,
+    bodyOf: (pid, selfId) => (!pid || pid === selfId ? pv : others.get(pid) ?? null) });
 
   // Events about the wizard on this screen use its body; another wizard's casts use theirs (R-082).
   const BODY_ONLY = new Set(['queue', 'windup', 'dash', 'dashEnd', 'dodge']);
@@ -461,10 +535,10 @@ export function createView(canvas, overlay) {
     for (const e of events) {
       const mine = !e.pid || !game.player || e.pid === game.player.id;
       const ov = mine ? null : others.get(e.pid) ?? null;
-      if (mine) wow.onEvent(e, game);
-      else if (!BODY_ONLY.has(e.type)) wow.onEvent(e, game, ov ? tipPos(ov) : null);
-      if (mine) afx.onEvent(e, game);
-      else if (!BODY_ONLY.has(e.type)) { fxTip = ov ? tipPos(ov) : null; afx.onEvent(e, game); fxTip = null; }
+      if (mine) safe.run('wow', () => wow.onEvent(e, game));
+      else if (!BODY_ONLY.has(e.type)) safe.run('wow', () => wow.onEvent(e, game, ov ? tipPos(ov) : null));
+      if (mine) safe.run('afx', () => afx.onEvent(e, game));
+      else if (!BODY_ONLY.has(e.type)) { fxTip = ov ? tipPos(ov) : null; safe.run('afx', () => afx.onEvent(e, game)); fxTip = null; }
       switch (e.type) {
         case 'cast': {
           const tp = tipPos(ov ?? pv);
@@ -559,6 +633,22 @@ export function createView(canvas, overlay) {
         case 'fizzle': burst('smoke', e.x, 1.6, e.z, 5, 0.8); break;
         case 'ward': burst('arcane', e.x, 1.0, e.z, 10, 2.5); break;
         case 'spawn': ringFx(e.x, e.z, 1.3, 0xff3b3b, 0.9, 0.05); break;
+        // R-112: weapons
+        case 'strike': weaponTrail(e); if (e.hits) shake = Math.min(1, shake + 0.05 + 0.04 * Math.min(4, e.hits) * (WEAPONS[e.weapon]?.blunt ? 1.6 : 1)); break;
+        case 'shoot': {
+          const W = WEAPONS[e.weapon], hx = e.x + e.dx * 0.8, hz = e.z + e.dz * 0.8;
+          if (W?.family === 'firearm') { burst('smoke', hx, 1.2, hz, 8, 1.2, { up: 0.3 }); burst('spark', hx, 1.2, hz, 6, 4); flash(hx, hz, 0xffc070, 18); }
+          for (const el of e.els ?? []) burst(elStyle(el), hx, 1.25, hz, 5, 1.6);
+          break;
+        }
+        case 'weaponImpact': {
+          const y = e.y ?? 1.1;
+          burst('spark', e.x, y, e.z, e.hit ? 7 : 4, 3);
+          if (WEAPONS[e.weapon]?.shot === 'stone') burst('earth', e.x, 0.3, e.z, 8, 2.2, { up: 0.8 });
+          for (const el of e.els) if (STYLE[el]) burst(el, e.x, y, e.z, 6, 2.2);
+          break;
+        }
+        case 'weapon': addText(e.x, 2.65, e.z, e.name, hexCss(e.color), 15, 1.1); break;
       }
     }
   }
@@ -707,7 +797,8 @@ export function createView(canvas, overlay) {
       let v = shotViews.get(b.id);
       if (!v) {
         let obj; const parts = {};
-        if (b.kind === 'boulder') {
+        if (b.weapon) obj = buildShotModel(b.weapon) ?? new THREE.Object3D();
+        else if (b.kind === 'boulder') {
           const m = b.els.includes('fire') ? ROCK_HOT : b.els.includes('arcane') ? ROCK_RUNE : b.els.includes('lightning') ? ROCK_ZAP : ROCK;
           obj = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), m);
           obj.castShadow = true;
@@ -730,6 +821,14 @@ export function createView(canvas, overlay) {
       const y = b.y ?? (b.kind === 'boulder' ? 0.95 : 1.15);
       v.age += dt;
       v.obj.position.set(b.x, y, b.z);
+      if (b.weapon) { // R-112: an arrow points along its flight; axes, stones and runes tumble
+        const hs = Math.hypot(b.vx, b.vz);
+        v.obj.rotation.y = Math.atan2(b.vx, b.vz);
+        v.obj.rotation.x = b.arc ? -Math.atan2(b.vy, hs) : 0;
+        if (v.obj.userData.spin) v.obj.rotation.x += v.age * v.obj.userData.spin;
+        if (b.els[0] !== 'steel') for (const el of b.els) for (let i = rate(10, dt); i--;) puff(elStyle(el), b.x, y, b.z, -b.vx * 0.04, 0.2, -b.vz * 0.04, { size: 0.6, life: 0.25 });
+        continue;
+      }
       if (v.body) { // spawns squashed wide, then stretches along its speed; the bright core leads, the tail tapers
         const hs = Math.hypot(b.vx, b.vz), spd = Math.hypot(hs, b.vy || 0), k = ease(v.age / 0.07), st = 1 + Math.min(2.2, spd * 0.05) * k, wide = 1 + 0.45 * (1 - k);
         v.obj.rotation.y = Math.atan2(b.vx, b.vz);
@@ -884,6 +983,7 @@ export function createView(canvas, overlay) {
       v.group.updateMatrixWorld(true);
       animateRig(v.rig, v.phase, G, k < 0.1);
       castPose(p, v, dt);
+      weaponPose(s, p, v, dt);
       if (p.dodge > 0) {
         const d = 1 - p.dodge / TUNING.dodgeTime;
         v.rig.root.rotation.x += Math.sin(d * Math.PI) * 0.6;
@@ -988,6 +1088,63 @@ export function createView(canvas, overlay) {
       v.mats.forEach((m, i) => { m.opacity = (i === 0 ? 0.45 : 0.08) + (i === 0 ? 0.25 : 0.08) * pulse + (o.held > 0 ? 0.25 : 0); });
     }
     for (const [id, v] of objViews) if (!seen.has(id)) { scene.remove(v.group); for (const m of v.mats) m.dispose?.(); objViews.delete(id); }
+  }
+
+  // R-112: rest, wind-up and follow-through of the weapon in the free hand. Read from the sim's swing state, so another
+  // wizard's blows in co-op look the same. Angles are sprung so the phases blend; a whirl is set outright.
+  function weaponPose(s, p, v, dt) {
+    if (v.wid !== p.weapon) {
+      if (v.wobj) v.wpivot.remove(v.wobj);
+      v.wobj = buildWeaponModel(p.weapon); v.wid = p.weapon;
+      v.wpivot.add(v.wobj);
+    }
+    const W = WEAPONS[p.weapon];
+    if (!W || !v.ohand) return;
+    const R = v.rig, o = 1 - v.side, sgn = o === 0 ? -1 : 1;
+    const wind = p.swing ? 1 - p.swing.t / Math.max(0.001, p.swing.max) : 0;
+    const fol = !p.swing && p.swingT > 0 ? 1 - p.swingT / Math.max(0.001, p.swingMax) : -1;
+    const busy = !!p.swing || fol >= 0;
+    const T = { rx: W.kind === 'ranged' ? 0.9 : 0.35, ry: 0, rz: sgn * 0.25, z: 0, lift: 0 };
+    let spin = null;
+    if (s.mode === 'menu') { T.rx = 0.25; T.rz = sgn * 0.35; }
+    else if (busy) switch (W.anim) {
+      case 'slash':
+        T.rx = 1.45; T.rz = 0;
+        T.ry = p.swing ? sgn * 1.3 * ease(wind) : sgn * (1.3 - 2.6 * ease(Math.min(1, fol * 1.6)));
+        T.lift = 1.1 * (p.swing ? wind : 1 - fol);
+        break;
+      case 'chop':
+        T.rz = 0;
+        T.rx = p.swing ? -0.5 - 0.7 * ease(wind) : -1.2 + 3.1 * ease(Math.min(1, fol * 2));
+        T.lift = p.swing ? 2.3 * wind : 2.3 - 1.7 * Math.min(1, fol * 2);
+        break;
+      case 'stab': case 'thrust': {
+        const reach = W.anim === 'thrust' ? 0.6 : 0.35;
+        T.rx = 1.5; T.rz = 0; T.lift = 1.25;
+        T.z = p.swing ? -0.2 * wind : reach * Math.sin(Math.PI * Math.min(1, fol * 1.4));
+        break;
+      }
+      case 'spin':
+        T.rx = 1.45; T.rz = 0; T.lift = 1.0;
+        if (!p.swing) spin = sgn * fol * Math.PI * 2;
+        break;
+      case 'throw':
+        T.rz = 0;
+        T.rx = p.swing ? -1.3 * ease(wind) : -1.3 + 2.9 * ease(fol);
+        T.lift = p.swing ? 2.4 * wind : 2.4 * (1 - fol);
+        break;
+      default: // bow, gun: aimed, with a kick when it fires
+        T.rx = Math.PI / 2 - (W.anim === 'gun' && fol >= 0 ? 0.45 * (1 - fol) : 0); T.rz = 0; T.lift = 1.4;
+    }
+    else if (W.kind === 'ranged' && p.wcd > 0) { T.rx = Math.PI / 2; T.rz = 0; T.lift = 1.4; }
+    const P = {};
+    for (const c of WCH) P[c] = spring(v.wpose[c], T[c], 700, dt, 0.8);
+    const sh = R.shoulders[o];
+    if (sh) sh.rotation.x -= P.lift;
+    R.root.updateMatrixWorld(true);
+    v.wpivot.position.copy(R.root.worldToLocal(v.ohand.getWorldPosition(_v)));
+    v.wpivot.position.z += P.z;
+    v.wpivot.rotation.set(P.rx, spin ?? P.ry, P.rz, 'YXZ');
   }
 
   function syncDecoys(s, dt) {
@@ -1097,6 +1254,7 @@ export function createView(canvas, overlay) {
 
   // ---------------------------------------------------------------- frame
   function render(s, dt) {
+    if (lost) return;
     t += dt;
     updatePlayerViews(s, dt);
     syncEnemies(s, dt);
@@ -1130,8 +1288,7 @@ export function createView(canvas, overlay) {
       }
     }
     for (const l of flashes) l.intensity *= Math.exp(-14 * dt);
-    fx.glow.update(dt);
-    fx.dust.update(dt);
+    safe.run('particles', () => { fx.glow.update(dt); fx.dust.update(dt); });
 
     const p = s.player;
     camMode = s.mode === 'menu' ? 'menu' : 'play';
@@ -1157,9 +1314,9 @@ export function createView(canvas, overlay) {
       for (const mm of pl.mats ?? [pl.mat]) { mm.opacity = op; mm.depthWrite = op > 0.95; }
     }
 
-    wow.update(dt, s, pv ? tipPos() : null);
-    afx.update(s);
-    fx2.update(dt);
+    safe.run('wow', () => wow.update(dt, s, pv ? tipPos() : null));
+    safe.run('afx', () => afx.update(s));
+    safe.run('fx2', () => fx2.update(dt));
     composer.render();
     drawOverlay(s, dt);
   }
@@ -1269,5 +1426,52 @@ export function createView(canvas, overlay) {
     ctx.globalAlpha = 1;
   }
 
-  return { reset, setWizard, screenToGround, consume, render, renderer };
+  // ---------------------------------------------------------------- quality (R-110)
+  // Point lights are what a lit pixel pays for, so a tier keeps only some of them lit. Lights are never toggled while
+  // playing (a changed light count recompiles every lit material); only here, on a tier change or an arena rebuild.
+  function applyLights() {
+    const all = [];
+    scene.traverse((o) => { if (o.isPointLight) all.push(o); });
+    const first = new Set([flashes[0], ...(arena?.braziers ?? []).map((b) => b.light)]);
+    all.sort((a, b) => (first.has(b) ? 1 : 0) - (first.has(a) ? 1 : 0));
+    all.forEach((l, i) => { l.visible = i < prof.lights; });
+  }
+
+  function applyQuality(tier) {
+    if (!PROFILES[tier]) return tierName;
+    tierName = tier; prof = PROFILES[tier];
+    resize();
+    moon.castShadow = prof.shadow > 0;
+    if (prof.shadow && moon.shadow.mapSize.x !== prof.shadow) {
+      moon.shadow.mapSize.set(prof.shadow, prof.shadow);
+      moon.shadow.map?.dispose();
+      moon.shadow.map = null;
+    }
+    bloom.enabled = prof.bloom;
+    for (const [P, n] of [[fx.glow, prof.glow], [fx.dust, prof.dust]]) { P.setLimit(n); P.density = prof.density; }
+    fx2.S.density = prof.fx;
+    fx2.budget(prof.sprites);
+    applyLights();
+    return tierName;
+  }
+  applyQuality(tierName);
+
+  function dispose() {
+    window.removeEventListener('resize', resize);
+    window.removeEventListener('orientationchange', resize);
+    window.visualViewport?.removeEventListener('resize', resize);
+    canvas.removeEventListener('webglcontextlost', onLost, false);
+    canvas.removeEventListener('webglcontextrestored', onRestored, false);
+    try { composer.dispose?.(); renderer.dispose(); } catch { /* the page is going away */ }
+  }
+
+  return {
+    reset, setWizard, screenToGround, consume, render, renderer, scene, caps, dispose,
+    setAim(x, z) { aim.x = x; aim.z = z; },
+    setQuality: applyQuality,
+    get tier() { return tierName; },
+    get lost() { return lost; },
+    // a layer that was switched off after repeated errors comes back after a restart
+    clearFaults() { safe.reset(); }
+  };
 }

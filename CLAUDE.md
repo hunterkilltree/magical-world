@@ -173,3 +173,40 @@ The browser port (`src/`, Vite + three.js) has online co-op for up to four wizar
 - Unlocks (R-092): `chapter.elements` (computed in `loadCampaign`) is what a chapter may queue; `queueEl` refuses the rest with a `locked` event and cancels nothing. `circle` in `data/campaign.json` is who starts; `wizardsAvailable()` adds profile unlocks. Quick play has no `campaign`, so everything is open.
 - Objectives (R-093): `chapter.objective` is `survive`, `hold` (a decoy with `objective: true`; `targetOf` sends every enemy to it), `burn` (an env prop in `props.targets`, lit only by fire) or `escape` (a clock and an exit ring). `setupObjective` builds them at `begin` and on every rewind; `updateObjective` runs each step; `objectiveFail` is a wipe (`wipeOut`). While `campaign.holding` the waves are done and only the objective is left. Defaults and validation live in `normalizeObjective` (campaign.js); braziers, cross and circle throw in `createCampaignGame` until built.
 - Story (R-094): text lives in `data/story/en.json` and `vi.json` (a string, a list of lines, or a card `{speaker, title, text[]}`), looked up by `src/game/story.js` (`createStory`: fallback to English; `bark(wizard, n)` is deterministic). Cards are keyed `<chapter id>.briefing` / `.ending`, titles `<id>.title`, lines `bark.<wizard id>` and `bark.any`. `hud.js` shows the card (`showStory`) and the bark; a campaign chapter waits for its briefing card. Add every key to both files; the Vietnamese is a draft for native review.
+
+- Showcase signatures (R-089): `src/game/signature-fx.js` ports the rest of the fx-showcase (afterimages, great spire, missiles, chain yank, prison, Magma Crush lava, Hurricane Eye, Arc Plasma burst); `arena-fx.js` calls it from sim events. Tests stub the effects layer (`tests/web/test_r089_signature_fx.test.mjs`).
+
+## Web port quality and phones (R-110, R-111)
+
+Browser port only; the Godot game is untouched.
+- `src/game/quality.js` is pure (no three, no DOM) and holds everything testable: `PROFILES` (`minimal` < `low` < `medium` < `high`;
+  `high` is the old look), `pickTier` (the first guess from `?q=`, the saved menu choice, memory, cores, the GPU name, phone), `pixelRatioFor`,
+  `createGovernor` (drops a tier under ~40 fps and never returns to a tier that was too slow; climbs after 20 s of steady 57 fps, up to the
+  device ceiling), `createFaultGuard` (frame throws: retry, lower the tier, stop), `createSafeRunner` (an optional layer that throws three times
+  is switched off), `safeGet`/`safeSet` (storage never throws). Numbers in `PROFILES` are our tuning, not measured on real weak hardware.
+- `render.js` applies a tier in `applyQuality`: render ratio and pixel budget (`resize`), shadow map size, bloom, how many point lights stay lit
+  (`applyLights`: about 17 exist, and each lit pixel pays for them; lights are only toggled on a tier change or an arena rebuild, never
+  while playing, because a changed count recompiles every lit material), particle caps/density (`Particles.setLimit`) and `fx2.budget`.
+  `antialias` is off on purpose: the scene goes through the composer's targets, so MSAA on the canvas smooths nothing. A lost WebGL context pauses the run.
+  New optional effect code should be called through `safe.run(name, fn)` in `render.js`.
+- `main.js` owns the loop: `try`/`catch` per frame, the governor, a frame cap (30 fps on `minimal`, 60 on a phone), the Graphics row
+  (`hud.js`, saved as `cow_quality`). `fatal.js` draws the "cannot run" card. `?q=minimal|low|medium|high` forces a tier and turns the governor off.
+- Phones: `touch.js` (pure maths + `createTouchControls`) feeds the same `move`/aim the keyboard does; `input.js` ignores touch pointers for
+  the mouse aim. `?touch=1` / `?touch=0` forces touch mode; the HUD layout is the `body.touch` block at the end of `styles.css`.
+  `window.__arena.quality` and `.view` (with `.scene`, `.setQuality`) are the test hooks. Touch cannot be simulated with mouse clicks:
+  dispatch `PointerEvent`s with `pointerType: 'touch'`.
+
+## Web port weapons (R-112)
+
+- `src/game/weapons.js` (pure): `WEAPONS` (24: 13 steel, 11 with an element, seven `FAMILIES`), `WIZARD_WEAPON` (each wizard's own),
+  `nextWeapon`, `weaponSpell(id)` (a cached spell-shaped hit: `parts.steel` + the element's part and statuses, `blunt`). The numbers are our
+  own tuning, not playtested; never retune `spells.json`/`enemies.json` for weapons.
+- Sim: `player.weapon`, `wcd`/`wcdMax` (cooldown), `swing` (wind-up, like `wind` for spells), `swingT`/`swingMax` (follow-through, for the
+  view). Actions `attack`, `reattack` (held), `weapon:next|prev|<id>`. `attack` -> `swing` event -> `blow` (melee: arc test like `CAST.cone`,
+  bulwark shields halve a frontal blow; ranged: `kind: 'bolt'` shots with `weapon: id`, which end in `weaponImpact`, never `impact`).
+  Spells and weapons exclude each other while winding up. `applyPayload` treats a `steel` part on a frozen target with `pl.blunt` like earth
+  (shatter). Runs that never attack are unchanged (golden digests).
+- View: `weapon-models.js` (primitives; grip at the origin, pointing +Y; projectiles fly +Z; templates cloned), `render.js` `weaponPose`
+  (free hand, from the sim's swing state so co-op matches), `weaponTrail`, weapon shots in `syncShots`. `vfx.js`/`arena-fx.js` skip weapon
+  shots' spell trails. Keys Q / middle click, C / Z; phone: the Weapon tile by the Cast pad and the ⇄ chip; menu Armory row, `?k=`.
+  Co-op: `protocol.js` accepts the actions, `snapshot.js` rebuilds `weapon:` keys from the armory.

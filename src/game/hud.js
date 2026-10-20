@@ -2,6 +2,7 @@
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
 import { describeBest } from './profile.js';
+import { WEAPONS, WEAPON_ORDER, FAMILIES } from './weapons.js';
 
 // Element glyphs (16px grid, stroked).
 const ICON = {
@@ -26,8 +27,16 @@ const $ = (id) => document.getElementById(id);
 const CONTROLS = [
   ['W A S D', 'Move'], ['Mouse', 'Aim'], ['1 – 0', 'Queue an element (up to 3)'], ['Left click', 'Cast at cursor · hold to recast'],
   ['Right click / E', 'Cast as an area around you'], ['F', 'Cast on yourself'], ['Space', 'Dodge roll (brief invulnerability)'],
+  ['Q / middle click', 'Weapon: strike or shoot · hold to keep going'], ['C / Z', 'Next / previous weapon'],
   ['X', 'Clear queue'], ['Esc', 'Pause'], ['M', 'Sound on / off'], ['R', 'Restart (paused or fallen)']
 ];
+// R-111: on a phone the keys are replaced by what the fingers do
+const CONTROLS_TOUCH = [
+  ['Left half', 'Move: drag a stick anywhere'], ['Cast pad', 'Touch to cast · hold to recast · drag to aim'], ['Tap the arena', 'Aim and cast right there'],
+  ['Element keys', 'Queue up to 3 elements'], ['Area · Self · Dodge', 'The buttons by the Cast pad'], ['Weapon', 'Strike or shoot · hold to keep going'],
+  ['⇄ weapon name', 'Switch to the next weapon'], ['Clear', 'Empties the queue'], ['Pause', 'Top right']
+];
+const QUALITY = [['auto', 'Auto'], ['minimal', 'Minimal'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']];
 const STATUS = [
   ['burn', 'Burning', '#ff6a2b'], ['wet', 'Wet', '#3d9bff'], ['chill', 'Chilled', '#a8ecff'], ['frozen', 'Frozen', '#ffffff'],
   ['shock', 'Shocked', '#f4e15c'], ['slow', 'Mired', '#b3793f'], ['stoneskin', 'Stoneskin', '#b3793f'], ['ward', 'Ward', '#d04bff'], ['haste', 'Haste', '#f4e15c'],
@@ -36,6 +45,7 @@ const STATUS = [
 ];
 
 export function createHud(o) {
+  const TOUCH = document.body.classList.contains('touch');
   const els = {
     hp: $('h-hp'), hpv: $('h-hpv'), en: $('h-en'), env: $('h-env'), enbar: $('h-enbar'), wave: $('h-wave'), left: $('h-left'), kills: $('h-kills'),
     score: $('h-score'), shape: $('h-shape'), spell: $('h-spell'), cost: $('h-cost'), status: $('h-status'), banner: $('banner'), toast: $('toast'),
@@ -47,6 +57,8 @@ export function createHud(o) {
   const tiles = { cast: $('t-cast'), nova: $('t-nova'), self: $('t-self'), dodge: $('t-dodge') };
   const cdText = {};
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
+  const wTile = $('t-weapon'), wTileName = wTile?.querySelector('b');
+  if (wTile) { const em = document.createElement('em'); wTile.appendChild(em); cdText.weapon = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
   let storyKey = '', barkT = 0, vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', lockKey = '', wizardId = o.wizardId;
 
@@ -61,7 +73,7 @@ export function createHud(o) {
   });
 
   document.querySelectorAll('.controls').forEach((n) => {
-    n.innerHTML = CONTROLS.map(([k, v]) => `<div class="ctl"><kbd>${k}</kbd><span>${v}</span></div>`).join('');
+    n.innerHTML = (TOUCH ? CONTROLS_TOUCH : CONTROLS).map(([k, v]) => `<div class="ctl"><kbd>${k}</kbd><span>${v}</span></div>`).join('');
   });
 
   // R-094: the language of the story cards and the wizards' lines.
@@ -69,6 +81,67 @@ export function createHud(o) {
   const markLang = () => langBtns.forEach((b) => b.classList.toggle('is-on', b.dataset.l === o.story?.lang));
   langBtns.forEach((b) => b.addEventListener('click', () => { o.onLang?.(b.dataset.l); markLang(); storyKey = ''; }));
   markLang();
+
+  let swapBtn = null;
+  if (TOUCH) {
+    for (const [k, txt] of [['cast', 'Hold'], ['nova', 'Around'], ['self', 'You'], ['dodge', 'Roll']]) { const sp = tiles[k].querySelector('span'); if (sp) sp.textContent = txt; }
+    const sp = wTile?.querySelector('span'); if (sp) sp.textContent = 'Hold';
+    const clear = document.createElement('button');
+    clear.id = 't-clear'; clear.className = 'clearbtn'; clear.textContent = 'Clear';
+    document.querySelector('#h-queue')?.appendChild(clear);
+    swapBtn = document.createElement('button');
+    swapBtn.id = 't-swap'; swapBtn.className = 'clearbtn swapbtn'; swapBtn.textContent = '⇄';
+    document.querySelector('#h-queue')?.appendChild(swapBtn);
+  }
+
+  // R-112: the Armory row. Weapons grouped by family; the pick is what you start with (C switches in a fight).
+  let weaponId = o.weaponOf?.() ?? 'sword';
+  const shortName = (id) => WEAPONS[id].name.replace(/^(Arming|War|Twin) /, '');
+  function fillArmory() {
+    const node = $('m-armory'); if (!node) return;
+    node.innerHTML = '';
+    for (const fam of Object.keys(FAMILIES)) {
+      const ids = WEAPON_ORDER.filter((id) => WEAPONS[id].family === fam);
+      const grp = document.createElement('div'); grp.className = 'armfam';
+      grp.innerHTML = `<span class="k">${FAMILIES[fam]}</span>`;
+      for (const id of ids) {
+        const W = WEAPONS[id], b = document.createElement('button');
+        b.className = 'arm' + (id === weaponId ? ' is-on' : '');
+        b.dataset.k = id;
+        b.style.setProperty('--c', hex(W.color));
+        b.innerHTML = `<i></i><b>${W.name}</b>${W.els.length ? `<small>${W.els.map((e) => ELEMENTS[e].name).join(' · ')}</small>` : ''}`;
+        b.addEventListener('click', () => { weaponId = id; o.onWeapon?.(id); markArmory(); });
+        grp.appendChild(b);
+      }
+      node.appendChild(grp);
+    }
+    markArmory();
+  }
+  function markArmory() {
+    document.querySelectorAll('.arm').forEach((x) => x.classList.toggle('is-on', x.dataset.k === weaponId));
+    const W = WEAPONS[weaponId], d = $('m-armory-desc'), pk = $('m-armory-pick');
+    if (d && W) d.innerHTML = `<b>${W.name}</b> · ${W.kind === 'melee' ? 'melee' : 'ranged'} · ${W.desc}`;
+    if (pk && W) pk.textContent = W.name;
+  }
+  fillArmory();
+
+  // R-110: Graphics row (menu and pause screen): Auto lets the game pick and adapt, the rest hold one tier
+  let quality = { choice: 'auto', tier: 'high' };
+  const cap1 = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  function fillQuality() {
+    document.querySelectorAll('.quality').forEach((node) => {
+      node.innerHTML = '';
+      QUALITY.forEach(([id, name]) => {
+        const b = document.createElement('button');
+        b.className = 'role' + (id === quality.choice ? ' is-on' : '');
+        b.style.setProperty('--c', '#7c3aff');
+        b.innerHTML = `<i></i><b>${name}</b><small>${id === 'auto' ? 'now ' + quality.tier : ''}</small>`;
+        b.addEventListener('click', () => o.onQuality?.(id));
+        node.appendChild(b);
+      });
+    });
+    document.querySelectorAll('.qnote').forEach((n) => { n.textContent = quality.choice === 'auto' ? `Auto · ${cap1(quality.tier)} now` : cap1(quality.tier); });
+  }
 
   function fillRoster(node) {
     node.innerHTML = '';
@@ -318,6 +391,9 @@ export function createHud(o) {
     setLobby, setNetStatus, setOffline, toast: (t) => toast(t),
     // keeps the roster and role pick in step with what the room says about you
     syncPick(wizard) { if (wizard && wizard !== wizardId) { wizardId = wizard; document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === wizard)); setWho(); fillRoles(); } },
+    setQuality(q) { quality = { ...quality, ...q }; fillQuality(); },
+    // the menu follows the weapon the game says you hold (a new wizard's own, or ?k=)
+    setWeapon(id) { if (WEAPONS[id] && id !== weaponId) { weaponId = id; markArmory(); } },
     setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
     update(g, events, dt) {
       const p = g.player;
@@ -343,10 +419,11 @@ export function createHud(o) {
         else if (e.type === 'hurt') { vig = Math.min(1, vig + (e.dot ? 0.08 : 0.55)); if (e.self && e.reason && !e.dot) toast('Self-inflicted · ' + e.reason); }
         else if (e.type === 'noEnergy') { toast('Not enough energy'); els.enbar.classList.remove('flash'); void els.enbar.offsetWidth; els.enbar.classList.add('flash'); }
         else if (e.type === 'locked') toast(`${ELEMENTS[e.el].name} is not learned yet`);
-        else if (e.type === 'queueFull') toast(`Queue holds ${MAX_QUEUE} elements — cast or clear (X)`);
+        else if (e.type === 'queueFull') toast(`Queue holds ${MAX_QUEUE} elements — cast or clear${TOUCH ? '' : ' (X)'}`);
         else if (e.type === 'cancel') toast(`${ELEMENTS[e.a].name} and ${ELEMENTS[e.b].name} cancel out`);
-        else if (e.type === 'fizzle') toast('Queue an element first (1–0)');
+        else if (e.type === 'fizzle') toast(TOUCH ? 'Tap an element first' : 'Queue an element first (1–0)');
         else if (e.type === 'tag' && e.tag === 'interrupt' && e.id === p.id) toast('Cast interrupted · Phép bị ngắt');
+        else if (e.type === 'weapon' && e.pid === p.id) toast(`${e.name} · ${FAMILIES[WEAPONS[e.weapon].family]}`);
         else if (e.type === 'cooldown') toast(e.spell ? `${e.name} recharging · ${e.t.toFixed(1)}s` : `${SHAPES[e.shape].label} spells recharging · ${e.t.toFixed(1)}s`);
       }
       toastT -= dt;
@@ -372,7 +449,7 @@ export function createHud(o) {
         sl.textContent = el ? ELEMENTS[el].name : '';
       });
       const queued = p.queue.length > 0, sp = resolveSpell(queued ? p.queue : p.last, p.role);
-      set(els.shape, sp ? (queued ? (sp.role ? ROLES[sp.role].name + ' · ' : '') + SHAPES[sp.def.shape].label : 'Recast · hold click') : 'Queue elements · 1–0');
+      set(els.shape, sp ? (queued ? (sp.role ? ROLES[sp.role].name + ' · ' : '') + SHAPES[sp.def.shape].label : (TOUCH ? 'Recast · hold Cast' : 'Recast · hold click')) : (TOUCH ? 'Tap up to 3 elements' : 'Queue elements · 1–0'));
       set(els.spell, sp ? sp.name : '—');
       set(els.cost, sp ? (queued && sp.role ? `${sp.cost} energy · ${sp.def.desc}` : `${sp.cost} energy`) : '');
       els.spell.style.color = sp ? hex(sp.color) : '';
@@ -388,6 +465,15 @@ export function createHud(o) {
         if (cdText[k].textContent !== String(txt)) cdText[k].textContent = txt;
         if (k === 'cast' && sp) { const sh = sp.def.shape, c = p.shapeCd[sh] || 0; if (c > 0) f = Math.max(f, c / (p.shapeMax[sh] || 1)); const sc = p.spellCd[sp.sid] || 0; if (sc > 0) f = Math.max(f, sc / (p.spellMax[sp.sid] || 1)); }
         tiles[k].style.setProperty('--cd', f.toFixed(3));
+      }
+
+      if (wTile && WEAPONS[p.weapon]) {
+        const name = shortName(p.weapon);
+        if (wTileName.textContent !== name) { wTileName.textContent = name; wTile.style.setProperty('--wc', hex(WEAPONS[p.weapon].color)); if (swapBtn) swapBtn.textContent = '⇄'; }
+        const f = p.wcd > 0 ? p.wcd / (p.wcdMax || 1) : 0;
+        wTile.style.setProperty('--cd', f.toFixed(3));
+        const txt = p.wcd > 0.5 ? p.wcd.toFixed(1) : '';
+        if (cdText.weapon.textContent !== txt) cdText.weapon.textContent = txt;
       }
 
       const active = STATUS.filter(([k]) => p.st[k] > 0);

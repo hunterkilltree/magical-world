@@ -610,6 +610,7 @@ export function createVfx({ scene, camera, renderer, flash }) {
     const seen = new Set();
     let li = 0;
     for (const b of s.shots) {
+      if (b.weapon) continue; // arrows and balls draw their own flight (R-112)
       seen.add(b.id);
       let tr = trails.get(b.id);
       const y = b.y ?? (b.kind === 'boulder' ? 0.95 : 1.15);
