@@ -11,8 +11,8 @@ const BLOCK = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Back
 export function createInput(canvas) {
   const keys = new Set();
   const ndc = { x: 0, y: -0.3 };
-  let actions = [], mouseHeld = false;
-  const holds = new Set(); // touch fingers keeping the cast going ('pad', 'tap')
+  let actions = [], mouseHeld = false, middleHeld = false;
+  const holds = new Set(); // touch fingers keeping the cast going ('pad', 'tap') or the weapon ('weapon')
   const touch = { move: null, dir: null }; // set by touch.js: the move stick, and the Cast pad's drag
 
   window.addEventListener('keydown', (e) => {
@@ -29,9 +29,12 @@ export function createInput(canvas) {
     else if (c === 'Escape' || c === 'KeyP') actions.push('pause');
     else if (c === 'KeyR') actions.push('restart');
     else if (c === 'KeyM') actions.push('mute');
+    else if (c === 'KeyQ') actions.push('attack'); // R-112: the weapon
+    else if (c === 'KeyC') actions.push('weapon:next');
+    else if (c === 'KeyZ') actions.push('weapon:prev');
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
-  window.addEventListener('blur', () => { keys.clear(); mouseHeld = false; holds.clear(); touch.move = touch.dir = null; });
+  window.addEventListener('blur', () => { keys.clear(); mouseHeld = middleHeld = false; holds.clear(); touch.move = touch.dir = null; });
 
   const track = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -45,9 +48,14 @@ export function createInput(canvas) {
     track(e);
     canvas.focus();
     if (e.button === 0) { actions.push('cast'); mouseHeld = true; }
+    else if (e.button === 1) { e.preventDefault(); actions.push('attack'); middleHeld = true; } // middle click: the weapon (R-112)
     else if (e.button === 2) actions.push('nova');
   });
-  window.addEventListener('pointerup', (e) => { if (e.button === 0 && e.pointerType !== 'touch') mouseHeld = false; });
+  window.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch') return;
+    if (e.button === 0) mouseHeld = false;
+    if (e.button === 1) middleHeld = false;
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   const k = (...codes) => (codes.some((c) => keys.has(c)) ? 1 : 0);
@@ -56,13 +64,14 @@ export function createInput(canvas) {
       const move = mergeMove({ x: k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), z: k('KeyS', 'ArrowDown') - k('KeyW', 'ArrowUp') }, touch.move);
       const out = actions;
       actions = [];
-      if (mouseHeld || holds.size) out.push('recast');
+      if (mouseHeld || holds.has('pad') || holds.has('tap')) out.push('recast');
+      if (middleHeld || keys.has('KeyQ') || holds.has('weapon')) out.push('reattack');
       return { move, ndc: { ...ndc }, actions: out, aimDir: touch.dir };
     },
     setTouch(o) { if ('move' in o) touch.move = o.move; if ('dir' in o) touch.dir = o.dir; },
     hold(id, on) { if (on) holds.add(id); else holds.delete(id); },
     aimAt(clientX, clientY) { track({ clientX, clientY }); },
-    requeue(a) { actions.unshift(...a.filter((x) => x !== 'recast')); },
+    requeue(a) { actions.unshift(...a.filter((x) => x !== 'recast' && x !== 'reattack')); },
     push(a) { actions.push(a); },
     focus() { canvas.focus(); }
   };

@@ -3,6 +3,7 @@
 // stereo spatialization, musical element chords, and low-frequency tactile synthesis.
 import sfxData from '../../data/sfx.json';
 import { safeGet, safeSet } from './quality.js';
+import { WEAPONS } from './weapons.js';
 
 const NOTE = {
   earth: 261.6,
@@ -372,6 +373,24 @@ export function createAudio() {
 
         case 'dodge':
           playKey('dodge', pos);
+          break;
+
+        // R-112: weapons borrow the court's clips, pitched to fit
+        case 'swing':
+          if (e.kind === 'melee') playKey('dodge', pos, 1.35);
+          break;
+        case 'strike':
+          if (e.hits) playKey(WEAPONS[e.weapon]?.blunt ? 'slam' : 'claw', pos, WEAPONS[e.weapon]?.blunt ? 1.25 : 1.1);
+          break;
+        case 'shoot':
+          if (WEAPONS[e.weapon]?.family === 'firearm') playKey('explode_small', pos, 1.7);
+          else playKey('dodge', pos, 1.8);
+          break;
+        case 'weaponImpact':
+          playKey(e.hit ? 'claw' : 'orb_impact', pos, 1.4);
+          break;
+        case 'weapon':
+          playKey('clear', pos, 1.2);
           break;
 
         case 'wall':

@@ -332,3 +332,40 @@ body.touch #t-self { right: 4px; bottom: 114px; }
 
 /* the start button stays in reach however long the menu is */
 body.touch #menu .col > .actions { position: sticky; bottom: -16px; z-index: 2; padding: 10px 0 12px; background: linear-gradient(to top, #fff 78%, rgba(255,255,255,0)); }
+
+/* R-112: the Armory row in the menu, the weapon tile, and its place by the Cast pad on a phone */
+.armory { display: grid; gap: 9px; }
+.armfam { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.armfam > .k { flex: 0 0 100%; font-size: 9.5px; }
+.arm { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface);
+  cursor: pointer; color: var(--ink); font: 600 12px var(--font-body); }
+.arm i { width: 9px; height: 9px; border-radius: 999px; background: var(--c); flex: 0 0 auto; }
+.arm b { font-weight: 600; }
+.arm small { font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
+.arm:hover { border-color: var(--c); }
+.arm.is-on { border-color: var(--brand); background: var(--brand-soft); box-shadow: inset 0 -2px 0 var(--c); }
+.armorydesc { font-size: 12.5px; margin-top: -8px; }
+.armorydesc b { color: var(--ink); font-weight: 600; }
+.tile.weapon { box-shadow: inset 0 -3px 0 var(--wc, #c9ced8); }
+.tile.weapon b { max-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.touch .arm { min-height: 40px; }
+body.touch .swapbtn { font-size: 13px; padding: 2px 9px; }
+
+/* four buttons on an arc round the Cast pad: Dodge, Weapon, Area, Self */
+body.touch .abilities { width: 196px; height: 196px; }
+body.touch .tile:not(#t-cast) { width: 58px; height: 58px; }
+body.touch #t-dodge { right: 135px; bottom: 23px; }
+body.touch #t-weapon { right: 120px; bottom: 79px; }
+body.touch #t-nova { right: 79px; bottom: 120px; }
+body.touch #t-self { right: 23px; bottom: 135px; }
+body.touch #t-weapon.held { background: rgba(124,58,255,.6); border-color: #fff; }
+body.touch #t-weapon b { font-size: 10.5px; max-width: 50px; }
+@media (max-height: 430px) {
+  body.touch .abilities { width: 176px; height: 176px; }
+  body.touch .tile:not(#t-cast) { width: 52px; height: 52px; }
+  body.touch #t-dodge { right: 121px; bottom: 21px; }
+  body.touch #t-weapon { right: 108px; bottom: 71px; }
+  body.touch #t-nova { right: 71px; bottom: 108px; }
+  body.touch #t-self { right: 21px; bottom: 121px; }
+  body.touch .spell { max-width: calc(100vw - 372px); }
+}

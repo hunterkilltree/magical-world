@@ -15,9 +15,10 @@ import { createSnapBuffer } from '../net/interp.js';
 import { PROFILES, TIER_ORDER, isTier, pickTier, createGovernor, createFaultGuard, safeGet, safeSet } from './quality.js';
 import { readTouchEnv, createTouchControls, aimPoint } from './touch.js';
 import { showFatal, FATAL } from './fatal.js';
+import { isWeapon, weaponFor } from './weapons.js';
 
 const SEND_EVERY = 1 / 30; // input messages per second, online
-const LOCAL_ONLY = new Set(['pause', 'restart', 'mute', 'recast']);
+const LOCAL_ONLY = new Set(['pause', 'restart', 'mute', 'recast', 'reattack']);
 const QUALITY_KEY = 'cow_quality'; // 'auto' or a tier name, saved by the Graphics row in the menu
 
 // Sound is optional: if it cannot start, the game plays on in silence.
@@ -37,13 +38,17 @@ export function initGame() {
   const roleOf = () => roleId ?? WIZARD_ROLE[wizardId] ?? 'destroyer';
   const THEMES = ['court', 'forest'];
   let themeId = THEMES.includes(params.get('a')) ? params.get('a') : 'court';
-  const make = () => { const g = createGame(wizardId, roleOf()); g.theme = themeId; return g; };
+  // R-112: the weapon picked in the Armory (or ?k=); null follows the wizard's own
+  let weaponId = isWeapon(params.get('k')) ? params.get('k') : null;
+  const weaponOf = () => weaponId ?? weaponFor(wizardId);
+  const make = () => { const g = createGame(wizardId, roleOf()); g.theme = themeId; g.player.weapon = weaponOf(); return g; };
   const saveUrl = () => {
     try {
       const q = new URLSearchParams(window.location.search);
       q.set('w', wizardId);
       if (roleId) q.set('r', roleId); else q.delete('r');
       if (themeId !== 'court') q.set('a', themeId); else q.delete('a');
+      if (weaponId) q.set('k', weaponId); else q.delete('k');
       history.replaceState(null, '', '?' + q.toString());
     } catch (e) {}
   };
@@ -175,6 +180,7 @@ export function initGame() {
     onPick(id) {
       wizardId = id;
       game.player.wizard = id;
+      if (!weaponId) { game.player.weapon = weaponFor(id); hud.setWeapon(game.player.weapon); }
       game.player.role = roleOf();
       view.setWizard(id);
       demo.poke();
@@ -192,6 +198,8 @@ export function initGame() {
     onMenu() { if (online) dropOnline(); else newGame('menu'); },
     onElement(el) { input.push('el:' + el); },
     onMute() { hud.setMuted(audio.toggle()); },
+    weaponOf,
+    onWeapon(id) { weaponId = id; game.player.weapon = id; demo.poke(); saveUrl(); },
     onQuality: chooseQuality,
     onCreate(name) { goOnline(null, name); },
     onJoin(code, name) { goOnline(code, name); },
@@ -221,16 +229,16 @@ export function initGame() {
     const f = input.read();
     const events = o.buffer.advance(g, now);
     if (!g.player) return;
-    if (!o.drawing) { o.drawing = true; view.reset(g); hud.reset(); input.focus(); }
+    if (!o.drawing) { o.drawing = true; view.reset(g); hud.reset(); input.focus(); o.actions.push('weapon:' + weaponOf()); }
     if (f.actions.includes('mute')) hud.setMuted(audio.toggle());
     if (f.actions.includes('restart') && g.mode === 'dead' && o.client.isHost) o.client.start();
-    const held = f.actions.includes('recast');
+    const held = f.actions.includes('recast'), wheld = f.actions.includes('reattack');
     for (const a of f.actions) if (!LOCAL_ONLY.has(a)) o.actions.push(a);
     const aim = aimOf(f, g);
     o.sendT += dt;
     if (o.sendT >= SEND_EVERY || o.actions.length) {
       o.sendT = 0;
-      o.client.sendInput({ move: f.move, aim, actions: [...o.actions.splice(0, 11), ...(held ? ['recast'] : [])] });
+      o.client.sendInput({ move: f.move, aim, actions: [...o.actions.splice(0, 10), ...(held ? ['recast'] : []), ...(wheld ? ['reattack'] : [])] });
     }
     const mine = forMe(events, o.client.me);
     view.consume(events, g);
@@ -260,6 +268,7 @@ export function initGame() {
     if (preview.length) view.consume(preview, game);
     view.consume(events, game);
     audio.play(events, game);
+    for (const e of events) if (e.type === 'weapon' && e.pid === game.player.id) { weaponId = e.weapon; hud.setWeapon(e.weapon); saveUrl(); } // the next run starts with it
     view.render(game, game.mode === 'paused' ? 0 : dt);
     hud.update(game, events, dt);
   }

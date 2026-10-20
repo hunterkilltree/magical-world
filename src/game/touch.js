@@ -149,6 +149,30 @@ export function createTouchControls({ canvas, input }) {
   const clear = $('t-clear');
   if (clear) on(clear, 'pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.push('clear'); });
 
+  // ---- the weapon (R-112): hold to keep striking; it aims like the untouched Cast pad (the nearest enemy)
+  const wbtn = $('t-weapon');
+  let wId = null;
+  if (wbtn) {
+    on(wbtn, 'pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || wId !== null) return;
+      e.preventDefault(); e.stopPropagation();
+      wId = e.pointerId; wbtn.classList.add('held');
+      try { wbtn.setPointerCapture(e.pointerId); } catch { /* gone already */ }
+      if (padId === null) input.setTouch({ dir: { x: 0, z: 0, mag: 0 } });
+      input.push('attack'); input.hold('weapon', true);
+    });
+    const drop = (e) => {
+      if (e.pointerId !== wId) return;
+      wId = null; wbtn.classList.remove('held');
+      input.hold('weapon', false);
+      if (padId === null) input.setTouch({ dir: null });
+    };
+    on(wbtn, 'pointerup', drop);
+    on(wbtn, 'pointercancel', drop);
+  }
+  const swap = $('t-swap');
+  if (swap) on(swap, 'pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.push('weapon:next'); });
+
   // ---- no zoom or page scroll from a pinch, a double tap or a long press
   on(doc, 'gesturestart', (e) => e.preventDefault());
   on(canvas, 'contextmenu', (e) => e.preventDefault());

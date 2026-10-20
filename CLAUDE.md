@@ -189,3 +189,18 @@ Browser port only; the Godot game is untouched.
   the mouse aim. `?touch=1` / `?touch=0` forces touch mode; the HUD layout is the `body.touch` block at the end of `styles.css`.
   `window.__arena.quality` and `.view` (with `.scene`, `.setQuality`) are the test hooks. Touch cannot be simulated with mouse clicks:
   dispatch `PointerEvent`s with `pointerType: 'touch'`.
+
+## Web port weapons (R-112)
+
+- `src/game/weapons.js` (pure): `WEAPONS` (24: 13 steel, 11 with an element, seven `FAMILIES`), `WIZARD_WEAPON` (each wizard's own),
+  `nextWeapon`, `weaponSpell(id)` (a cached spell-shaped hit: `parts.steel` + the element's part and statuses, `blunt`). The numbers are our
+  own tuning, not playtested; never retune `spells.json`/`enemies.json` for weapons.
+- Sim: `player.weapon`, `wcd`/`wcdMax` (cooldown), `swing` (wind-up, like `wind` for spells), `swingT`/`swingMax` (follow-through, for the
+  view). Actions `attack`, `reattack` (held), `weapon:next|prev|<id>`. `attack` -> `swing` event -> `blow` (melee: arc test like `CAST.cone`,
+  bulwark shields halve a frontal blow; ranged: `kind: 'bolt'` shots with `weapon: id`, which end in `weaponImpact`, never `impact`).
+  Spells and weapons exclude each other while winding up. `applyPayload` treats a `steel` part on a frozen target with `pl.blunt` like earth
+  (shatter). Runs that never attack are unchanged (golden digests).
+- View: `weapon-models.js` (primitives; grip at the origin, pointing +Y; projectiles fly +Z; templates cloned), `render.js` `weaponPose`
+  (free hand, from the sim's swing state so co-op matches), `weaponTrail`, weapon shots in `syncShots`. `vfx.js`/`arena-fx.js` skip weapon
+  shots' spell trails. Keys Q / middle click, C / Z; phone: the Weapon tile by the Cast pad and the ⇄ chip; menu Armory row, `?k=`.
+  Co-op: `protocol.js` accepts the actions, `snapshot.js` rebuilds `weapon:` keys from the armory.

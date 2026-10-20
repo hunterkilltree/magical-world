@@ -507,3 +507,19 @@ enemy, else along the facing); Area, Self and Dodge are buttons next to it; the 
 tap on the right half of the arena aims and casts there. The sim is unchanged (a touch stick feeds the same `move`
 and aim the keyboard and mouse do). A portrait phone is asked to turn sideways. Phones start at `low` or `medium`,
 render at no more than 60 fps, and add a web manifest so the game can be installed full screen.
+
+### R-112 [done] The armory: weapons beside spells
+Core and presentation, browser port only (the Godot game is unchanged). Twenty-four weapons in seven families
+(blades, axes, hammers and maces, polearms, bows, firearms, thrown) live in `src/game/weapons.js`; thirteen are plain
+steel and eleven carry an element, so all ten elements have a weapon. A weapon is a second attack: Q (or the middle
+mouse button, or the Weapon button on a phone) strikes, holding it strikes again when the cooldown is up, and it costs
+no energy. Melee weapons hit every foe inside their reach and arc after a short wind-up (a bulwark's shield turns half
+of a frontal blow); ranged weapons loose bolts, arrows, balls, pellets, axes, stones or runes that fly like spell bolts
+(pierce, spread, lob). A hit is a payload like a spell's: steel damage plus the element's damage and statuses, so the
+element rules hold (a wet foe takes double lightning, three ice chops freeze, fire burns, light blinds, dark curses);
+blunt weapons shatter frozen foes like earth. No attack while frozen, stunned or winding up a spell, and no spell while
+swinging. C (and Shift+C) cycles the armory in a fight; the menu's Armory row picks the weapon to start with (each
+wizard has their own by default, `?k=` in the URL). The weapon is held in the free hand and swung, thrust, whirled,
+drawn or fired with its own trail and shots. Co-op rooms accept the new actions and snapshots carry weapons and their
+shots. Single-player runs that never attack are unchanged (the seeded digests still match). The numbers are our own
+tuning, not playtested.

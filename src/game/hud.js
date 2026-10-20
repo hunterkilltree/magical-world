@@ -1,6 +1,7 @@
 // DOM HUD + menu/pause/death screens. Reads state; user intent goes back via callbacks.
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
+import { WEAPONS, WEAPON_ORDER, FAMILIES } from './weapons.js';
 
 // Element glyphs (16px grid, stroked).
 const ICON = {
@@ -25,12 +26,14 @@ const $ = (id) => document.getElementById(id);
 const CONTROLS = [
   ['W A S D', 'Move'], ['Mouse', 'Aim'], ['1 – 0', 'Queue an element (up to 3)'], ['Left click', 'Cast at cursor · hold to recast'],
   ['Right click / E', 'Cast as an area around you'], ['F', 'Cast on yourself'], ['Space', 'Dodge roll (brief invulnerability)'],
+  ['Q / middle click', 'Weapon: strike or shoot · hold to keep going'], ['C / Z', 'Next / previous weapon'],
   ['X', 'Clear queue'], ['Esc', 'Pause'], ['M', 'Sound on / off'], ['R', 'Restart (paused or fallen)']
 ];
 // R-111: on a phone the keys are replaced by what the fingers do
 const CONTROLS_TOUCH = [
   ['Left half', 'Move: drag a stick anywhere'], ['Cast pad', 'Touch to cast · hold to recast · drag to aim'], ['Tap the arena', 'Aim and cast right there'],
-  ['Element keys', 'Queue up to 3 elements'], ['Area · Self · Dodge', 'The buttons by the Cast pad'], ['Clear', 'Empties the queue'], ['Pause', 'Top right']
+  ['Element keys', 'Queue up to 3 elements'], ['Area · Self · Dodge', 'The buttons by the Cast pad'], ['Weapon', 'Strike or shoot · hold to keep going'],
+  ['⇄ weapon name', 'Switch to the next weapon'], ['Clear', 'Empties the queue'], ['Pause', 'Top right']
 ];
 const QUALITY = [['auto', 'Auto'], ['minimal', 'Minimal'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']];
 const STATUS = [
@@ -51,6 +54,8 @@ export function createHud(o) {
   const tiles = { cast: $('t-cast'), nova: $('t-nova'), self: $('t-self'), dodge: $('t-dodge') };
   const cdText = {};
   for (const k in tiles) { const em = document.createElement('em'); tiles[k].appendChild(em); cdText[k] = em; }
+  const wTile = $('t-weapon'), wTileName = wTile?.querySelector('b');
+  if (wTile) { const em = document.createElement('em'); wTile.appendChild(em); cdText.weapon = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
   let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', wizardId = o.wizardId;
 
@@ -68,12 +73,48 @@ export function createHud(o) {
     n.innerHTML = (TOUCH ? CONTROLS_TOUCH : CONTROLS).map(([k, v]) => `<div class="ctl"><kbd>${k}</kbd><span>${v}</span></div>`).join('');
   });
 
+  let swapBtn = null;
   if (TOUCH) {
     for (const [k, txt] of [['cast', 'Hold'], ['nova', 'Around'], ['self', 'You'], ['dodge', 'Roll']]) { const sp = tiles[k].querySelector('span'); if (sp) sp.textContent = txt; }
+    const sp = wTile?.querySelector('span'); if (sp) sp.textContent = 'Hold';
     const clear = document.createElement('button');
     clear.id = 't-clear'; clear.className = 'clearbtn'; clear.textContent = 'Clear';
     document.querySelector('#h-queue')?.appendChild(clear);
+    swapBtn = document.createElement('button');
+    swapBtn.id = 't-swap'; swapBtn.className = 'clearbtn swapbtn'; swapBtn.textContent = '⇄';
+    document.querySelector('#h-queue')?.appendChild(swapBtn);
   }
+
+  // R-112: the Armory row. Weapons grouped by family; the pick is what you start with (C switches in a fight).
+  let weaponId = o.weaponOf?.() ?? 'sword';
+  const shortName = (id) => WEAPONS[id].name.replace(/^(Arming|War|Twin) /, '');
+  function fillArmory() {
+    const node = $('m-armory'); if (!node) return;
+    node.innerHTML = '';
+    for (const fam of Object.keys(FAMILIES)) {
+      const ids = WEAPON_ORDER.filter((id) => WEAPONS[id].family === fam);
+      const grp = document.createElement('div'); grp.className = 'armfam';
+      grp.innerHTML = `<span class="k">${FAMILIES[fam]}</span>`;
+      for (const id of ids) {
+        const W = WEAPONS[id], b = document.createElement('button');
+        b.className = 'arm' + (id === weaponId ? ' is-on' : '');
+        b.dataset.k = id;
+        b.style.setProperty('--c', hex(W.color));
+        b.innerHTML = `<i></i><b>${W.name}</b>${W.els.length ? `<small>${W.els.map((e) => ELEMENTS[e].name).join(' · ')}</small>` : ''}`;
+        b.addEventListener('click', () => { weaponId = id; o.onWeapon?.(id); markArmory(); });
+        grp.appendChild(b);
+      }
+      node.appendChild(grp);
+    }
+    markArmory();
+  }
+  function markArmory() {
+    document.querySelectorAll('.arm').forEach((x) => x.classList.toggle('is-on', x.dataset.k === weaponId));
+    const W = WEAPONS[weaponId], d = $('m-armory-desc'), pk = $('m-armory-pick');
+    if (d && W) d.innerHTML = `<b>${W.name}</b> · ${W.kind === 'melee' ? 'melee' : 'ranged'} · ${W.desc}`;
+    if (pk && W) pk.textContent = W.name;
+  }
+  fillArmory();
 
   // R-110: Graphics row (menu and pause screen): Auto lets the game pick and adapt, the rest hold one tier
   let quality = { choice: 'auto', tier: 'high' };
@@ -278,6 +319,8 @@ export function createHud(o) {
     // keeps the roster and role pick in step with what the room says about you
     syncPick(wizard) { if (wizard && wizard !== wizardId) { wizardId = wizard; document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === wizard)); setWho(); fillRoles(); } },
     setQuality(q) { quality = { ...quality, ...q }; fillQuality(); },
+    // the menu follows the weapon the game says you hold (a new wizard's own, or ?k=)
+    setWeapon(id) { if (WEAPONS[id] && id !== weaponId) { weaponId = id; markArmory(); } },
     setMuted(m) { $('h-mute').innerHTML = (m ? 'Sound off' : 'Sound on') + ' <span>M</span>'; },
     update(g, events, dt) {
       const p = g.player;
@@ -291,6 +334,7 @@ export function createHud(o) {
         else if (e.type === 'cancel') toast(`${ELEMENTS[e.a].name} and ${ELEMENTS[e.b].name} cancel out`);
         else if (e.type === 'fizzle') toast(TOUCH ? 'Tap an element first' : 'Queue an element first (1–0)');
         else if (e.type === 'tag' && e.tag === 'interrupt' && e.id === p.id) toast('Cast interrupted · Phép bị ngắt');
+        else if (e.type === 'weapon' && e.pid === p.id) toast(`${e.name} · ${FAMILIES[WEAPONS[e.weapon].family]}`);
         else if (e.type === 'cooldown') toast(e.spell ? `${e.name} recharging · ${e.t.toFixed(1)}s` : `${SHAPES[e.shape].label} spells recharging · ${e.t.toFixed(1)}s`);
       }
       toastT -= dt;
@@ -332,6 +376,15 @@ export function createHud(o) {
         if (cdText[k].textContent !== String(txt)) cdText[k].textContent = txt;
         if (k === 'cast' && sp) { const sh = sp.def.shape, c = p.shapeCd[sh] || 0; if (c > 0) f = Math.max(f, c / (p.shapeMax[sh] || 1)); const sc = p.spellCd[sp.sid] || 0; if (sc > 0) f = Math.max(f, sc / (p.spellMax[sp.sid] || 1)); }
         tiles[k].style.setProperty('--cd', f.toFixed(3));
+      }
+
+      if (wTile && WEAPONS[p.weapon]) {
+        const name = shortName(p.weapon);
+        if (wTileName.textContent !== name) { wTileName.textContent = name; wTile.style.setProperty('--wc', hex(WEAPONS[p.weapon].color)); if (swapBtn) swapBtn.textContent = '⇄'; }
+        const f = p.wcd > 0 ? p.wcd / (p.wcdMax || 1) : 0;
+        wTile.style.setProperty('--cd', f.toFixed(3));
+        const txt = p.wcd > 0.5 ? p.wcd.toFixed(1) : '';
+        if (cdText.weapon.textContent !== txt) cdText.weapon.textContent = txt;
       }
 
       const active = STATUS.filter(([k]) => p.st[k] > 0);

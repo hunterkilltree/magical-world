@@ -13,6 +13,8 @@ import { ARENA_R, GATES, TUNING } from './sim.js';
 import { ENEMY_TYPES } from './enemies.js';
 import { createWow } from './wow.js';
 import { PROFILES, pixelRatioFor, createSafeRunner } from './quality.js';
+import { WEAPONS } from './weapons.js';
+import { buildWeaponModel, buildShotModel } from './weapon-models.js';
 
 const cols = (...h) => h.map((x) => new THREE.Color(x));
 const STYLE = {
@@ -184,6 +186,7 @@ const POSE = {
 };
 const DASH_POSE = { lean: 0.55, crouch: 0.3, arm: 0.6, tilt: 1.3, trail: 0.8 };
 const CH = ['lean', 'twist', 'roll', 'crouch', 'lunge', 'arm', 'tilt', 'trail', 'flare', 'slide'];
+const WCH = ['rx', 'ry', 'rz', 'z', 'lift'];
 const PROP_RX = /^(staff|shard_|crystal_socket|skull|jaw|horn_|rod_tip|coil_|club_|orb|geo_core|wind_)/;
 function spring(sp, target, k, dt, zeta = 0.5) {
   const c = 2 * Math.sqrt(k) * zeta, n = Math.max(1, Math.ceil(dt * Math.sqrt(k) * 2)), h = dt / n;
@@ -394,6 +397,23 @@ export function createView(canvas, overlay, opts = {}) {
     wow.vfx.bolt(pts.map((p, i) => new THREE.Vector3(p[0], i === 0 ? y0 : y1, p[1])), color, { quiet, w: quiet ? 0.11 : 0.22, life: quiet ? 0.14 : 0.26 });
   }
 
+  // A blow's arc: a crescent that flashes and fades along the swing (R-112).
+  const trailGeos = new Map();
+  function weaponTrail(e) {
+    const key = e.range + ':' + e.arc;
+    if (!trailGeos.has(key)) {
+      const a = Math.min(Math.PI * 2, (e.arc * Math.PI) / 180);
+      trailGeos.set(key, new THREE.RingGeometry(e.range * 0.35, e.range, 40, 1, -a / 2, a).rotateX(-Math.PI / 2));
+    }
+    const m = addMat(e.color ?? 0xffffff, e.els?.length ? 1.6 : 1.1, 0.55);
+    m.side = THREE.DoubleSide;
+    const o = new THREE.Mesh(trailGeos.get(key), m);
+    o.position.set(e.x, WEAPONS[e.weapon]?.anim === 'chop' ? 0.25 : 1.0, e.z);
+    o.rotation.y = Math.atan2(-e.dz, e.dx);
+    transient(o, 0.2, (k) => { m.opacity = 0.55 * (1 - k); o.scale.setScalar(0.9 + 0.15 * k); });
+    if (e.hits && WEAPONS[e.weapon]?.anim === 'chop') ringFx(e.x + e.dx * e.range * 0.7, e.z + e.dz * e.range * 0.7, 1.2, e.color ?? 0xffb070, 0.35);
+  }
+
   function ringFx(x, z, r, color, dur = 0.4, y = 0.06) {
     const m = flatMat(color, 0.85);
     const o = new THREE.Mesh(RING, m);
@@ -445,8 +465,11 @@ export function createView(canvas, overlay, opts = {}) {
     ice.userData.fx = ward.userData.fx = stones.userData.fx = true;
     const motes = [0, 1, 2].map(() => { const m = new THREE.Mesh(SPHERE, glowMat(0xffffff)); m.scale.setScalar(0.09); scene.add(m); return m; });
     const pose = {}; for (const c of CH) pose[c] = { x: 0, v: 0 };
+    // R-112: the weapon rides on its own pivot at the free hand
+    const wpivot = new THREE.Group(); wpivot.name = 'weapon_pivot'; root.add(wpivot);
+    const wpose = {}; for (const c of WCH) wpose[c] = { x: 0, v: 0 };
     return { group, rig: built.rig, tip, ice, ward, stones, motes, phase: 0, yaw: Math.PI, w, pivot, hand, side, hatCone, hatX: hatCone?.rotation.x ?? 0,
-      pose, hat: { x: 0, v: 0 }, whip: { x: 0, v: 0 } };
+      pose, hat: { x: 0, v: 0 }, whip: { x: 0, v: 0 }, wpivot, ohand: root.getObjectByName('hand_' + (1 - side)), wid: null, wobj: null, wpose };
   }
 
   function clearViews() {
@@ -608,6 +631,22 @@ export function createView(canvas, overlay, opts = {}) {
         case 'fizzle': burst('smoke', e.x, 1.6, e.z, 5, 0.8); break;
         case 'ward': burst('arcane', e.x, 1.0, e.z, 10, 2.5); break;
         case 'spawn': ringFx(e.x, e.z, 1.3, 0xff3b3b, 0.9, 0.05); break;
+        // R-112: weapons
+        case 'strike': weaponTrail(e); if (e.hits) shake = Math.min(1, shake + 0.05 + 0.04 * Math.min(4, e.hits) * (WEAPONS[e.weapon]?.blunt ? 1.6 : 1)); break;
+        case 'shoot': {
+          const W = WEAPONS[e.weapon], hx = e.x + e.dx * 0.8, hz = e.z + e.dz * 0.8;
+          if (W?.family === 'firearm') { burst('smoke', hx, 1.2, hz, 8, 1.2, { up: 0.3 }); burst('spark', hx, 1.2, hz, 6, 4); flash(hx, hz, 0xffc070, 18); }
+          for (const el of e.els ?? []) burst(elStyle(el), hx, 1.25, hz, 5, 1.6);
+          break;
+        }
+        case 'weaponImpact': {
+          const y = e.y ?? 1.1;
+          burst('spark', e.x, y, e.z, e.hit ? 7 : 4, 3);
+          if (WEAPONS[e.weapon]?.shot === 'stone') burst('earth', e.x, 0.3, e.z, 8, 2.2, { up: 0.8 });
+          for (const el of e.els) if (STYLE[el]) burst(el, e.x, y, e.z, 6, 2.2);
+          break;
+        }
+        case 'weapon': addText(e.x, 2.65, e.z, e.name, hexCss(e.color), 15, 1.1); break;
       }
     }
   }
@@ -756,7 +795,8 @@ export function createView(canvas, overlay, opts = {}) {
       let v = shotViews.get(b.id);
       if (!v) {
         let obj; const parts = {};
-        if (b.kind === 'boulder') {
+        if (b.weapon) obj = buildShotModel(b.weapon) ?? new THREE.Object3D();
+        else if (b.kind === 'boulder') {
           const m = b.els.includes('fire') ? ROCK_HOT : b.els.includes('arcane') ? ROCK_RUNE : b.els.includes('lightning') ? ROCK_ZAP : ROCK;
           obj = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), m);
           obj.castShadow = true;
@@ -779,6 +819,14 @@ export function createView(canvas, overlay, opts = {}) {
       const y = b.y ?? (b.kind === 'boulder' ? 0.95 : 1.15);
       v.age += dt;
       v.obj.position.set(b.x, y, b.z);
+      if (b.weapon) { // R-112: an arrow points along its flight; axes, stones and runes tumble
+        const hs = Math.hypot(b.vx, b.vz);
+        v.obj.rotation.y = Math.atan2(b.vx, b.vz);
+        v.obj.rotation.x = b.arc ? -Math.atan2(b.vy, hs) : 0;
+        if (v.obj.userData.spin) v.obj.rotation.x += v.age * v.obj.userData.spin;
+        if (b.els[0] !== 'steel') for (const el of b.els) for (let i = rate(10, dt); i--;) puff(elStyle(el), b.x, y, b.z, -b.vx * 0.04, 0.2, -b.vz * 0.04, { size: 0.6, life: 0.25 });
+        continue;
+      }
       if (v.body) { // spawns squashed wide, then stretches along its speed; the bright core leads, the tail tapers
         const hs = Math.hypot(b.vx, b.vz), spd = Math.hypot(hs, b.vy || 0), k = ease(v.age / 0.07), st = 1 + Math.min(2.2, spd * 0.05) * k, wide = 1 + 0.45 * (1 - k);
         v.obj.rotation.y = Math.atan2(b.vx, b.vz);
@@ -933,6 +981,7 @@ export function createView(canvas, overlay, opts = {}) {
       v.group.updateMatrixWorld(true);
       animateRig(v.rig, v.phase, G, k < 0.1);
       castPose(p, v, dt);
+      weaponPose(s, p, v, dt);
       if (p.dodge > 0) {
         const d = 1 - p.dodge / TUNING.dodgeTime;
         v.rig.root.rotation.x += Math.sin(d * Math.PI) * 0.6;
@@ -990,6 +1039,63 @@ export function createView(canvas, overlay, opts = {}) {
     if (R.head) R.head.rotation.x += hat * 0.35;
     if (v.hatCone) { v.hatCone.rotation.x = v.hatX + hat * 1.1; }
     v.group.position.set(p.x + Math.sin(v.yaw) * P.slide, 0, p.z + Math.cos(v.yaw) * P.slide);
+  }
+
+  // R-112: rest, wind-up and follow-through of the weapon in the free hand. Read from the sim's swing state, so another
+  // wizard's blows in co-op look the same. Angles are sprung so the phases blend; a whirl is set outright.
+  function weaponPose(s, p, v, dt) {
+    if (v.wid !== p.weapon) {
+      if (v.wobj) v.wpivot.remove(v.wobj);
+      v.wobj = buildWeaponModel(p.weapon); v.wid = p.weapon;
+      v.wpivot.add(v.wobj);
+    }
+    const W = WEAPONS[p.weapon];
+    if (!W || !v.ohand) return;
+    const R = v.rig, o = 1 - v.side, sgn = o === 0 ? -1 : 1;
+    const wind = p.swing ? 1 - p.swing.t / Math.max(0.001, p.swing.max) : 0;
+    const fol = !p.swing && p.swingT > 0 ? 1 - p.swingT / Math.max(0.001, p.swingMax) : -1;
+    const busy = !!p.swing || fol >= 0;
+    const T = { rx: W.kind === 'ranged' ? 0.9 : 0.35, ry: 0, rz: sgn * 0.25, z: 0, lift: 0 };
+    let spin = null;
+    if (s.mode === 'menu') { T.rx = 0.25; T.rz = sgn * 0.35; }
+    else if (busy) switch (W.anim) {
+      case 'slash':
+        T.rx = 1.45; T.rz = 0;
+        T.ry = p.swing ? sgn * 1.3 * ease(wind) : sgn * (1.3 - 2.6 * ease(Math.min(1, fol * 1.6)));
+        T.lift = 1.1 * (p.swing ? wind : 1 - fol);
+        break;
+      case 'chop':
+        T.rz = 0;
+        T.rx = p.swing ? -0.5 - 0.7 * ease(wind) : -1.2 + 3.1 * ease(Math.min(1, fol * 2));
+        T.lift = p.swing ? 2.3 * wind : 2.3 - 1.7 * Math.min(1, fol * 2);
+        break;
+      case 'stab': case 'thrust': {
+        const reach = W.anim === 'thrust' ? 0.6 : 0.35;
+        T.rx = 1.5; T.rz = 0; T.lift = 1.25;
+        T.z = p.swing ? -0.2 * wind : reach * Math.sin(Math.PI * Math.min(1, fol * 1.4));
+        break;
+      }
+      case 'spin':
+        T.rx = 1.45; T.rz = 0; T.lift = 1.0;
+        if (!p.swing) spin = sgn * fol * Math.PI * 2;
+        break;
+      case 'throw':
+        T.rz = 0;
+        T.rx = p.swing ? -1.3 * ease(wind) : -1.3 + 2.9 * ease(fol);
+        T.lift = p.swing ? 2.4 * wind : 2.4 * (1 - fol);
+        break;
+      default: // bow, gun: aimed, with a kick when it fires
+        T.rx = Math.PI / 2 - (W.anim === 'gun' && fol >= 0 ? 0.45 * (1 - fol) : 0); T.rz = 0; T.lift = 1.4;
+    }
+    else if (W.kind === 'ranged' && p.wcd > 0) { T.rx = Math.PI / 2; T.rz = 0; T.lift = 1.4; }
+    const P = {};
+    for (const c of WCH) P[c] = spring(v.wpose[c], T[c], 700, dt, 0.8);
+    const sh = R.shoulders[o];
+    if (sh) sh.rotation.x -= P.lift;
+    R.root.updateMatrixWorld(true);
+    v.wpivot.position.copy(R.root.worldToLocal(v.ohand.getWorldPosition(_v)));
+    v.wpivot.position.z += P.z;
+    v.wpivot.rotation.set(P.rx, spin ?? P.ry, P.rz, 'YXZ');
   }
 
   function syncDecoys(s, dt) {

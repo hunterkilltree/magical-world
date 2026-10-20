@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { initGame } from './game/main.js';
+import { showFatal, FATAL } from './game/fatal.js';
 
 export const App: React.FC = () => {
   const initializedRef = useRef(false);
@@ -7,7 +8,9 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    const cleanup = initGame();
+    // R-110: an error while the game starts shows the Reload card instead of an empty page
+    let cleanup: (() => void) | undefined;
+    try { cleanup = initGame(); } catch (err) { console.error('[game] could not start', err); showFatal({ ...FATAL.stopped, detail: (err as Error)?.message }); }
     return () => {
       if (cleanup) cleanup();
       initializedRef.current = false;
@@ -71,6 +74,7 @@ export const App: React.FC = () => {
           <div className="tile" id="t-nova"><b>Area</b><span>Right · E</span></div>
           <div className="tile" id="t-self"><b>Self</b><span>F</span></div>
           <div className="tile" id="t-dodge"><b>Dodge</b><span>Space</span></div>
+          <div className="tile weapon" id="t-weapon"><b>Sword</b><span>Q</span></div>
         </div>
 
         <div id="banner"></div>
@@ -90,6 +94,9 @@ export const App: React.FC = () => {
             <div className="label"><span>Casting role · Role archetype</span></div>
             <div className="roles" id="m-roles"></div>
             <div className="rolecard" id="m-rolecard"></div>
+            <div className="label"><span>Armory · Kho vũ khí</span><span id="m-armory-pick"></span></div>
+            <div className="armory" id="m-armory"></div>
+            <p className="lede armorydesc" id="m-armory-desc"></p>
             <div className="label"><span>Arena · Đấu trường</span></div>
             <div className="roles arenas" id="m-arenas"></div>
             <div className="label"><span>Graphics · Đồ họa</span><span className="qnote"></span></div>
