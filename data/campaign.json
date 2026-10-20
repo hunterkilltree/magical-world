@@ -1,6 +1,7 @@
 {
   "_notes": "The campaign (R-090). Chapters in play order; design in story/CAMPAIGN_PLAN.md. Engine-neutral: the browser port reads it first, Godot later. A chapter is added here when it is built. New numbers are our own tuning, not playtested; nothing here changes spells.json or enemies.json (difficulty is the existing wave scaling from waveStart).",
   "version": 1,
+  "circle": ["ember_pyromancer", "rime_cryomancer", "stone_druid", "storm_conduit", "arcane_archmage"],
   "chapters": [
     {
       "id": "prologue",

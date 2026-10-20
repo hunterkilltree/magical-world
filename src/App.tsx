@@ -30,6 +30,16 @@ export const App: React.FC = () => {
           <div className="stat"><span className="k">Kills</span><b id="h-kills">0</b></div>
           <div className="stat"><span className="k">Score</span><b id="h-score">0</b></div>
         </div>
+        <div className="bark glass" id="h-bark" hidden>
+          <b id="h-bark-who"></b>
+          <span id="h-bark-text"></span>
+        </div>
+        <div className="obj glass" id="h-obj" hidden>
+          <span className="k" id="h-obj-name"></span>
+          <b id="h-obj-val"></b>
+          <span className="bar"><i id="h-obj-bar"></i></span>
+          <small id="h-obj-hint"></small>
+        </div>
         <div className="tr">
           <button className="pausebtn glass" id="h-mute">Sound on <span>M</span></button>
           <button className="pausebtn glass" id="h-pause">Pause <span>Esc</span></button>
@@ -84,11 +94,18 @@ export const App: React.FC = () => {
       <div className="screen on" id="menu">
         <div className="panel card">
           <div className="col">
-            <div className="kicker">Grauhold Keep · Inner court</div>
+            <div className="kickrow">
+              <div className="kicker">Grauhold Keep · Inner court</div>
+              <div className="lang" id="m-lang" role="group" aria-label="Story language · Ngôn ngữ cốt truyện">
+                <button type="button" data-l="en">EN</button>
+                <button type="button" data-l="vi">VI</button>
+              </div>
+            </div>
             <h1>Court of Waves</h1>
             <p className="lede">
               Hold the court against thralls, bulwarks and hexcallers. Queue up to three elements, then cast — the mix decides the spell, and careless mixes hurt you too.
             </p>
+            <p className="best" id="m-best"></p>
             <div className="label">Choose your wizard</div>
             <div className="roster" id="m-roster"></div>
             <div className="label"><span>Casting role · Role archetype</span></div>
@@ -145,6 +162,19 @@ export const App: React.FC = () => {
         </div>
       </div>
 
+      <div className="screen" id="story">
+        <div className="panel card story">
+          <div className="col">
+            <div className="kicker" id="s-speaker"></div>
+            <h1 id="s-title"></h1>
+            <div className="story-text" id="s-text"></div>
+            <div className="actions">
+              <button className="btn btn-primary" id="s-go">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="rotate" aria-hidden="true">
         <div>
           <b>Turn your phone sideways</b>
@@ -180,6 +210,7 @@ export const App: React.FC = () => {
             <div className="kicker" id="d-kick">Fallen</div>
             <h1>The court holds</h1>
             <div className="dstats" id="d-stats"></div>
+            <p className="best" id="d-best"></p>
             <div className="actions">
               <button className="btn btn-primary" id="d-restart">Try again · R</button>
               <button className="btn btn-ghost" id="d-menu">Change wizard</button>

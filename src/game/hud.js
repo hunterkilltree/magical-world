@@ -1,6 +1,7 @@
 // DOM HUD + menu/pause/death screens. Reads state; user intent goes back via callbacks.
 import { ELEMENTS, ORDER, SHAPES, MAX_QUEUE, resolveSpell, grimoireFor, SHARED } from './spells.js';
 import { ROLES, ROLE_ORDER, STYLES, ROLE_BOOK, SIGNATURE } from './roles.js';
+import { describeBest } from './profile.js';
 import { WEAPONS, WEAPON_ORDER, FAMILIES } from './weapons.js';
 
 // Element glyphs (16px grid, stroked).
@@ -48,6 +49,8 @@ export function createHud(o) {
   const els = {
     hp: $('h-hp'), hpv: $('h-hpv'), en: $('h-en'), env: $('h-env'), enbar: $('h-enbar'), wave: $('h-wave'), left: $('h-left'), kills: $('h-kills'),
     score: $('h-score'), shape: $('h-shape'), spell: $('h-spell'), cost: $('h-cost'), status: $('h-status'), banner: $('banner'), toast: $('toast'),
+    story: $('story'), sSpeaker: $('s-speaker'), sTitle: $('s-title'), sText: $('s-text'), sGo: $('s-go'), bark: $('h-bark'), barkWho: $('h-bark-who'), barkText: $('h-bark-text'),
+    obj: $('h-obj'), objName: $('h-obj-name'), objVal: $('h-obj-val'), objBar: $('h-obj-bar'), objHint: $('h-obj-hint'),
     vig: $('vignette'), name: $('h-name'), role: $('h-role'), cls: $('h-cls'), sw: $('h-sw'), queue: $('h-queue')
   };
   const slots = [...document.querySelectorAll('.slot')];
@@ -57,7 +60,7 @@ export function createHud(o) {
   const wTile = $('t-weapon'), wTileName = wTile?.querySelector('b');
   if (wTile) { const em = document.createElement('em'); wTile.appendChild(em); cdText.weapon = em; }
   const screens = { menu: $('menu'), pause: $('pause'), dead: $('dead') };
-  let vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', wizardId = o.wizardId;
+  let storyKey = '', barkT = 0, vig = 0, lastToast = '', toastT = 0, prevMode = null, statusKey = '', lockKey = '', wizardId = o.wizardId;
 
   const row = $('h-elements');
   ORDER.forEach((el) => {
@@ -72,6 +75,12 @@ export function createHud(o) {
   document.querySelectorAll('.controls').forEach((n) => {
     n.innerHTML = (TOUCH ? CONTROLS_TOUCH : CONTROLS).map(([k, v]) => `<div class="ctl"><kbd>${k}</kbd><span>${v}</span></div>`).join('');
   });
+
+  // R-094: the language of the story cards and the wizards' lines.
+  const langBtns = [...document.querySelectorAll('#m-lang button')];
+  const markLang = () => langBtns.forEach((b) => b.classList.toggle('is-on', b.dataset.l === o.story?.lang));
+  langBtns.forEach((b) => b.addEventListener('click', () => { o.onLang?.(b.dataset.l); markLang(); storyKey = ''; }));
+  markLang();
 
   let swapBtn = null;
   if (TOUCH) {
@@ -141,6 +150,11 @@ export function createHud(o) {
       b.className = 'pick' + (w.id === wizardId ? ' is-on' : '');
       b.dataset.w = w.id;
       b.innerHTML = `<span class="sw" style="background:${hex(w.glow)}"></span><span><b>${w.name}</b><small>${w.role}</small></span>`;
+      if (o.wizardOpen && !o.wizardOpen(w.id)) { // R-092: joins later in the campaign
+        b.classList.add('is-locked'); b.disabled = true; b.title = 'Joins later in the campaign · Gia nhập ở chặng sau';
+        node.appendChild(b);
+        return;
+      }
       b.addEventListener('click', () => {
         wizardId = w.id;
         document.querySelectorAll('.pick').forEach((x) => x.classList.toggle('is-on', x.dataset.w === w.id));
@@ -196,7 +210,14 @@ export function createHud(o) {
   }
   fillRoles();
 
+  // The best wave and score with the chosen wizard (R-091), on the menu.
+  function fillBest() {
+    const w = o.wizards.find((x) => x.id === wizardId), node = $('m-best');
+    if (node && w) node.textContent = describeBest(o.bestOf?.(wizardId), w.name);
+  }
+
   function setWho() {
+    fillBest();
     const w = o.wizards.find((x) => x.id === wizardId), R = ROLES[o.roleOf()];
     els.name.textContent = w.name;
     els.role.textContent = w.role;
@@ -207,8 +228,8 @@ export function createHud(o) {
   setWho();
 
   // Grimoire grouped by character: your role first and open, the other four folded, shared spells last.
-  function fillGrimoire(found, role) {
-    const row = (g) => `<div class="gr${found.has(g.sid ?? g.key) ? ' is-found' : ''}"><span class="gels">${chips(g.els)}</span>
+  function fillGrimoire(found, role, open) {
+    const row = (g) => `<div class="gr${found.has(g.sid ?? g.key) ? ' is-found' : ''}${open && g.els.some((e) => !open.includes(e)) ? ' is-locked' : ''}"><span class="gels">${chips(g.els)}</span>
       <span class="gname">${g.name}<small>${SHAPES[g.shape].label}</small></span><span class="gdesc">${g.desc}</span></div>`;
     const order = [role, ...ROLE_ORDER.filter((r) => r !== role)];
     const group = (title, c, list, open) => `<details class="grp"${open ? ' open' : ''}><summary><span class="dot" style="--c:${c}"></span>${title}
@@ -293,6 +314,55 @@ export function createHud(o) {
   const toast = (text) => { if (text === lastToast && toastT > 0) return; lastToast = text; toastT = 1.6; replay(els.toast, text); };
   const set = (n, v) => { if (n.textContent !== String(v)) n.textContent = v; };
 
+  // The briefing before a chapter and the ending after it (R-094). A chapter without a card just goes on.
+  function showStory(g) {
+    const c = g.campaign, phase = c?.phase;
+    const want = c && g.mode === 'play' && (phase === 'briefing' || phase === 'camp') ? { phase, key: c.chapter.id + (phase === 'briefing' ? '.briefing' : '.ending') } : null;
+    const k = want ? want.key + '|' + (o.story?.lang ?? '') : '';
+    if (k === storyKey) return;
+    storyKey = k;
+    els.story.classList.toggle('on', false);
+    if (!want) return;
+    const card = o.story?.card(want.key);
+    if (!card) { o.onStoryGo?.(want.phase); return; } // no card, no waiting
+    els.sSpeaker.textContent = card.speaker ?? '';
+    els.sTitle.textContent = card.title ?? c.chapter.title;
+    els.sText.innerHTML = card.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('');
+    els.sGo.textContent = want.phase === 'briefing' ? 'Begin · Bắt đầu' : 'Continue · Tiếp tục';
+    els.sGo.onclick = () => { els.story.classList.remove('on'); o.onStoryGo?.(want.phase); }; // storyKey stays: the card is not shown again for this phase
+    els.story.classList.add('on');
+    els.sGo.focus();
+  }
+
+  // One line from a wizard (or from Bram) in the quiet after a wave.
+  function bark(g) {
+    const r = o.story?.bark(g.player.wizard, g.wave + g.campaign.chapter.index * 7);
+    if (!r) return;
+    const w = o.wizards.find((x) => x.id === r.speaker);
+    els.barkWho.textContent = w ? w.name : o.story.text('speaker.' + r.speaker) ?? '';
+    els.barkText.textContent = r.text;
+    els.bark.hidden = false;
+    barkT = 6;
+  }
+
+  // The chapter's objective and how far along it is (R-093).
+  function fillObjective(g) {
+    const c = g.campaign, ob = c?.obj, live = c && (c.phase === 'waves' || c.phase === 'climax') && ob && ob.type !== 'survive';
+    els.obj.hidden = !live;
+    if (!live) return;
+    let val = '', frac = 1, hint = '', low = false;
+    if (ob.type === 'hold') { val = `${Math.max(0, Math.ceil(ob.hp))} / ${ob.maxHp}`; frac = ob.hp / ob.maxHp; low = frac < 0.35; hint = 'Enemies go for it before they go for you'; }
+    else if (ob.type === 'burn') { val = ob.done ? 'Destroyed' : `${ob.progress.toFixed(1)} / ${ob.need}s`; frac = ob.progress / ob.need; hint = ob.done ? 'Done' : ob.progress > 0 ? 'Keep it burning · water puts it out' : 'Only fire destroys it'; }
+    else if (ob.type === 'escape') {
+      const t = Math.max(0, ob.t), m = Math.floor(t / 60), sec = Math.floor(t % 60);
+      val = `${m}:${String(sec).padStart(2, '0')}`; frac = t / ob.max; low = frac < 0.2;
+      hint = ob.open ? (ob.held > 0 ? 'Hold the ring…' : 'The way out is open · everyone into the ring') : 'Clear the waves before the light is gone';
+    }
+    els.objName.textContent = ob.name; els.objVal.textContent = val; els.objHint.textContent = hint;
+    els.objBar.style.transform = `scaleX(${Math.max(0, Math.min(1, frac))})`;
+    els.obj.classList.toggle('is-low', low);
+  }
+
   function showScreens(g) {
     const dead = g.mode === 'dead' && g.player.deadT > 1.0;
     screens.menu.classList.toggle('on', g.mode === 'menu');
@@ -300,10 +370,13 @@ export function createHud(o) {
     screens.dead.classList.toggle('on', dead);
     document.body.classList.toggle('in-menu', g.mode === 'menu');
     if (g.mode !== prevMode || (dead && !screens.dead.dataset.filled)) {
-      if (g.mode === 'paused') fillGrimoire(g.stats.found, g.player.role);
+      if (g.mode === 'paused') fillGrimoire(g.stats.found, g.player.role, g.campaign?.chapter.elements);
+      if (g.mode === 'menu') { fillBest(); fillRoster($('m-roster')); }
       if (dead) {
         screens.dead.dataset.filled = '1';
         $('d-kick').textContent = `Fallen on wave ${g.wave}`;
+        const lr = o.lastRun?.(), me = o.wizards.find((x) => x.id === g.player.wizard);
+        $('d-best').textContent = lr && me && lr.wizard === g.player.wizard ? (lr.improved.wave || lr.improved.score ? 'New best! ' : '') + describeBest(o.bestOf?.(lr.wizard), me.name) : '';
         $('d-stats').innerHTML = [['Wave reached', g.wave], ['Kills', g.kills], ['Score', g.score], ['Damage dealt', Math.round(g.stats.dealt)],
           ['Self-inflicted', Math.round(g.stats.selfDmg)], ['Spells found', `${g.stats.found.size} / ${grimoireFor(g.player.role).length}`]]
           .map(([k, v]) => `<div><span class="k">${k}</span><b>${v}</b></div>`).join('');
@@ -325,17 +398,27 @@ export function createHud(o) {
     update(g, events, dt) {
       const p = g.player;
       showScreens(g);
+      fillObjective(g);
+      showStory(g);
+      if (barkT > 0 && (barkT -= dt) <= 0) els.bark.hidden = true;
+      const open = g.campaign?.chapter.elements, ok = open ? open.join() : '';
+      if (ok !== lockKey) { lockKey = ok; ORDER.forEach((el, i) => row.children[i]?.classList.toggle('is-locked', !!open && !open.includes(el))); }
       for (const e of events) {
-        if (e.type === 'chapterBegin') replay(els.banner, e.title);
+        if (e.type === 'chapterBegin') replay(els.banner, o.story?.text(e.id + '.title') ?? e.title);
+        else if (e.type === 'waveClear' && g.campaign && g.campaign.phase !== 'reward') bark(g);
         else if (e.type === 'climax') replay(els.banner, `Final wave · ${e.n}`);
         else if (e.type === 'chapterClear') replay(els.banner, `Chapter cleared · ${e.title}`);
         else if (e.type === 'camp') toast('Press Enter to go on');
+        else if (e.type === 'objectiveFail') replay(els.banner, e.kind === 'hold' ? 'The structure is lost' : 'The light is gone');
+        else if (e.type === 'objectiveWait') replay(els.banner, e.kind === 'burn' ? 'The waves are done · set it alight' : 'The way out is open');
+        else if (e.type === 'objectiveDone') replay(els.banner, 'Destroyed');
         else if (e.type === 'retry') { replay(els.banner, `Again · wave ${e.wave}`); toast('You fell. The wave comes again.'); }
         else if (e.type === 'chapterFailed') toast('The chapter is lost. Press R to try again.');
         else if (e.type === 'wave') replay(els.banner, `Wave ${e.n}`);
         else if (e.type === 'waveClear') replay(els.banner, `Wave ${e.n} cleared · +${e.heal} health`);
         else if (e.type === 'hurt') { vig = Math.min(1, vig + (e.dot ? 0.08 : 0.55)); if (e.self && e.reason && !e.dot) toast('Self-inflicted · ' + e.reason); }
         else if (e.type === 'noEnergy') { toast('Not enough energy'); els.enbar.classList.remove('flash'); void els.enbar.offsetWidth; els.enbar.classList.add('flash'); }
+        else if (e.type === 'locked') toast(`${ELEMENTS[e.el].name} is not learned yet`);
         else if (e.type === 'queueFull') toast(`Queue holds ${MAX_QUEUE} elements — cast or clear${TOUCH ? '' : ' (X)'}`);
         else if (e.type === 'cancel') toast(`${ELEMENTS[e.a].name} and ${ELEMENTS[e.b].name} cancel out`);
         else if (e.type === 'fizzle') toast(TOUCH ? 'Tap an element first' : 'Queue an element first (1–0)');

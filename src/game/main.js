@@ -2,9 +2,12 @@
 // Co-op (R-082): in a room the sim runs on the server; this page sends input and draws snapshots.
 import { createGame, createCoopGame, createCampaignGame, step } from './sim.js';
 import { CAMPAIGN } from './campaign-data.js';
+import { createProfileStore, browserStorage } from './profile.js';
+import { STORY } from './story-data.js';
+import { saveLanguage } from './story.js';
+import { wizardsAvailable } from './campaign.js';
 // R-110: the frame loop is guarded (a throwing frame is retried, then the quality drops, then a card replaces the game)
 // and a governor lowers the graphics tier when frames run slow. R-111: touch controls on phones.
-import { createGame, createCoopGame, step } from './sim.js';
 import { createView } from './render.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
@@ -42,9 +45,16 @@ export function initGame() {
   let themeId = THEMES.includes(params.get('a')) ? params.get('a') : 'court';
   // ?c=<chapter id> plays that campaign chapter (R-090); without it, quick play as always.
   let chapterId = CAMPAIGN.byId[params.get('c')] ? params.get('c') : null;
+  const profile = createProfileStore(); // R-091: what the player has earned is kept between runs
+  // R-092: in the campaign you pick from the circle and the wizards cleared chapters have earned; quick play has all.
+  const wizardOpen = (id) => !chapterId || wizardsAvailable(CAMPAIGN, profile.profile.unlocked.wizards).includes(id);
+  if (!wizardOpen(wizardId)) wizardId = wizardsAvailable(CAMPAIGN, profile.profile.unlocked.wizards)[0];
+  // R-112: the weapon picked in the Armory (or ?k=); null follows the wizard's own
+  let weaponId = isWeapon(params.get('k')) ? params.get('k') : null;
+  const weaponOf = () => weaponId ?? weaponFor(wizardId);
   const make = () => {
-    if (chapterId) return createCampaignGame(wizardId, roleOf(), CAMPAIGN.byId[chapterId]);
-    const g = createGame(wizardId, roleOf()); g.theme = themeId; return g;
+    if (chapterId) { const g = createCampaignGame(wizardId, roleOf(), CAMPAIGN.byId[chapterId]); g.player.weapon = weaponOf(); return g; }
+    const g = createGame(wizardId, roleOf()); g.theme = themeId; g.player.weapon = weaponOf(); return g;
   };
   // A cleared chapter leads to the next one's briefing (the menu), or back to quick play after the last.
   const nextChapter = (next) => {
@@ -52,10 +62,6 @@ export function initGame() {
     try { const q = new URLSearchParams(window.location.search); if (next) q.set('c', next); else q.delete('c'); history.replaceState(null, '', '?' + q.toString()); } catch (e) {}
     newGame('menu');
   };
-  // R-112: the weapon picked in the Armory (or ?k=); null follows the wizard's own
-  let weaponId = isWeapon(params.get('k')) ? params.get('k') : null;
-  const weaponOf = () => weaponId ?? weaponFor(wizardId);
-  const make = () => { const g = createGame(wizardId, roleOf()); g.theme = themeId; g.player.weapon = weaponOf(); return g; };
   const saveUrl = () => {
     try {
       const q = new URLSearchParams(window.location.search);
@@ -132,7 +138,14 @@ export function initGame() {
   let game = make();
   view.reset(game);
 
+  const rememberRun = (g) => {
+    if (!g || !g.player || online?.drawing) return;
+    if (g.stats?.found?.size) profile.recordPages([...g.stats.found]);
+    if (!g.campaign && g.wave > 0) profile.recordRun({ wizard: g.player.wizard, wave: g.wave, score: g.score });
+  };
+
   function newGame(mode) {
+    rememberRun(game); // a run given up on counts too
     game = make();
     game.mode = mode;
     view.reset(game);
@@ -190,6 +203,12 @@ export function initGame() {
     wizardId,
     roleOf,
     themeOf: () => themeId,
+    bestOf: (id) => profile.bestOf(id),
+    story: STORY,
+    onLang(l) { STORY.setLang(l); saveLanguage(browserStorage(), l); },
+    onStoryGo(phase) { input.push(phase === 'briefing' ? 'begin' : 'continue'); input.focus(); },
+    wizardOpen,
+    lastRun: () => profile.lastRun,
     onArena(id) { if (game.campaign) return; themeId = id; const mode = game.mode; game.theme = id; view.reset(game); game.mode = mode; demo.poke(); saveUrl(); },
     onPick(id) {
       wizardId = id;
@@ -205,7 +224,7 @@ export function initGame() {
       roleId = id; game.player.role = id; demo.poke(); saveUrl();
       if (online?.client.me) online.client.pick(wizardId, roleId);
     },
-    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; if (game.campaign) input.push('begin'); input.focus(); },
+    onStart() { game.player.wind = null; game.player.castT = 0; game.mode = 'play'; input.focus(); }, // a campaign chapter waits for its briefing card
     onResume() { if (game.mode === 'paused') game.mode = 'play'; input.focus(); },
     onPause() { if (!online?.drawing && game.mode === 'play') game.mode = 'paused'; },
     onRestart() { if (online) { if (online.client.isHost) online.client.start(); } else newGame('play'); },
@@ -278,6 +297,10 @@ export function initGame() {
       acc -= STEP;
     }
     if (actions.length) input.requeue(actions);
+    for (const e of events) {
+      if (e.type === 'playerDeath') rememberRun(game);
+      else if (e.type === 'chapterClear') { profile.recordPages([...game.stats.found]); profile.recordChapter({ id: e.id, unlocks: e.unlocks, lessons: e.lessons, retries: e.retries, choices: {} }); }
+    }
     const done = events.find((e) => e.type === 'chapterDone');
     if (done) { nextChapter(done.next); return; }
     const preview = demo.update(game, dt);
@@ -338,6 +361,8 @@ export function initGame() {
     last = performance.now();
   };
   document.addEventListener('visibilitychange', onVisChange);
+  const onHide = () => rememberRun(game);
+  window.addEventListener('pagehide', onHide);
   window.addEventListener('pagehide', pauseIfPlaying);
   // a phone held upright shows the "turn sideways" card (styles.css): do not let the run go on behind it
   const upright = window.matchMedia?.('(orientation: portrait) and (pointer: coarse) and (max-width: 700px)');
@@ -355,6 +380,7 @@ export function initGame() {
     cancelAnimationFrame(rafId);
     dropOnline();
     document.removeEventListener('visibilitychange', onVisChange);
+    window.removeEventListener('pagehide', onHide);
     window.removeEventListener('pagehide', pauseIfPlaying);
     upright?.removeEventListener?.('change', onUpright);
     AUDIO_EVENTS.forEach((t) => window.removeEventListener(t, initAudio, { capture: true }));
