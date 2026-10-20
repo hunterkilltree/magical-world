@@ -2,6 +2,8 @@
 // Combines authentic recorded CC0 studio clips (data/sfx.json) with dynamic pitch-shifting,
 // stereo spatialization, musical element chords, and low-frequency tactile synthesis.
 import sfxData from '../../data/sfx.json';
+import { safeGet, safeSet } from './quality.js';
+import { WEAPONS } from './weapons.js';
 
 const NOTE = {
   earth: 261.6,
@@ -23,7 +25,7 @@ export function createAudio() {
   let ac = null;
   let masterGain = null;
   let compressor = null;
-  let muted = localStorage.getItem('cow_muted') === '1';
+  let muted = safeGet('cow_muted') === '1'; // storage may be blocked (R-110)
   let volume = 0.85;
 
   const bufferCache = new Map();
@@ -33,13 +35,13 @@ export function createAudio() {
 
   function init() {
     if (ac) {
-      if (ac.state === 'suspended') ac.resume();
+      if (ac.state === 'suspended') ac.resume()?.catch?.(() => {});
       return;
     }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
 
-    ac = new AudioContextClass();
+    try { ac = new AudioContextClass(); } catch { ac = null; return; } // no sound is better than no game (R-110)
 
     // Studio-grade dynamic mastering chain
     compressor = ac.createDynamicsCompressor();
@@ -373,6 +375,24 @@ export function createAudio() {
           playKey('dodge', pos);
           break;
 
+        // R-112: weapons borrow the court's clips, pitched to fit
+        case 'swing':
+          if (e.kind === 'melee') playKey('dodge', pos, 1.35);
+          break;
+        case 'strike':
+          if (e.hits) playKey(WEAPONS[e.weapon]?.blunt ? 'slam' : 'claw', pos, WEAPONS[e.weapon]?.blunt ? 1.25 : 1.1);
+          break;
+        case 'shoot':
+          if (WEAPONS[e.weapon]?.family === 'firearm') playKey('explode_small', pos, 1.7);
+          else playKey('dodge', pos, 1.8);
+          break;
+        case 'weaponImpact':
+          playKey(e.hit ? 'claw' : 'orb_impact', pos, 1.4);
+          break;
+        case 'weapon':
+          playKey('clear', pos, 1.2);
+          break;
+
         case 'wall':
           playKey('wall_raise', pos);
           break;
@@ -421,7 +441,7 @@ export function createAudio() {
     },
     toggle() {
       muted = !muted;
-      localStorage.setItem('cow_muted', muted ? '1' : '0');
+      safeSet('cow_muted', muted ? '1' : '0');
       if (masterGain && ac) {
         masterGain.gain.setValueAtTime(muted ? 0 : volume, ac.currentTime);
       }

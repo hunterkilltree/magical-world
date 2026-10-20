@@ -10,7 +10,7 @@ import { Room } from './room.js';
 import { validateClientMessage, ROOM_LETTERS } from '../src/net/protocol.js';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png',
-  '.svg': 'image/svg+xml', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ico': 'image/x-icon', '.map': 'application/json' };
+  '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ico': 'image/x-icon', '.map': 'application/json' };
 const DIST = join(fileURLToPath(new URL('..', import.meta.url)), 'dist');
 
 const RATE = { capacity: 240, perSecond: 120 }; // messages per connection: a burst, then a steady rate

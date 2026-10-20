@@ -243,7 +243,7 @@ export function createArenaFx({ fx, R, tipPos, scene, bodyOf }) {
       S = s;
       const seen = new Set();
       for (const b of s.shots) {
-        if (b.owner !== 'player') continue;
+        if (b.owner !== 'player' || (b.weapon && b.els[0] === 'steel')) continue; // a plain arrow leaves no element behind (R-112)
         seen.add(b.id);
         const y = b.y ?? (b.kind === 'boulder' ? 0.95 : 1.15), now = [b.x, y, b.z], P = palOf(b.els), last = trails.get(b.id);
         trails.set(b.id, now);

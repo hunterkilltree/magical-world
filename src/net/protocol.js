@@ -8,6 +8,7 @@
 import { ELEMENTS } from '../game/spells.js';
 import { ROLES, WIZARD_ROLE } from '../game/roles.js';
 import { ARENA_R } from '../game/sim.js';
+import { isWeapon } from '../game/weapons.js';
 
 export const MAX_PLAYERS = 4;
 export const ROOM_CODE_RE = /^[A-Z]{4}$/;
@@ -18,7 +19,7 @@ export const MAX_NAME = 16;
 export const MAX_ACTIONS = 12; // per input message
 export const AIM_LIMIT = ARENA_R + 25;
 
-const ACTIONS = new Set(['clear', 'cast', 'recast', 'nova', 'self', 'dodge']); // not pause, restart or mute
+const ACTIONS = new Set(['clear', 'cast', 'recast', 'nova', 'self', 'dodge', 'attack', 'reattack', 'weapon:next', 'weapon:prev']); // not pause, restart or mute
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isVec = (v) => v && typeof v === 'object' && isNum(v.x) && isNum(v.z);
 const fail = (code, message) => ({ ok: false, code, message });
@@ -30,7 +31,8 @@ export function cleanName(v) {
 }
 
 export function isAction(a) {
-  return typeof a === 'string' && (ACTIONS.has(a) || (a.startsWith('el:') && Object.prototype.hasOwnProperty.call(ELEMENTS, a.slice(3))));
+  return typeof a === 'string' && (ACTIONS.has(a) || (a.startsWith('el:') && Object.prototype.hasOwnProperty.call(ELEMENTS, a.slice(3)))
+    || (a.startsWith('weapon:') && isWeapon(a.slice(7))));
 }
 
 // Checks one client message. {ok: true, msg} with a cleaned copy, or {ok: false, code, message}.

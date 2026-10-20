@@ -1,4 +1,5 @@
-// Keyboard + mouse → movement vector, aim (screen NDC) and a queue of discrete actions.
+// Keyboard + mouse (+ touch, R-111) → movement vector, aim (screen NDC, or a pad direction) and a queue of discrete actions.
+import { mergeMove } from './touch.js';
 const EL_KEYS = {
   Digit1: 'fire', Digit2: 'water', Digit3: 'ice', Digit4: 'lightning', Digit5: 'earth',
   Digit6: 'arcane', Digit7: 'nature', Digit8: 'wind', Digit9: 'light', Digit0: 'dark',
@@ -10,7 +11,9 @@ const BLOCK = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Back
 export function createInput(canvas) {
   const keys = new Set();
   const ndc = { x: 0, y: -0.3 };
-  let actions = [], held = false;
+  let actions = [], mouseHeld = false, middleHeld = false;
+  const holds = new Set(); // touch fingers keeping the cast going ('pad', 'tap') or the weapon ('weapon')
+  const touch = { move: null, dir: null }; // set by touch.js: the move stick, and the Cast pad's drag
 
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea, select')) return;
@@ -27,35 +30,49 @@ export function createInput(canvas) {
     else if (c === 'KeyR') actions.push('restart');
     else if (c === 'Enter' || c === 'NumpadEnter') actions.push('continue'); // campaign: leave the camp
     else if (c === 'KeyM') actions.push('mute');
+    else if (c === 'KeyQ') actions.push('attack'); // R-112: the weapon
+    else if (c === 'KeyC') actions.push('weapon:next');
+    else if (c === 'KeyZ') actions.push('weapon:prev');
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
-  window.addEventListener('blur', () => { keys.clear(); held = false; });
+  window.addEventListener('blur', () => { keys.clear(); mouseHeld = middleHeld = false; holds.clear(); touch.move = touch.dir = null; });
 
   const track = (e) => {
     const r = canvas.getBoundingClientRect();
     ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
     ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
   };
-  window.addEventListener('pointermove', track);
+  // A finger never moves the mouse aim; touch.js turns fingers into the stick, the pad and tap-to-aim.
+  window.addEventListener('pointermove', (e) => { if (e.pointerType !== 'touch') track(e); });
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;
     track(e);
     canvas.focus();
-    if (e.button === 0) { actions.push('cast'); held = true; }
+    if (e.button === 0) { actions.push('cast'); mouseHeld = true; }
+    else if (e.button === 1) { e.preventDefault(); actions.push('attack'); middleHeld = true; } // middle click: the weapon (R-112)
     else if (e.button === 2) actions.push('nova');
   });
-  window.addEventListener('pointerup', (e) => { if (e.button === 0) held = false; });
+  window.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch') return;
+    if (e.button === 0) mouseHeld = false;
+    if (e.button === 1) middleHeld = false;
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   const k = (...codes) => (codes.some((c) => keys.has(c)) ? 1 : 0);
   return {
     read() {
-      const move = { x: k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), z: k('KeyS', 'ArrowDown') - k('KeyW', 'ArrowUp') };
+      const move = mergeMove({ x: k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), z: k('KeyS', 'ArrowDown') - k('KeyW', 'ArrowUp') }, touch.move);
       const out = actions;
       actions = [];
-      if (held) out.push('recast');
-      return { move, ndc: { ...ndc }, actions: out };
+      if (mouseHeld || holds.has('pad') || holds.has('tap')) out.push('recast');
+      if (middleHeld || keys.has('KeyQ') || holds.has('weapon')) out.push('reattack');
+      return { move, ndc: { ...ndc }, actions: out, aimDir: touch.dir };
     },
-    requeue(a) { actions.unshift(...a.filter((x) => x !== 'recast')); },
+    setTouch(o) { if ('move' in o) touch.move = o.move; if ('dir' in o) touch.dir = o.dir; },
+    hold(id, on) { if (on) holds.add(id); else holds.delete(id); },
+    aimAt(clientX, clientY) { track({ clientX, clientY }); },
+    requeue(a) { actions.unshift(...a.filter((x) => x !== 'recast' && x !== 'reattack')); },
     push(a) { actions.push(a); },
     focus() { canvas.focus(); }
   };

@@ -31,8 +31,9 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1530; font-family: var(--font-body); color: var(--ink); }
-#root { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1530; font-family: var(--font-body); color: var(--ink);
+  overscroll-behavior: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#root { width: 100vw; height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
 
 a { color: var(--brand); }
 a:hover { color: #5620d6; }
@@ -47,8 +48,8 @@ button { font-family: var(--font-body); }
 .btn-ghost:hover { border-color: var(--ink); }
 .card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); border: 1px solid var(--line); }
 
-#game, #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-#game { cursor: crosshair; outline: none; }
+#game, #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; }
+#game { cursor: crosshair; outline: none; touch-action: none; }
 #overlay { pointer-events: none; }
 #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0;
   background: radial-gradient(ellipse at center, transparent 52%, rgba(220,38,38,.6) 100%); }
@@ -138,7 +139,7 @@ body.in-menu .hud { opacity: 0; }
   background: rgba(14,11,26,.5); backdrop-filter: blur(2px); }
 #menu { background: linear-gradient(90deg, rgba(14,11,26,.15), rgba(14,11,26,.7) 55%); justify-items: end; }
 .screen.on { display: grid; }
-.panel { width: min(1000px, 100%); max-height: calc(100vh - 48px); overflow: auto; display: grid;
+.panel { width: min(1000px, 100%); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto; display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; padding: 30px 32px; color: var(--ink); }
 #menu .panel { width: min(560px, 100%); grid-template-columns: 1fr; }
 #dead .panel { width: min(540px, 100%); grid-template-columns: 1fr; }
@@ -236,3 +237,135 @@ body.in-menu .hud { opacity: 0; }
 .party-row.me { box-shadow: inset 3px 0 0 var(--brand); }
 .lobby-hint { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
 #m-net-status.err { color: #ef4444; text-transform: none; letter-spacing: 0; }
+
+/* R-110: the graphics row, and the card that replaces the game when it cannot run */
+.roles.quality { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.qnote { text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+#fatal { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; padding: 24px; background: rgba(14,11,26,.94); }
+#fatal.on { display: grid; }
+#fatal .card { width: min(520px, 100%); padding: 28px 30px; display: grid; gap: 14px; color: var(--ink); }
+#fatal h1 { margin: 0; font-size: 28px; letter-spacing: -.02em; line-height: 1.1; }
+#fatal .detail { margin: 0; font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--ink-faint); word-break: break-word; }
+/* blurring the live canvas behind every panel costs a frame's worth of GPU on weak machines */
+body[data-quality="low"] .glass, body[data-quality="minimal"] .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(22,18,37,.9); }
+body[data-quality="low"] .screen, body[data-quality="minimal"] .screen { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* R-111: phones. The safe-area insets keep the HUD out from under a notch or the home bar. */
+:root { --sat: env(safe-area-inset-top, 0px); --sar: env(safe-area-inset-right, 0px); --sab: env(safe-area-inset-bottom, 0px); --sal: env(safe-area-inset-left, 0px); }
+#rotate { display: none; position: fixed; inset: 0; z-index: 50; place-items: center; text-align: center; padding: 24px; background: #1a1530; color: #f4f1ff; }
+#rotate b { display: block; font: 700 20px var(--font-display); margin-bottom: 6px; }
+#rotate span { font-size: 14px; color: var(--ink-faint); }
+#rotate div::before { content: ''; display: block; width: 40px; height: 68px; margin: 0 auto 16px; border: 3px solid #f4f1ff; border-radius: 9px; animation: turn 2.4s ease-in-out infinite; }
+@keyframes turn { 0%, 25% { transform: rotate(0); } 65%, 100% { transform: rotate(90deg); } }
+@media (prefers-reduced-motion: reduce) { #rotate div::before { animation: none; transform: rotate(90deg); } }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 700px) { #rotate { display: grid; } }
+
+.vstick { position: fixed; width: 0; height: 0; z-index: 12; pointer-events: none; display: none; }
+.vstick.on { display: block; }
+.vstick .base { position: absolute; left: -58px; top: -58px; width: 116px; height: 116px; border-radius: 50%; border: 2px solid rgba(255,255,255,.28); background: rgba(255,255,255,.06); }
+.vstick .knob { position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: rgba(255,255,255,.3); }
+
+body.touch { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body.touch .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(22,18,37,.88); }
+body.touch .screen { backdrop-filter: none; -webkit-backdrop-filter: none; padding: calc(10px + var(--sat)) calc(10px + var(--sar)) calc(10px + var(--sab)) calc(10px + var(--sal)); }
+body.touch .panel { grid-template-columns: 1fr; gap: 16px; padding: 16px 18px; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); -webkit-overflow-scrolling: touch; }
+body.touch #menu { justify-items: center; }
+body.touch .panel h1 { font-size: 26px; }
+body.touch .controls { grid-template-columns: 1fr; }
+body.touch .btn { min-height: 44px; }
+body.touch .pick, body.touch .role { min-height: 44px; }
+body.touch .pausebtn span { display: none; }
+body.touch .stat .k { font-size: 7px; letter-spacing: .12em; }
+body.touch .elkey, body.touch .tile, body.touch .pausebtn, body.touch .clearbtn { touch-action: none; }
+
+body.touch .top { top: calc(8px + var(--sat)); padding: 4px 2px; }
+body.touch .stat { padding: 1px 10px; min-width: 0; gap: 0; }
+body.touch .stat b { font-size: 15px; }
+body.touch .tr { top: calc(8px + var(--sat)); right: calc(8px + var(--sar)); }
+body.touch .pausebtn { padding: 9px 11px; font-size: 12px; min-height: 40px; }
+
+body.touch .vitals { top: calc(8px + var(--sat)); left: calc(8px + var(--sal)); bottom: auto; width: 168px; padding: 8px 10px; gap: 6px; }
+body.touch .who b { font-size: 13px; }
+body.touch .who .sw { width: 9px; height: 9px; }
+body.touch #h-role, body.touch .cls, body.touch .statuses:empty { display: none; }
+body.touch .mrow { margin-bottom: 2px; }
+body.touch .bar { height: 7px; }
+
+body.touch .spell { left: 50%; transform: translateX(-50%); bottom: calc(6px + var(--sab)); padding: 6px 8px; gap: 5px; width: 300px; max-width: calc(100vw - 380px); min-width: 252px; justify-items: stretch; }
+body.touch #h-queue { gap: 4px; flex-wrap: nowrap; width: 100%; justify-content: flex-start; }
+body.touch .slot { width: 34px; height: 26px; font-size: 7.5px; flex: 0 0 auto; }
+body.touch .spellinfo { flex: 1; min-width: 0; padding-left: 4px; gap: 0; }
+body.touch .spellinfo b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.touch .spellinfo #h-cost, body.touch .spellinfo .k { display: none; }
+body.touch .clearbtn { pointer-events: auto; flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: #f4f1ff; font: 600 10px var(--font-body); min-height: 28px; }
+body.touch #h-elements { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+body.touch .elkey { width: auto; padding: 4px 0 3px; gap: 2px; }
+body.touch .elkey .kbd { min-width: 22px; height: 20px; }
+body.touch .elkey .nm { font-size: 8px; }
+body.touch #toast { bottom: calc(150px + var(--sab)); }
+
+body.touch .abilities { position: absolute; right: calc(10px + var(--sar)); bottom: calc(8px + var(--sab)); width: 188px; height: 176px; padding: 0; gap: 0; display: block;
+  background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.touch .tile { position: absolute; pointer-events: auto; border-radius: 50%; width: 62px; height: 62px; background: rgba(22,18,37,.82); border: 1.5px solid rgba(255,255,255,.22); }
+body.touch .tile b { font-size: 12px; }
+body.touch .tile span { font-size: 9px; }
+body.touch .tile::after { border-radius: 50%; }
+body.touch #t-cast { right: 0; bottom: 0; width: 104px; height: 104px; border-color: rgba(255,255,255,.4); background: rgba(80,40,160,.55); }
+body.touch #t-cast b { font-size: 16px; }
+body.touch #t-cast.held { background: rgba(124,58,255,.7); border-color: #fff; }
+body.touch #t-dodge { right: 114px; bottom: 4px; }
+body.touch #t-nova { right: 86px; bottom: 84px; }
+body.touch #t-self { right: 4px; bottom: 114px; }
+
+@media (max-height: 430px) {
+  body.touch .vitals { width: 150px; }
+  body.touch .elkey { padding: 5px 0; }
+  body.touch .elkey .nm { display: none; }
+  body.touch .abilities { width: 168px; height: 158px; }
+  body.touch #t-cast { width: 94px; height: 94px; }
+  body.touch .tile:not(#t-cast) { width: 56px; height: 56px; }
+  body.touch #t-dodge { right: 102px; }
+  body.touch #t-nova { right: 78px; bottom: 76px; }
+  body.touch #t-self { bottom: 102px; }
+  body.touch .spell { max-width: calc(100vw - 350px); }
+}
+
+/* the start button stays in reach however long the menu is */
+body.touch #menu .col > .actions { position: sticky; bottom: -16px; z-index: 2; padding: 10px 0 12px; background: linear-gradient(to top, #fff 78%, rgba(255,255,255,0)); }
+
+/* R-112: the Armory row in the menu, the weapon tile, and its place by the Cast pad on a phone */
+.armory { display: grid; gap: 9px; }
+.armfam { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.armfam > .k { flex: 0 0 100%; font-size: 9.5px; }
+.arm { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface);
+  cursor: pointer; color: var(--ink); font: 600 12px var(--font-body); }
+.arm i { width: 9px; height: 9px; border-radius: 999px; background: var(--c); flex: 0 0 auto; }
+.arm b { font-weight: 600; }
+.arm small { font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
+.arm:hover { border-color: var(--c); }
+.arm.is-on { border-color: var(--brand); background: var(--brand-soft); box-shadow: inset 0 -2px 0 var(--c); }
+.armorydesc { font-size: 12.5px; margin-top: -8px; }
+.armorydesc b { color: var(--ink); font-weight: 600; }
+.tile.weapon { box-shadow: inset 0 -3px 0 var(--wc, #c9ced8); }
+.tile.weapon b { max-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.touch .arm { min-height: 40px; }
+body.touch .swapbtn { font-size: 13px; padding: 2px 9px; }
+
+/* four buttons on an arc round the Cast pad: Dodge, Weapon, Area, Self */
+body.touch .abilities { width: 196px; height: 196px; }
+body.touch .tile:not(#t-cast) { width: 58px; height: 58px; }
+body.touch #t-dodge { right: 135px; bottom: 23px; }
+body.touch #t-weapon { right: 120px; bottom: 79px; }
+body.touch #t-nova { right: 79px; bottom: 120px; }
+body.touch #t-self { right: 23px; bottom: 135px; }
+body.touch #t-weapon.held { background: rgba(124,58,255,.6); border-color: #fff; }
+body.touch #t-weapon b { font-size: 10.5px; max-width: 50px; }
+@media (max-height: 430px) {
+  body.touch .abilities { width: 176px; height: 176px; }
+  body.touch .tile:not(#t-cast) { width: 52px; height: 52px; }
+  body.touch #t-dodge { right: 121px; bottom: 21px; }
+  body.touch #t-weapon { right: 108px; bottom: 71px; }
+  body.touch #t-nova { right: 71px; bottom: 108px; }
+  body.touch #t-self { right: 21px; bottom: 121px; }
+  body.touch .spell { max-width: calc(100vw - 372px); }
+}
