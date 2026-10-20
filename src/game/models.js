@@ -401,6 +401,30 @@ export function buildEnemy(kind) {
   return R;
 }
 
+// R-093: what a chapter's objective puts in the court: the winch to hold, the pile to burn, the way out.
+export function buildObjective(kind) {
+  const g = new THREE.Group();
+  if (kind === 'winch') {
+    const wood = mat('obj_wood', { color: 0x6b4a2c, roughness: 0.95, flatShading: true }), iron = mat('obj_iron', { color: 0x3a3a44, roughness: 0.6, metalness: 0.5, flatShading: true });
+    put(g, new THREE.BoxGeometry(2.6, 0.18, 1.2), mat('obj_stone', { color: 0x7a6e62, roughness: 0.95, flatShading: true }), [0, 0.09, 0]);
+    put(g, new THREE.BoxGeometry(0.28, 2.1, 0.28), wood, [-0.9, 1.1, 0]);
+    put(g, new THREE.BoxGeometry(0.28, 2.1, 0.28), wood, [0.9, 1.1, 0]);
+    put(g, new THREE.BoxGeometry(2.3, 0.22, 0.3), wood, [0, 2.15, 0]);
+    put(g, new THREE.CylinderGeometry(0.34, 0.34, 1.5, 10), wood, [0, 1.3, 0], [0, 0, Math.PI / 2]);
+    put(g, new THREE.TorusGeometry(0.38, 0.05, 6, 14), iron, [-0.8, 1.3, 0], [0, Math.PI / 2, 0]);
+    put(g, new THREE.TorusGeometry(0.38, 0.05, 6, 14), iron, [0.8, 1.3, 0], [0, Math.PI / 2, 0]);
+    put(g, new THREE.CylinderGeometry(0.04, 0.04, 1.2, 5), mat('obj_rope', { color: 0xb59a6a, roughness: 1 }), [0, 0.7, 0.4]);
+  } else if (kind === 'logpile') {
+    const bark = mat('obj_log', { color: 0x6b4423, roughness: 0.95, flatShading: true });
+    [[-0.55, 0.3], [0, 0.3], [0.55, 0.3], [-0.28, 0.82], [0.28, 0.82], [0, 1.34]].forEach(([x, y], i) => put(g, new THREE.CylinderGeometry(0.28, 0.28, 1.9, 8), bark, [x, y, (i % 2) * 0.06], [Math.PI / 2, 0, 0.05 * i]));
+  } else { // exit: a ring on the floor and a column of light
+    const glow = new THREE.MeshBasicMaterial({ color: 0x8fffd0, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+    put(g, new THREE.TorusGeometry(1, 0.06, 6, 40), glow, [0, 0.08, 0], [Math.PI / 2, 0, 0], null, false);
+    put(g, new THREE.CylinderGeometry(0.98, 0.98, 4.5, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x8fffd0, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }), [0, 2.25, 0], null, null, false);
+  }
+  return g;
+}
+
 export function buildWall(kind, seed) {
   const g = new THREE.Group();
   if (kind === 'wood') {

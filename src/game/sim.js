@@ -2,7 +2,8 @@
 // step(state, input, dt) advances the world and returns events for the renderer/HUD.
 // Rules: hunterkilltree/magical-world story/STORY.md R-037 … R-058, plus Ice Spear (water+ice) and tier-3 power.
 import { ELEMENTS, MAX_QUEUE, CANCELS, resolveSpell, makeSpell } from './spells.js';
-import { ENEMY_TYPES, waveRoster } from './enemies.js';
+import { ENEMY_TYPES, PARTY_SCALE, waveRoster } from './enemies.js';
+import { OBJECTIVES_BUILT } from './campaign.js';
 import { ROLES, STYLES, SHAPE_WEIGHT, WIZARD_ROLE, rolePair } from './roles.js';
 
 export const ARENA_R = 24;
@@ -117,10 +118,15 @@ export function createCoopGame(slots = []) {
 // A chapter is a game with a `campaign` run on it: briefing -> waves -> climax -> reward -> camp -> done, or failed. Quick play
 // has no run (`campaign` is undefined) and every rule below keys off it, so a seeded quick-play run is unchanged.
 function newRun(chapter) {
-  return { chapter, phase: 'briefing', checkpoint: { wave: 0, kills: 0, score: 0 }, retries: 0, rewardT: 0 };
+  return { chapter, phase: 'briefing', checkpoint: { wave: 0, kills: 0, score: 0, objDone: false }, prevCheckpoint: null, retries: 0, rewardT: 0, holding: false, obj: { type: chapter.objective.type } };
+}
+
+function assertBuilt(chapter) {
+  if (!OBJECTIVES_BUILT.includes(chapter.objective.type)) throw new Error(`objective "${chapter.objective.type}" is not built yet (chapter "${chapter.id}")`);
 }
 
 export function createCampaignGame(wizard, role, chapter) {
+  assertBuilt(chapter);
   const s = createGame(wizard, role);
   s.campaign = newRun(chapter);
   s.theme = chapter.arena;
@@ -128,6 +134,7 @@ export function createCampaignGame(wizard, role, chapter) {
 }
 
 export function createCampaignCoopGame(slots, chapter) {
+  assertBuilt(chapter);
   const s = createCoopGame(slots);
   s.campaign = newRun(chapter);
   s.theme = chapter.arena;
@@ -137,9 +144,84 @@ export function createCampaignCoopGame(slots, chapter) {
 // Where a wizard stands at the start (the same spots addPlayer and createGame use).
 const homeOf = (id) => { const k = Math.max(0, (+String(id).replace(/D/g, '') || 1) - 1) % MAX_PLAYERS, a = (k * Math.PI) / 2; return [Math.sin(a) * 3.5, Math.cos(a) * 3.5]; };
 
+// ---- objectives (R-093). The objective decides what clearing the chapter means; the waves still come as usual.
+// hold: a structure (a decoy that is not yours to hurt) that enemies attack first; at 0 the attempt is lost.
+// burn: a target in the environment that only fire destroys. escape: a clock, and an exit to reach once the waves are done.
+const partyHp = (n) => 1 + PARTY_SCALE.count * (n - 1);
+const partyTime = (n) => 1 + (PARTY_SCALE.count / 2) * (n - 1);
+
+function setupObjective(s) {
+  const c = s.campaign, o = c.chapter.objective, n = s.players.length || 1;
+  s.decoys = s.decoys.filter((d) => !d.objective);
+  if (s.props.targets) s.props.targets = [];
+  c.holding = false;
+  if (o.type === 'hold') {
+    const hp = Math.round(o.hp * partyHp(n));
+    const D = { id: s.nid++, decoy: true, objective: true, name: o.name, x: o.x, z: o.z, vx: 0, vz: 0, kvx: 0, kvz: 0, r: 0.9, mass: 1e6, hp, maxHp: hp, life: 1e9, max: 1e9,
+      burst: 0, pulse: 0, pulseT: 0, heal: 0, st: status(), sp: null, flash: 0, face: 0 };
+    s.decoys.push(D);
+    c.obj = { type: 'hold', name: o.name, id: D.id, hp, maxHp: hp, x: o.x, z: o.z, healPct: o.healPct };
+  } else if (o.type === 'burn') {
+    const T = { id: 'obj' + s.nid++, type: 'target', kind: 'logpile', x: o.x, z: o.z, r: o.r, need: o.need, state: 'whole', t: 0, tickT: 0 };
+    (s.props.targets ??= []).push(T);
+    c.obj = { type: 'burn', name: o.name, x: o.x, z: o.z, r: o.r, need: o.need, progress: 0, done: false };
+  } else if (o.type === 'escape') {
+    const max = o.seconds * partyTime(n);
+    c.obj = { type: 'escape', name: o.name, t: max, max, exit: { ...o.exit }, open: false, held: 0, cleared: false };
+  } else c.obj = { type: o.type };
+}
+
+const objectiveMet = (s) => { const o = s.campaign.obj; return o.type === 'burn' ? o.done : o.type !== 'escape'; };
+
+function clearChapter(s) {
+  const c = s.campaign, ch = c.chapter;
+  c.phase = 'reward'; c.rewardT = 3; c.holding = false;
+  s.decoys = s.decoys.filter((d) => !d.objective);
+  ev(s, 'chapterClear', { id: ch.id, title: ch.title, unlocks: { elements: [...ch.unlocks.elements], wizards: [...ch.unlocks.wizards] }, lessons: [...ch.lessons],
+    retries: c.retries, kills: s.kills, score: s.score });
+}
+
+// Losing the objective is a wipe: solo, the wave comes again; co-op, the party has fallen and chooses to try again.
+function objectiveFail(s, kind, why) {
+  const c = s.campaign;
+  ev(s, 'objectiveFail', { id: c.chapter.id, kind, why });
+  for (const p of s.players) if (p.alive) { p.alive = false; p.hp = 0; p.down = true; p.reviveT = 0; p.wind = null; p.dashT = 0; p.deadT = 0; ev(s, 'playerDown', { pid: p.id, id: p.id, x: p.x, z: p.z }); }
+  wipeOut(s);
+}
+
+function updateObjective(s, dt) {
+  const c = s.campaign;
+  if (!c || (c.phase !== 'waves' && c.phase !== 'climax')) return;
+  const o = c.obj;
+  if (o.type === 'hold') {
+    const D = s.decoys.find((d) => d.id === o.id);
+    if (D) o.hp = D.hp;
+    if (!D || D.hp <= 0) objectiveFail(s, 'hold', 'destroyed');
+  } else if (o.type === 'burn') {
+    const T = s.props.targets?.[0];
+    if (T) {
+      o.progress = T.state === 'ash' ? o.need : Math.min(o.need, T.t);
+      if (T.state === 'ash' && !o.done) { o.done = true; ev(s, 'objectiveDone', { kind: 'burn', x: T.x, z: T.z }); }
+    }
+    if (o.done && c.holding) clearChapter(s);
+  } else if (o.type === 'escape') {
+    o.t -= dt;
+    if (o.open) {
+      const alive = s.players.filter((q) => q.alive);
+      const inside = alive.length > 0 && alive.every((q) => Math.hypot(q.x - o.exit.x, q.z - o.exit.z) < o.exit.r);
+      o.held = inside ? o.held + dt : 0;
+      if (o.held >= 1) { o.cleared = true; clearChapter(s); return; }
+    }
+    if (o.t <= 0) objectiveFail(s, 'escape', 'timeout');
+  }
+}
+
 // Back to the last cleared wave: the court is emptied, everyone is whole and at the start, the wave comes again.
 function rewind(s) {
-  const c = s.campaign, cp = c.checkpoint;
+  const c = s.campaign;
+  // Lost after the last wave was cleared (waiting on the objective): play that last wave again.
+  const cp = c.holding && c.prevCheckpoint ? c.prevCheckpoint : c.checkpoint;
+  c.checkpoint = cp; c.prevCheckpoint = null;
   c.retries++;
   c.phase = 'waves';
   s.wave = cp.wave; s.kills = cp.kills; s.score = cp.score;
@@ -147,6 +229,8 @@ function rewind(s) {
   s.shots = []; s.areas = []; s.walls = []; s.decoys = []; s.regrow = [];
   for (const b of s.props.barrels) { b.alive = true; b.fuse = 0; }
   for (const p of s.players) { const [x, z] = homeOf(p.id); Object.assign(p, makePlayer(p.id, p.wizard, p.role, x, z, p.name)); }
+  setupObjective(s);
+  if (cp.objDone && c.obj.type === 'burn') { const T = s.props.targets[0]; T.state = 'ash'; T.t = T.need; c.obj.done = true; c.obj.progress = c.obj.need; }
   ev(s, 'retry', { id: c.chapter.id, wave: cp.wave + 1, retries: c.retries });
 }
 
@@ -162,7 +246,7 @@ export function retryChapter(s) {
 function campaignAct(s, a) {
   const c = s.campaign;
   if (!c || s.mode !== 'play') return;
-  if (a === 'begin' && c.phase === 'briefing') { c.phase = 'waves'; ev(s, 'chapterBegin', { id: c.chapter.id, title: c.chapter.title, waves: c.chapter.waves }); }
+  if (a === 'begin' && c.phase === 'briefing') { c.phase = 'waves'; setupObjective(s); ev(s, 'chapterBegin', { id: c.chapter.id, title: c.chapter.title, waves: c.chapter.waves }); }
   else if (a === 'continue' && c.phase === 'camp') { c.phase = 'done'; ev(s, 'chapterDone', { id: c.chapter.id, next: c.chapter.next }); }
 }
 
@@ -218,6 +302,7 @@ export function step(s, inp, dt) {
   updateWalls(s, dt);
   updateDecoys(s, dt);
   updateProps(s, dt);
+  if (s.campaign) updateObjective(s, dt);
   s.enemies = s.enemies.filter((e) => (e.hp > 0 ? true : (kill(s, e), false)));
   for (const p of s.players) {
     if (!p.alive || p.hp > 0) continue;
@@ -225,16 +310,7 @@ export function step(s, inp, dt) {
     p.alive = false; p.hp = 0; p.down = true; p.reviveT = 0; p.wind = null; p.dashT = 0; p.deadT = 0;
     ev(s, 'playerDown', { pid: p.id, id: p.id, x: p.x, z: p.z });
   }
-  if (s.players.length && s.players.every((q) => !q.alive) && s.mode === 'play') {
-    const c = s.campaign, inWaves = c && (c.phase === 'waves' || c.phase === 'climax');
-    if (inWaves && !s.coop) rewind(s); // solo: the wave comes again, the chapter is kept
-    else {
-      if (inWaves) { c.phase = 'failed'; ev(s, 'chapterFailed', { id: c.chapter.id, wave: s.wave, checkpoint: c.checkpoint.wave }); }
-      s.mode = 'dead';
-      const p = s.player ?? s.players[0];
-      ev(s, 'playerDeath', { pid: p.id, x: p.x, z: p.z });
-    }
-  }
+  if (s.players.length && s.players.every((q) => !q.alive) && s.mode === 'play') wipeOut(s);
   s.remaining = s.spawnQ.length + s.enemies.length;
   return s.events;
 }
@@ -546,6 +622,7 @@ function spawnDecoy(s, sp, x, z, o, owner = s.who ?? s.players[0]) {
 
 function updateDecoys(s, dt) {
   for (const D of s.decoys) {
+    if (D.objective) { D.flash = Math.max(0, D.flash - dt); continue; } // a structure: it stands where it was put
     s.who = byId(s, D.pid);
     D.life -= dt; D.flash = Math.max(0, D.flash - dt);
     move(s, D, dt);
@@ -558,7 +635,7 @@ function updateDecoys(s, dt) {
   }
   const keep = [];
   for (const D of s.decoys) {
-    if (D.life > 0 && D.hp > 0) { keep.push(D); continue; }
+    if (D.objective || (D.life > 0 && D.hp > 0)) { keep.push(D); continue; }
     if (D.burst) explode(s, D.x, D.z, D.burst, D.sp.payload, { color: D.sp.color, els: D.sp.els, key: D.sp.key, tier: D.sp.tier, big: true });
     ev(s, 'decoyEnd', { id: D.id, x: D.x, z: D.z, broken: D.hp <= 0, els: D.sp.els, color: D.sp.color });
   }
@@ -954,10 +1031,15 @@ function wallHit(s, w, pl, k) {
 }
 
 // ---------------------------------------------------------------- environment
-const envList = (s) => [...s.props.puddles, ...s.props.brush, ...s.props.barrels.filter((b) => b.alive)];
+const envList = (s) => [...s.props.puddles, ...s.props.brush, ...(s.props.targets ?? []), ...s.props.barrels.filter((b) => b.alive)];
 
 function envAt(s, x, z, R, els, blast) {
   for (const o of envList(s)) if (Math.hypot(o.x - x, o.z - z) < R + o.r * 0.9) envHit(s, o, els, blast);
+}
+
+function lightTarget(s, tg) {
+  tg.state = 'burning'; tg.t = 0;
+  ev(s, 'ignite', { x: tg.x, z: tg.z, r: tg.r, id: tg.id });
 }
 
 function ignite(s, br) {
@@ -978,6 +1060,11 @@ function envHit(s, o, els, blast) {
   const has = (e) => els.includes(e);
   if (o.type === 'barrel') {
     if (o.alive && !o.fuse && (blast || has('fire') || has('lightning') || has('arcane'))) o.fuse = blast ? 0.15 : 0.05;
+    return;
+  }
+  if (o.type === 'target') { // R-093: only fire destroys it; water and ice put it out
+    if ((has('water') || has('ice')) && o.state === 'burning') { o.state = 'whole'; o.t = 0; ev(s, 'steam', { x: o.x, z: o.z, r: o.r }); return; }
+    if (has('fire') && o.state === 'whole') lightTarget(s, o);
     return;
   }
   if (o.type === 'brush') {
@@ -1030,6 +1117,13 @@ function updateProps(s, dt) {
     if (pd.t <= 0) pd.state = 'water';
   }
   if (drained) s.props.puddles = s.props.puddles.filter((pd) => pd.temp === undefined || pd.temp > 0);
+  for (const tg of s.props.targets ?? []) {
+    if (tg.state === 'whole') { for (const e of ents) if (inside(tg, e) && e.st.burn > 0) { lightTarget(s, tg); break; } }
+    else if (tg.state === 'burning') {
+      tg.t += dt;
+      if (tg.t >= tg.need) { tg.state = 'ash'; tg.t = tg.need; ev(s, 'targetDown', { x: tg.x, z: tg.z, r: tg.r, id: tg.id }); }
+    }
+  }
   for (const br of s.props.brush) {
     if (br.state === 'dry') {
       for (const e of ents) if (inside(br, e) && e.st.burn > 0) { ignite(s, br); break; }
@@ -1126,6 +1220,16 @@ function collide(s, e) {
   if (d > max) { e.x *= max / d; e.z *= max / d; }
 }
 
+// Everyone is down. A campaign chapter in its waves: solo, the wave comes again; co-op, the chapter is lost. Otherwise the run ends.
+function wipeOut(s) {
+  const c = s.campaign, inWaves = c && (c.phase === 'waves' || c.phase === 'climax');
+  if (inWaves && !s.coop) { rewind(s); return; }
+  if (inWaves) { c.phase = 'failed'; ev(s, 'chapterFailed', { id: c.chapter.id, wave: s.wave, checkpoint: c.checkpoint.wave }); }
+  s.mode = 'dead';
+  const p = s.player ?? s.players[0];
+  ev(s, 'playerDeath', { pid: p.id, x: p.x, z: p.z });
+}
+
 function pushOut(e, o) {
   const dx = e.x - o.x, dz = e.z - o.z, d = Math.hypot(dx, dz), m = e.r + o.r;
   if (d >= m) return;
@@ -1139,6 +1243,7 @@ function updateWaves(s, dt) {
   if (c) {
     if (c.phase === 'reward') { c.rewardT -= dt; if (c.rewardT <= 0) { c.phase = 'camp'; ev(s, 'camp', { id: c.chapter.id }); } }
     if (c.phase !== 'waves' && c.phase !== 'climax') return; // briefing, reward, camp, done: the court is quiet
+    if (c.holding) return; // every wave is cleared; the objective is all that is left
   }
   if (s.spawnQ.length) {
     s.spawnT -= dt;
@@ -1156,12 +1261,19 @@ function updateWaves(s, dt) {
     }
     ev(s, 'waveClear', { n: s.wave, heal: amt });
     if (c) {
-      c.checkpoint = { wave: s.wave, kills: s.kills, score: s.score };
+      if (c.obj.type === 'hold') { // a cleared wave mends the structure a little
+        const D = s.decoys.find((d) => d.id === c.obj.id);
+        if (D) { D.hp = Math.min(D.maxHp, D.hp + D.maxHp * c.obj.healPct); c.obj.hp = D.hp; }
+      }
+      c.prevCheckpoint = c.checkpoint;
+      c.checkpoint = { wave: s.wave, kills: s.kills, score: s.score, objDone: !!c.obj.done };
       if (s.wave >= c.chapter.waves) {
-        c.phase = 'reward'; c.rewardT = 3;
-        const ch = c.chapter;
-        ev(s, 'chapterClear', { id: ch.id, title: ch.title, unlocks: { elements: [...ch.unlocks.elements], wizards: [...ch.unlocks.wizards] }, lessons: [...ch.lessons],
-          retries: c.retries, kills: s.kills, score: s.score });
+        if (objectiveMet(s)) clearChapter(s);
+        else {
+          c.holding = true;
+          if (c.obj.type === 'escape') { c.obj.open = true; ev(s, 'exitOpen', { id: c.chapter.id, x: c.obj.exit.x, z: c.obj.exit.z, r: c.obj.exit.r }); }
+          ev(s, 'objectiveWait', { id: c.chapter.id, kind: c.obj.type });
+        }
         return;
       }
     }
@@ -1232,6 +1344,10 @@ function steer(s, e, ux, uz, spd, dt) {
 
 // Confused enemies (R-056) go for the nearest other enemy instead of you.
 function targetOf(s, e) {
+  if (e.st.confuse <= 0 && s.campaign?.obj.type === 'hold') { // R-093: the structure draws every enemy, near or far
+    const D = s.decoys.find((d) => d.id === s.campaign.obj.id);
+    if (D && D.hp > 0) return D;
+  }
   if (e.st.confuse <= 0 && s.decoys.length) { // doubles draw the eye
     let best = null, bd = 11;
     for (const D of s.decoys) { const L = dist(D, e); if (L < bd) { bd = L; best = D; } }
