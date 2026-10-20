@@ -28,6 +28,7 @@ export function createInput(canvas) {
     else if (c === 'Backspace' || c === 'KeyX') actions.push('clear');
     else if (c === 'Escape' || c === 'KeyP') actions.push('pause');
     else if (c === 'KeyR') actions.push('restart');
+    else if (c === 'Enter' || c === 'NumpadEnter') actions.push('continue'); // campaign: leave the camp
     else if (c === 'KeyM') actions.push('mute');
     else if (c === 'KeyQ') actions.push('attack'); // R-112: the weapon
     else if (c === 'KeyC') actions.push('weapon:next');

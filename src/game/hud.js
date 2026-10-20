@@ -326,7 +326,13 @@ export function createHud(o) {
       const p = g.player;
       showScreens(g);
       for (const e of events) {
-        if (e.type === 'wave') replay(els.banner, `Wave ${e.n}`);
+        if (e.type === 'chapterBegin') replay(els.banner, e.title);
+        else if (e.type === 'climax') replay(els.banner, `Final wave · ${e.n}`);
+        else if (e.type === 'chapterClear') replay(els.banner, `Chapter cleared · ${e.title}`);
+        else if (e.type === 'camp') toast('Press Enter to go on');
+        else if (e.type === 'retry') { replay(els.banner, `Again · wave ${e.wave}`); toast('You fell. The wave comes again.'); }
+        else if (e.type === 'chapterFailed') toast('The chapter is lost. Press R to try again.');
+        else if (e.type === 'wave') replay(els.banner, `Wave ${e.n}`);
         else if (e.type === 'waveClear') replay(els.banner, `Wave ${e.n} cleared · +${e.heal} health`);
         else if (e.type === 'hurt') { vig = Math.min(1, vig + (e.dot ? 0.08 : 0.55)); if (e.self && e.reason && !e.dot) toast('Self-inflicted · ' + e.reason); }
         else if (e.type === 'noEnergy') { toast('Not enough energy'); els.enbar.classList.remove('flash'); void els.enbar.offsetWidth; els.enbar.classList.add('flash'); }
@@ -345,7 +351,7 @@ export function createHud(o) {
       set(els.hpv, Math.ceil(p.hp));
       els.en.style.transform = `scaleX(${p.energy / p.maxEnergy})`;
       set(els.env, Math.floor(p.energy));
-      set(els.wave, g.wave || '–');
+      set(els.wave, g.wave ? (g.campaign ? `${g.wave}/${g.campaign.chapter.waves}` : g.wave) : '–');
       set(els.left, g.wave ? g.remaining : '–');
       set(els.kills, g.kills);
       set(els.score, g.score);
